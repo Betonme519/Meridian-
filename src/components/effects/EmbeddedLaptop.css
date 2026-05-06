@@ -15,8 +15,12 @@
   border-radius: 1vw 1vw 0.3vw 0.3vw;
   z-index: 0;
   transform: translateZ(0);
+  /* Multi-layer drop shadow: tight (defines edge) + wide soft (ambient
+   * grounding so the laptop reads as a card on the white page). */
   box-shadow:
-    0 3vw 6vw rgba(0, 0, 0, 0.45),
+    0 2vw 4vw rgba(0, 0, 0, 0.35),
+    0 5vw 10vw rgba(0, 0, 0, 0.18),
+    0 8vw 18vw rgba(0, 0, 0, 0.08),
     inset 0 0 0 0.08vw rgba(255, 255, 255, 0.06);
 }
 
@@ -89,6 +93,10 @@
   height: 14vw;
   transform-origin: top center;
   transform: rotateX(95deg);
+  /* preserve-3d so child rotations (e.g. the front lip's rotateX(-90deg))
+   * are composed in 3D rather than flattened back to 2D. Without this the
+   * front face appears as a paper-thin sliver. */
+  transform-style: preserve-3d;
   background: linear-gradient(
     180deg,
     #d6d6d6 0%,
@@ -112,33 +120,80 @@
   border-radius: 0 0 0.6vw 0.6vw;
 }
 
-/* Keyboard well — recessed dark area with key grid drawn via gradients */
+/* Front face of the base — the "lip" facing the viewer. Without this strip
+ * the base panel reads as paper-thin from a 3/4 view. The base-3d parent is
+ * rotated rotateX(95deg) to lie flat, so a child rotateX(-90deg) at the
+ * front edge stands the strip perpendicular to the keyboard surface, giving
+ * a real thickness lip below it. */
+.embedded-laptop-base-front {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2vw;
+  background: linear-gradient(
+    180deg,
+    #d4d4d4 0%,
+    #b8b8b8 25%,
+    #888 75%,
+    #555 100%
+  );
+  border-radius: 0 0 0.5vw 0.5vw;
+  transform-origin: top center;
+  transform: rotateX(-90deg);
+  box-shadow:
+    inset 0 0.06vw 0 rgba(255, 255, 255, 0.55),
+    inset 0 -0.05vw 0.1vw rgba(0, 0, 0, 0.4),
+    0 0.2vw 0.5vw rgba(0, 0, 0, 0.3);
+}
+
+/* Keyboard panel — raised above the base surface. Stacked offset shadows
+ * fake the panel's side walls so the whole keyboard plate has visible
+ * thickness (not just individual keys). */
 .embedded-laptop-keyboard {
   position: absolute;
   top: 1.2vw;
   left: 6%;
   right: 6%;
   height: 6vw;
-  background-color: #181818;
-  background-image:
-    repeating-linear-gradient(
-      90deg,
-      transparent 0,
-      transparent calc(100% / 14 - 0.05vw),
-      rgba(220, 220, 220, 0.18) calc(100% / 14 - 0.05vw),
-      rgba(220, 220, 220, 0.18) calc(100% / 14)
-    ),
-    repeating-linear-gradient(
-      0deg,
-      transparent 0,
-      transparent calc(100% / 5 - 0.05vw),
-      rgba(220, 220, 220, 0.18) calc(100% / 5 - 0.05vw),
-      rgba(220, 220, 220, 0.18) calc(100% / 5)
-    );
+  background: linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 100%);
   border-radius: 0.25vw;
+  padding: 0.18vw;
+  display: flex;
+  flex-direction: column;
+  gap: 0.07vw;
   box-shadow:
-    inset 0 0.1vw 0.3vw rgba(0, 0, 0, 0.55),
-    inset 0 -0.05vw 0 rgba(255, 255, 255, 0.04);
+    /* Side walls of the raised panel (stacked solid offsets create a
+     * pseudo-extruded edge along the panel's bottom). */
+    0 0.06vw 0 #2c2c2c,
+    0 0.12vw 0 #1c1c1c,
+    0 0.18vw 0 #0c0c0c,
+    0 0.24vw 0 #050505,
+    /* Drop shadow under the raised panel */
+    0 0.32vw 0.4vw rgba(0, 0, 0, 0.5),
+    /* Top inner shadow gives the well slight depth */
+    inset 0 0.06vw 0.18vw rgba(0, 0, 0, 0.55),
+    inset 0 -0.03vw 0 rgba(255, 255, 255, 0.03);
+}
+
+.embedded-laptop-keyboard-row {
+  display: flex;
+  gap: 0.07vw;
+  flex: 1;
+}
+
+.embedded-laptop-key {
+  flex: 1;
+  background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 55%, #0e0e0e 100%);
+  border-radius: 0.07vw;
+  border: 0.015vw solid rgba(255, 255, 255, 0.04);
+  /* Key thickness: solid bottom edge fakes a chamfered keycap side, drop
+   * shadow seats the key in the well. */
+  box-shadow:
+    inset 0 0.04vw 0 rgba(255, 255, 255, 0.10),
+    inset 0 -0.03vw 0 rgba(0, 0, 0, 0.5),
+    0 0.06vw 0 #050505,
+    0 0.10vw 0.08vw rgba(0, 0, 0, 0.45);
 }
 
 /* Trackpad below the keyboard */
@@ -203,4 +258,20 @@
     rgba(255, 255, 255, 0.04) 100%
   );
   z-index: 5;
+}
+
+/* ---- Card-style hover lift (page 2 only) ----------------------------- */
+/* Wrapper sits between the GSAP-controlled composite and the laptop, so its
+ * own translateY composes on top of the scroll transform. The :hover rule
+ * only fires when the showcase has scrolled past 70% — at that point the
+ * showcase code adds the `card-hover-enabled` class. Subtle lift, smooth
+ * easing in both enter and leave directions. */
+.card-lift {
+  transition: transform 0.55s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* Translate compensates for the parent composite's 0.32 scale at the end
+ * state. -2vh logical → roughly 6-8px visual lift. Subtle but noticeable. */
+.card-lift.card-hover-enabled:hover {
+  transform: translateY(-2vh);
 }

@@ -590,7 +590,7 @@ function Footer() {
 function HeroLaptopShowcase() {
   const containerRef = useRef<HTMLDivElement>(null);
   const compositeRef = useRef<HTMLDivElement>(null);
-  const hoverTiltRef = useRef<HTMLDivElement>(null);
+  const cardLiftRef = useRef<HTMLDivElement>(null);
   const trustRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -604,13 +604,20 @@ function HeroLaptopShowcase() {
           start: "top top",
           end: "bottom bottom",
           scrub: 1,
+          onUpdate: (self) => {
+            // Once the showcase has mostly settled into its page-2 pose,
+            // enable the card-style hover lift. Toggle a class instead of
+            // setState so we don't re-render on every scroll tick.
+            const el = cardLiftRef.current;
+            if (!el) return;
+            if (self.progress > 0.7) el.classList.add("card-hover-enabled");
+            else el.classList.remove("card-hover-enabled");
+          },
         },
       });
 
       // Composite (laptop frame + Hero on screen) shrinks and rotates as one
-      // unit. Starts almost immediately (offset 0.05) and uses power2.out so
-      // the early movement is brisk and the second half decelerates — fast
-      // start, slow tail.
+      // unit. Fast start, slow tail (power2.out + offset 0.05).
       tl.to(
         compositeRef.current,
         {
@@ -635,45 +642,17 @@ function HeroLaptopShowcase() {
     return () => ctx.revert();
   }, []);
 
-  // Mouse tracking: laptop yaw/pitch follows cursor position relative to its
-  // own bounding rect. Composes with the parent composite's scroll-driven
-  // transform via translateZ-aware preserve-3d on the laptop. CSS transition
-  // smooths the snap; no JS lerp needed.
-  useEffect(() => {
-    const el = hoverTiltRef.current;
-    if (!el) return;
-
-    const onMove = (e: MouseEvent) => {
-      const rect = el.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width - 0.5;
-      const y = (e.clientY - rect.top) / rect.height - 0.5;
-      const ry = (x * 24).toFixed(2); // ±12° yaw
-      const rx = (-y * 24).toFixed(2); // ±12° pitch — mouse-at-top exposes keyboard
-      el.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
-    };
-
-    const onLeave = () => {
-      el.style.transform = "rotateX(0deg) rotateY(0deg)";
-    };
-
-    el.addEventListener("mousemove", onMove);
-    el.addEventListener("mouseleave", onLeave);
-
-    return () => {
-      el.removeEventListener("mousemove", onMove);
-      el.removeEventListener("mouseleave", onLeave);
-    };
-  }, []);
-
   return (
     <section ref={containerRef} className="relative" style={{ height: "220vh" }}>
       <div
         className="sticky top-0 h-screen w-full overflow-hidden bg-white"
         style={{ perspective: "1800px" }}
       >
-        {/* Composite: laptop frame + Hero on screen, animated as one unit.
-         * Inner hoverTilt layer composes a small mouse-driven rotation on top
-         * of the scroll-driven transform. */}
+        {/* Composite holds the GSAP-controlled scroll transform. The inner
+         * card-lift wrapper handles the page-2 hover state — translates the
+         * laptop slightly upward like a card raising under the cursor. The
+         * hover effect is gated by `card-hover-enabled` (added once the
+         * showcase progress is past 70% so it doesn't trigger on page 1). */}
         <div
           ref={compositeRef}
           className="absolute inset-0 z-10"
@@ -684,13 +663,9 @@ function HeroLaptopShowcase() {
           }}
         >
           <div
-            ref={hoverTiltRef}
-            className="w-full h-full"
-            style={{
-              transformStyle: "preserve-3d",
-              willChange: "transform",
-              transition: "transform 0.18s ease-out",
-            }}
+            ref={cardLiftRef}
+            className="card-lift w-full h-full"
+            style={{ transformStyle: "preserve-3d", willChange: "transform" }}
           >
             <EmbeddedLaptop>
               <Hero />

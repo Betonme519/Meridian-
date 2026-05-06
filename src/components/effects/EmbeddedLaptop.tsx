@@ -5,12 +5,14 @@ interface EmbeddedLaptopProps {
   children?: ReactNode;
 }
 
+const KEY_ROWS = 5;
+const KEYS_PER_ROW = 14;
+
 /**
  * 3D-ish laptop frame:
  *  - lid-back / lid edges / lid front: build the lid as a box with thickness
  *  - bezel + screen: the visible front of the lid
- *  - base + keyboard + trackpad: a horizontal panel rotated to lie flat,
- *    revealing the keyboard from above-front angles
+ *  - base + keyboard (real per-key divs) + trackpad
  */
 export default function EmbeddedLaptop({ children }: EmbeddedLaptopProps) {
   return (
@@ -25,7 +27,16 @@ export default function EmbeddedLaptop({ children }: EmbeddedLaptopProps) {
       </div>
       <div className="embedded-laptop-base-3d">
         <div className="embedded-laptop-base-bottom" />
-        <div className="embedded-laptop-keyboard" />
+        <div className="embedded-laptop-base-front" />
+        <div className="embedded-laptop-keyboard">
+          {Array.from({ length: KEY_ROWS }).map((_, row) => (
+            <div key={row} className="embedded-laptop-keyboard-row">
+              {Array.from({ length: KEYS_PER_ROW }).map((_, col) => (
+                <div key={col} className="embedded-laptop-key" />
+              ))}
+            </div>
+          ))}
+        </div>
         <div className="embedded-laptop-trackpad" />
       </div>
     </div>
