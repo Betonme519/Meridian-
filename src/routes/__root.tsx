@@ -1,6 +1,6 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 
-import appCss from "../styles/global.css?url";
+import appCss from "../styles/globals.css?url";
 
 function NotFoundComponent() {
   return (

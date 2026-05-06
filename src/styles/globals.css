@@ -2,6 +2,7 @@
 @source "../../src";
 @import "tw-animate-css";
 @import "./variables.css";
+@import "./animations.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -12,6 +13,8 @@
  * classes (e.g. --color-primary -> bg-primary, text-primary).
  *
  * Color tokens (the actual oklch values) live in ./variables.css.
+ * Reusable @keyframes + .animate-* classes live in ./animations.css.
+ *
  * To add a new semantic color:
  * 1. Add the variable to :root (light) and .dark (dark) in variables.css
  * 2. Register it in @theme inline below as --color-<name>: var(--<name>)
@@ -70,38 +73,4 @@
     color: var(--color-foreground);
     font-family: 'Inter', sans-serif;
   }
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeInOverlay {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes fadeInDialog {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.animate-fade-in-up {
-  animation: fadeInUp 0.6s ease-out forwards;
-}
-
-.animate-fade-in-overlay {
-  animation: fadeInOverlay 0.4s ease-out forwards;
-}
-
-.animate-slide-up-overlay {
-  animation: fadeInDialog 0.5s ease-out forwards;
-  transform: translate(-50%, -50%);
 }
