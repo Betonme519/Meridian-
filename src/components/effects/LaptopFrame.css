@@ -1,0 +1,93 @@
+/* CSS-drawn laptop mockup. The screen area is transparent so the page
+ * behind shows through (used as a "screen content" effect). */
+
+.laptop-mockup {
+  width: 38vw;
+  max-width: 720px;
+  min-width: 360px;
+  position: relative;
+  filter: drop-shadow(0 24px 48px rgba(0, 0, 0, 0.32));
+}
+
+.laptop-lid {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: linear-gradient(155deg, #2a2a2a 0%, #0a0a0a 100%);
+  border-radius: 14px 14px 3px 3px;
+  padding: 12px;
+  transform: perspective(2200px) rotateX(-2.5deg);
+  transform-origin: bottom center;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.laptop-camera {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #181818;
+  box-shadow: inset 0 0 0 1px #333;
+}
+
+/* Screen "glass" — transparent so Hero behind shows through.
+ * The bezel is the dark padding around it (.laptop-lid). */
+.laptop-screen {
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+  background: transparent;
+  /* subtle screen reflection */
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.laptop-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0) 35%,
+    rgba(255, 255, 255, 0) 65%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+}
+
+.laptop-hinge {
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(180deg, #1a1a1a 0%, #3a3a3a 50%, #1a1a1a 100%);
+  border-radius: 0 0 2px 2px;
+}
+
+.laptop-base {
+  position: relative;
+  width: 108%;
+  height: 12px;
+  margin: 0 -4%;
+  background: linear-gradient(180deg, #b8b8b8 0%, #e8e8e8 25%, #909090 70%, #555 100%);
+  border-radius: 0 0 12px 12px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 6px 14px rgba(0, 0, 0, 0.22);
+}
+
+.laptop-base-notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14%;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 0 0 6px 6px;
+}
