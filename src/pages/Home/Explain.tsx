@@ -3,7 +3,7 @@ export default function Explain() {
   return (
     <section
       id="explain"
-      className="px-6 py-24 bg-gray-50 border-y border-gray-100"
+      className="px-6 pt-40 pb-24 bg-gray-50 border-y border-gray-100"
     >
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-14">

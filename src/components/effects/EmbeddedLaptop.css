@@ -6,8 +6,19 @@
   transform-style: preserve-3d;
 }
 
+/* ---- Lid wrapper (the hinge group) ---------------------------------- */
+/* Holds lid-back + edges + bezel + screen. Rotated around its bottom edge
+ * to "close" the laptop onto the base. */
+.embedded-laptop-lid {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform-origin: bottom center;
+  will-change: transform;
+}
+
 /* ---- Lid front plate (the dark plastic surrounding the bezel) -------- */
-.embedded-laptop::before {
+.embedded-laptop-lid::before {
   content: "";
   position: absolute;
   inset: -1.8vw -1.8vw -1vw -1.8vw;
@@ -24,20 +35,57 @@
     inset 0 0 0 0.08vw rgba(255, 255, 255, 0.06);
 }
 
+/* ---- MacBook-style finger recess on the lid's front edge ------------ */
+/* On a real Mac the lid has a shallow curved cutout in the centre of its
+ * front edge — the notch you slip a fingertip into to open the laptop.
+ * In our coord system the lid's "front" before any rotation is its TOP
+ * edge (top: -1.8vw of the lid wrapper). After the lid rotates -90° to
+ * close, this region becomes the front-top of the slab. The pseudo-
+ * element draws a dark curved shadow there so it reads as an indent. */
+/* Recess on the top face of the closed slab — child of lid-back so it is
+ * guaranteed to render on top of the lid-back panel (when two siblings are
+ * coplanar, browsers don't honour z-index reliably; nesting fixes that).
+ * top:0 = top of the lid-back panel = front edge of the closed slab top
+ * face after the -90° rotation. */
+.embedded-laptop-lid-back::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32vw;
+  height: 3.2vw;
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    rgba(0, 0, 0, 0.75) 0%,
+    rgba(0, 0, 0, 0.45) 55%,
+    rgba(0, 0, 0, 0.15) 85%,
+    transparent 100%
+  );
+  border-radius: 0 0 16vw 16vw;
+  pointer-events: none;
+}
+
 /* ---- Lid back plate (only visible when laptop is rotated) ------------ */
+/* Pulled deeper (-1.4vw) to match the thicker side edges, so the lid reads
+ * as a genuine aluminum slab when viewed edge-on after closing. Lighter
+ * gradient (silver-graphite) so the closed laptop reads like a real Mac
+ * body rather than a flat black shape. */
 .embedded-laptop-lid-back {
   position: absolute;
   inset: -1.8vw -1.8vw -1vw -1.8vw;
-  background: linear-gradient(155deg, #1a1a1a 0%, #050505 100%);
+  background: linear-gradient(155deg, #c8c8ca 0%, #6e6e72 60%, #3a3a3c 100%);
   border-radius: 1vw 1vw 0.3vw 0.3vw;
   z-index: -1;
-  transform: translateZ(-0.5vw);
+  transform: translateZ(-1.4vw);
 }
 
-/* ---- 4 side strips of the lid (the thickness, ~0.5vw deep) ----------- */
+/* ---- 4 side strips of the lid (the thickness, ~1.4vw deep) ----------- */
+/* Silver gradient so the closed laptop's profile reads like aluminum
+ * instead of a black plastic slab. */
 .embedded-laptop-edge {
   position: absolute;
-  background: linear-gradient(180deg, #1f1f1f 0%, #080808 100%);
+  background: linear-gradient(180deg, #b8b8bc 0%, #6a6a6e 60%, #3a3a3c 100%);
   z-index: -1;
 }
 
@@ -46,19 +94,24 @@
   top: -1.8vw;
   left: -1.8vw;
   right: -1.8vw;
-  height: 0.5vw;
+  height: 1.4vw;
   transform-origin: top;
   transform: rotateX(-90deg);
 }
 
 /* Bottom edge: lying flat at the lid's bottom, facing down */
+/* When the lid rotates -90° to close, this strip ends up as the BACK wall
+ * of the closed slab — its top edge is the corner that shows at the top of
+ * the trapezoid in screen space (the lid-back material's thickness corner).
+ * Rounding the strip's top-left/right corners curves that 3D corner. */
 .embedded-laptop-edge-bottom {
   bottom: -1vw;
   left: -1.8vw;
   right: -1.8vw;
-  height: 0.5vw;
+  height: 1.4vw;
   transform-origin: bottom;
   transform: rotateX(90deg);
+  border-radius: 0.7vw 0.7vw 0 0;
 }
 
 /* Left edge: lying flat at the lid's left, facing left */
@@ -66,7 +119,7 @@
   left: -1.8vw;
   top: -1.8vw;
   bottom: -1vw;
-  width: 0.5vw;
+  width: 1.4vw;
   transform-origin: left;
   transform: rotateY(90deg);
 }
@@ -76,7 +129,7 @@
   right: -1.8vw;
   top: -1.8vw;
   bottom: -1vw;
-  width: 0.5vw;
+  width: 1.4vw;
   transform-origin: right;
   transform: rotateY(-90deg);
 }
@@ -116,7 +169,7 @@
   position: absolute;
   inset: 0;
   background: linear-gradient(180deg, #6a6a6a 0%, #2a2a2a 100%);
-  transform: translateZ(-0.5vw);
+  transform: translateZ(-1.2vw);
   border-radius: 0 0 0.6vw 0.6vw;
 }
 
@@ -147,6 +200,28 @@
     0 0.2vw 0.5vw rgba(0, 0, 0, 0.3);
 }
 
+/* Matching half of the MacBook finger recess on the base's front lip —
+ * pairs with .embedded-laptop-lid::after to form a single circular cutout
+ * straddling the seam between lid and base when the laptop is closed. */
+.embedded-laptop-base-front::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32vw;
+  height: 1.8vw;
+  background: radial-gradient(
+    ellipse at 50% 100%,
+    rgba(0, 0, 0, 0.65) 0%,
+    rgba(0, 0, 0, 0.35) 55%,
+    rgba(0, 0, 0, 0.12) 85%,
+    transparent 100%
+  );
+  border-radius: 16vw 16vw 0 0;
+  pointer-events: none;
+}
+
 /* Keyboard panel — raised above the base surface. Stacked offset shadows
  * fake the panel's side walls so the whole keyboard plate has visible
  * thickness (not just individual keys). */
@@ -163,14 +238,9 @@
   flex-direction: column;
   gap: 0.07vw;
   box-shadow:
-    /* Side walls of the raised panel (stacked solid offsets create a
-     * pseudo-extruded edge along the panel's bottom). */
-    0 0.06vw 0 #2c2c2c,
-    0 0.12vw 0 #1c1c1c,
-    0 0.18vw 0 #0c0c0c,
-    0 0.24vw 0 #050505,
-    /* Drop shadow under the raised panel */
-    0 0.32vw 0.4vw rgba(0, 0, 0, 0.5),
+    /* Subtle drop shadow under the raised panel (no stacked solid offsets —
+     * those produced a visible black band below the keyboard in open view). */
+    0 0.18vw 0.35vw rgba(0, 0, 0, 0.45),
     /* Top inner shadow gives the well slight depth */
     inset 0 0.06vw 0.18vw rgba(0, 0, 0, 0.55),
     inset 0 -0.03vw 0 rgba(255, 255, 255, 0.03);

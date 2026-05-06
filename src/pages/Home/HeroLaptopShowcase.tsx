@@ -17,6 +17,9 @@ export default function HeroLaptopShowcase() {
   const compositeRef = useRef<HTMLDivElement>(null);
   const cardLiftRef = useRef<HTMLDivElement>(null);
   const trustRef = useRef<HTMLDivElement>(null);
+  const lidRef = useRef<HTMLDivElement>(null);
+  const screenRef = useRef<HTMLDivElement>(null);
+  const baseRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -40,8 +43,8 @@ export default function HeroLaptopShowcase() {
         },
       });
 
-      // Composite (laptop frame + Hero on screen) shrinks and rotates as one
-      // unit. Fast start, slow tail (power2.out + offset 0.05).
+      // Phase 1: composite (laptop frame + Hero on screen) shrinks and
+      // rotates to the right as one unit. Fast start, slow tail.
       tl.to(
         compositeRef.current,
         {
@@ -61,13 +64,82 @@ export default function HeroLaptopShowcase() {
         { opacity: 1, x: 0, duration: 0.8, ease: "power2.out" },
         0.6,
       );
+
+      // Phase 2: trust copy fades back out, lid closes, composite slides to
+      // horizontal center and tilts so the closed laptop is shown from a
+      // slight top-down angle right at the page-2 / page-3 boundary.
+      tl.to(
+        trustRef.current,
+        { opacity: 0, x: -40, duration: 0.5, ease: "power2.in" },
+        1.5,
+      );
+
+      tl.to(
+        compositeRef.current,
+        {
+          xPercent: 0,
+          // Math: composite is 100vh tall, scaled around its center. After
+          // scale(s) the lid-bottom hinge sits at 50vh + 50vh*s. Camera
+          // (perspective-origin) is at 50vh. We need yPercent to translate
+          // by exactly -50vh*s so the hinge lands ON the camera line and we
+          // see the closed slab edge-on. yPercent is % of unscaled height
+          // (=100vh), so yPercent = -50*s. For s=0.28 → yPercent = -14.
+          yPercent: -14,
+          rotateY: 0,
+          rotateX: 0,
+          scale: 0.28,
+          scaleZ: 0.05,
+          duration: 0.9,
+          ease: "power2.inOut",
+        },
+        1.5,
+      );
+
+      // GSAP defaults transformOrigin to "50% 50% 0" and ignores the
+      // CSS-declared origin once it touches transforms — so we have to
+      // re-pin the hinge axis here. Without this, rotateX(-95) spins the
+      // lid around its center instead of folding around its bottom edge.
+      gsap.set(lidRef.current, { transformOrigin: "50% 100% 0" });
+
+      tl.to(
+        lidRef.current,
+        // Exactly -90° = perfectly flat. -95° (5° overshoot) leaves the lid
+        // tipped slightly forward toward the camera, so its front edge
+        // catches more perspective expansion than the base.
+        { rotateX: -90, duration: 0.9, ease: "power2.inOut" },
+        1.5,
+      );
+
+      // Take over the base's transform from CSS (rotateX 95° about top
+      // hinge) so GSAP can compose scaleX on top of it cleanly. Then widen
+      // the base in phase 2 so the keyboard panel matches the lid's
+      // perspective-magnified width when the laptop is closed.
+      gsap.set(baseRef.current, {
+        rotateX: 95,
+        transformOrigin: "50% 0%",
+      });
+
+      tl.to(
+        baseRef.current,
+        { scaleX: 1.875, duration: 0.9, ease: "power2.inOut" },
+        1.5,
+      );
+
+      // Fade the Hero (rendered inside the screen) out slightly ahead of the
+      // lid finishing — by the time the lid is flat, the screen content is
+      // already gone, so no flattened "black slab" of the Hero remains.
+      tl.to(
+        screenRef.current,
+        { opacity: 0, duration: 0.5, ease: "power2.in" },
+        1.5,
+      );
     }, containerRef);
 
     return () => ctx.revert();
   }, []);
 
   return (
-    <section ref={containerRef} className="relative" style={{ height: "220vh" }}>
+    <section ref={containerRef} className="relative" style={{ height: "320vh" }}>
       <div
         className="sticky top-0 h-screen w-full overflow-hidden bg-white"
         style={{ perspective: "1800px" }}
@@ -86,7 +158,7 @@ export default function HeroLaptopShowcase() {
             className="card-lift w-full h-full"
             style={{ transformStyle: "preserve-3d", willChange: "transform" }}
           >
-            <EmbeddedLaptop>
+            <EmbeddedLaptop lidRef={lidRef} screenRef={screenRef} baseRef={baseRef}>
               <Hero />
             </EmbeddedLaptop>
           </div>

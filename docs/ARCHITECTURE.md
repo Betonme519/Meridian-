@@ -1,223 +1,133 @@
 # Meridian — Architecture
 
-> 文件结构、数据流、API、状态管理。新接手的 AI 读这份立刻清醒。
+> 文件结构 / 数据流 / API / 状态管理。新接手 AI 读这份立刻清醒。
 
 ---
 
-## 1. 顶层目录结构
+## 1. 目录结构
 
 ```
 .
-├─ public/                           ← 静态资源（图片直接公开访问，如 "首页 (1).jpg"）
-├─ src/                              ← 全部应用代码（详见下方）
-├─ docs/                             ← 项目文档（你正在看）
-├─ .tanstack/                        ← TanStack 构建产物（.gitignore）
-├─ package.json                      ← bun + npm 兼容
-├─ tsconfig.json                     ← strict + 路径别名 @/* → ./src/*
-├─ vite.config.ts                    ← @lovable.dev/vite-tanstack-config 一行预设
-├─ wrangler.jsonc                    ← Cloudflare Workers 部署配置
-└─ components.json                   ← shadcn/ui CLI 配置
-```
+├─ public/                 静态资源（直接公开访问）
+├─ src/                    应用代码（见下）
+├─ docs/                   项目文档
+├─ package.json            scripts: dev / build / build:dev / preview / lint / format（bun + npm 兼容）
+├─ tsconfig.json           strict + 路径别名 @/* → ./src/*
+├─ vite.config.ts          @lovable.dev/vite-tanstack-config 一行预设
+├─ wrangler.jsonc          Cloudflare Workers 部署
+└─ components.json         shadcn/ui CLI
 
----
-
-## 2. src/ 详细结构
-
-```
 src/
-├─ pages/                            ← 业务页面，一页一目录
-│  ├─ Home/                          ← 落地页（已实现）
-│  │  ├─ index.tsx                   ← 组合各 section 的 shell（30 行）
-│  │  ├─ Hero.tsx                    ← Hero 区（GridMotion 背景 + 大标题 + CTA）
-│  │  ├─ HeroLaptopShowcase.tsx      ← 滚动驱动的笔记本展示（GSAP ScrollTrigger）
-│  │  ├─ Trust.tsx                   ← 建立信任 section（暂未挂载，保留复用）
-│  │  ├─ Flow.tsx                    ← 三步流程
-│  │  ├─ Explain.tsx                 ← 可解释性课程卡示例
-│  │  ├─ GpaMath.tsx                 ← GPA 公式展示
-│  │  ├─ Honesty.tsx                 ← 确定/估算/未知三栏
-│  │  ├─ Control.tsx                 ← 风险与控制权
-│  │  ├─ Feedback.tsx                ← 真实反馈卡（含偏差案例）
-│  │  ├─ FinalCTA.tsx                ← 底部 CTA
-│  │  └─ Home.css                    ← Home 专用 CSS（占位）
-│  │
-│  ├─ CourseAnalyzer/                ← 课程分析页（骨架）
-│  │  ├─ index.tsx
-│  │  ├─ UploadPanel.tsx
-│  │  ├─ AnalysisResult.tsx
-│  │  └─ CourseAnalyzer.css
-│  │
-│  ├─ Dashboard/                     ← 学生仪表盘（骨架）
-│  │  ├─ index.tsx
-│  │  ├─ GPAWidget.tsx
-│  │  ├─ RiskCard.tsx
-│  │  └─ Dashboard.css
-│  │
-│  └─ Planner / Courses / Upload / AIAdvisor / Profile / ← 早期占位，待整合
+├─ pages/                  业务页面，一页一目录
+│  ├─ Home/                落地页（已实现）
+│  │  ├─ index.tsx                    section shell（30 行）
+│  │  ├─ Hero / HeroLaptopShowcase    Hero 区 + 滚动笔记本（GSAP ScrollTrigger）
+│  │  ├─ Trust                        建立信任（保留未挂载，复用）
+│  │  ├─ Flow / Explain / GpaMath     三步流程 / 课程卡示例 / GPA 公式
+│  │  ├─ Honesty / Control / Feedback 确定/估算/未知 / 风险与控制 / 真实反馈
+│  │  ├─ FinalCTA                     底部 CTA
+│  │  └─ Home.css                     占位
+│  ├─ CourseAnalyzer/      骨架：index + UploadPanel + AnalysisResult + .css
+│  ├─ Dashboard/           骨架：index + GPAWidget + RiskCard + .css
+│  └─ Planner / Courses / Upload / AIAdvisor / Profile/   早期占位，待整合
 │
 ├─ components/
-│  ├─ common/                        ← 业务通用组件（暂占位）
-│  ├─ layout/                        ← 跨页面布局组件
-│  │  ├─ Navbar.tsx                  ← 自适应顶栏（透明 ↔ 白底）
-│  │  ├─ Footer.tsx                  ← 站点底部
-│  │  └─ PageShell.tsx               ← Nav + main + Footer 标准壳
-│  ├─ effects/                       ← 视觉效果组件
-│  │  ├─ GridMotion.tsx + .css       ← Hero 背景图墙，自动循环滚动
-│  │  ├─ EmbeddedLaptop.tsx + .css   ← 3D 伪笔记本（lid + 键盘 + 厚度）
-│  │  ├─ LaptopFrame.tsx + .css      ← 旧版独立笔记本（已不用，留作 fallback）
-│  │  └─ SplitText.tsx               ← 字符级 fade-up 文字动画
-│  └─ ui/                            ← shadcn/ui 50+ Radix primitives，不要重复写
+│  ├─ layout/              全站壳：Navbar.tsx ★（自适应透明↔白底）+ Footer + PageShell
+│  ├─ effects/             视觉效果
+│  │  ├─ EmbeddedLaptop.{tsx,css}     3D 伪笔记本（lid + 键盘 + 厚度）
+│  │  ├─ GridMotion.{tsx,css}         Hero 背景图墙，自动循环
+│  │  ├─ SplitText.tsx                字符级 fade-up
+│  │  ├─ LaptopFrame.{tsx,css}        旧版独立笔记本，已不用，留 fallback
+│  │  └─ ⚠ LiquidEther.css            悬挂文件，无对应 .tsx，确认无引用后可删
+│  ├─ ui/                  shadcn/ui 46 个 Radix primitives — 不要重写
+│  ├─ common/              业务通用 UI（当前空，placeholder）
+│  └─ ⚠ ChatPanel / CourseCard / GPAChart / Navbar / Sidebar / UploadBox/
+│                          散装 domain 组件，部分与 layout/ 重复（Navbar/Sidebar），
+│                          后续应整合到 common/ 或对应页面下
 │
-├─ context/                          ← React Context 全局状态
-│  ├─ AuthContext.tsx                ← 用户登录状态（待接入）
-│  └─ UserContext.tsx                ← 用户画像 / 偏好（待接入）
-│
-├─ hooks/                            ← 自定义 React hooks
-│  ├─ useAuth.ts                     ← 包装 AuthContext
-│  ├─ useCourses.ts                  ← 课程列表 hook
-│  ├─ usePlanner.ts                  ← 规划器 hook
-│  └─ use-mobile.tsx                 ← shadcn 自带视口检测
-│
-├─ api/                              ← 前端调用 Cloudflare Worker 的封装
-│  ├─ authApi.ts                     ← 登录 / 注册（待接入）
-│  ├─ courseApi.ts                   ← 课程 CRUD
-│  ├─ plannerApi.ts                  ← 选课规划
-│  └─ aiApi.ts                       ← AI 推荐 / 解析
-│
-├─ services/                         ← 业务逻辑层（不直接 fetch）
-│  ├─ recommendationService.ts       ← 推荐打分逻辑
-│  ├─ gpaService.ts                  ← GPA 计算引擎
-│  └─ ragService.ts                  ← 学校手册 RAG 检索
-│
-├─ data/                             ← Mock 数据 / 种子数据
-│  ├─ mockCourses.ts
-│  └─ userProfile.ts
-│
-├─ utils/                            ← 纯函数工具
-│  ├─ calculateGPA.ts                ← 加权平均计算
-│  └─ format.ts                      ← 数字 / 日期 / 文本格式化
-│
-├─ assets/                           ← 项目内静态资源（与 public 区分）
-│  ├─ images/  icons/  logos/        ← 通过 import 引用的资源
-│
+├─ context/                AuthContext / UserContext（待接入）
+├─ hooks/                  useAuth / useCourses / usePlanner / use-mobile（shadcn 自带）
+├─ api/                    前端调 Worker 的薄壳：authApi / courseApi / plannerApi / aiApi
+├─ services/               业务规则：gpaService / ragService / recommendationService
+├─ data/                   Mock：mockCourses / userProfile
+├─ utils/                  纯函数：calculateGPA / format
+├─ assets/                 import 引用的图片 / icons / logos
 ├─ styles/
-│  ├─ globals.css                    ← Tailwind 入口 + @theme inline
-│  ├─ variables.css                  ← 设计令牌（oklch 色阶 + radius）
-│  └─ animations.css                 ← @keyframes + .animate-* 工具类
-│
-├─ layouts/                          ← 旧版页面骨架（待与 components/layout 整合）
-├─ lib/utils.ts                      ← shadcn 标配 cn() 等工具
-├─ routes/                           ← TanStack Router 文件式路由
-│  ├─ __root.tsx                     ← 根布局（HTML shell + meta + 错误页）
-│  └─ index.tsx                      ← `/` 路由 → 渲染 Home
-├─ router.tsx                        ← createRouter 配置（错误组件 / 滚动恢复）
-├─ routeTree.gen.ts                  ← 自动生成，不要手改
-└─ styles.css                        ← 已弃用（已迁到 styles/globals.css）
+│  ├─ globals.css                    Tailwind 入口 + @theme inline
+│  ├─ variables.css                  设计令牌（oklch + radius）
+│  └─ animations.css                 @keyframes + .animate-* 工具类
+├─ layouts/                旧版页面骨架（DashboardLayout / MainLayout），待与 components/layout 整合
+├─ lib/utils.ts            shadcn 标配 cn()
+├─ routes/                 TanStack Router 文件式
+│  ├─ __root.tsx                     根布局 + Provider 挂载点
+│  └─ index.tsx                      `/` → 渲染 Home
+├─ router.tsx              createRouter 配置
+└─ routeTree.gen.ts        自动生成，禁手改
 ```
 
 ---
 
-## 3. 每层职责（一句话）
+## 2. 每层职责（一句话）
 
 | 层 | 干什么 | 不能干什么 |
 |---|---|---|
 | `pages/*/` | 页面级组合 + section JSX | 不写复用组件、不直接 fetch |
-| `components/layout/` | 全站布局壳（Nav / Footer） | 不写业务逻辑 |
-| `components/common/` | 业务通用 UI（卡片包装等） | 不嵌入特定页面状态 |
-| `components/effects/` | 视觉特效（动画、3D） | 不写业务数据 |
-| `components/ui/` | shadcn 原子组件（不要改不要重写） | — |
-| `hooks/` | React 状态封装（订阅 context、订阅 API） | 不写组件 |
-| `context/` | 全局 React Context 实例 + Provider | 不写业务计算 |
-| `api/` | 调 Cloudflare Worker 的薄壳，返回 typed Promise | 不写业务规则、不缓存 |
-| `services/` | 业务规则、跨 API 协调、数据映射 | 不直接 fetch（用 api 层） |
-| `data/` | Mock / 种子数据 | 不写函数 |
-| `utils/` | 纯函数（无副作用） | 不引用 React、不引用 fetch |
-| `styles/` | 全局样式 + token | 不写组件级样式（用 Tailwind / 同名 .css） |
+| `components/layout/` | 全站布局壳 | 不写业务逻辑 |
+| `components/effects/` | 视觉特效 | 不写业务数据 |
+| `components/ui/` | shadcn 原子组件 | 不要改 / 不要重写 |
+| `hooks/` | React 状态封装（订阅 context / API） | 不写组件 |
+| `context/` | 全局 Context 实例 + Provider | 不写业务计算 |
+| `api/` | 调 Worker 的薄壳，typed Promise | 不判业务条件 / 不缓存 |
+| `services/` | 业务规则、跨 API 协调、数据映射 | 不直接 fetch（走 api 层） |
+| `data/` | Mock / 种子 | 不写函数 |
+| `utils/` | 纯函数 | 不引 React / 不引 fetch |
+| `styles/` | 全局样式 + token | 不写组件级（用 Tailwind / 同名 .css） |
 
 ---
 
-## 4. 数据流
-
-### 总图
+## 3. 数据流
 
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│                          User (Browser)                            │
-└────────────────────────────────────────────────────────────────────┘
-                                 │
-                                 ▼
-┌────────────────────────────────────────────────────────────────────┐
-│          pages/*/  (UI components, JSX 编排)                       │
-│                                 │                                  │
-│                                 ▼                                  │
-│  hooks/ (useAuth, useCourses…)  ←──  context/  ←── React Provider  │
-└────────────────────────────────────────────────────────────────────┘
-                                 │
-                                 ▼
-┌────────────────────────────────────────────────────────────────────┐
-│      services/  (业务规则: GPA 计算、推荐打分、RAG 检索)           │
-└────────────────────────────────────────────────────────────────────┘
-                                 │
-                                 ▼
-┌────────────────────────────────────────────────────────────────────┐
-│         api/  (前端 SDK：fetch 封装、错误处理、类型定义)           │
-└────────────────────────────────────────────────────────────────────┘
-                                 │ HTTPS
-                                 ▼
-┌────────────────────────────────────────────────────────────────────┐
-│   Cloudflare Worker  (后端: 路由 + 业务执行 + 数据库连接)          │
-│        ├─ KV / D1 / R2  (持久化)                                   │
-│        ├─ AI 调用 (RAG, embeddings, 学校手册解析)                  │
-│        └─ 第三方 API                                               │
-└────────────────────────────────────────────────────────────────────┘
+User → pages/*/  →  hooks/  ←→  context/
+                          │
+                          ▼
+                      services/   （GPA 计算 / 推荐打分 / RAG 检索）
+                          │
+                          ▼
+                        api/      （fetch 封装 / 错误处理 / 类型）
+                          │ HTTPS
+                          ▼
+                Cloudflare Worker  （路由 + 业务执行 + KV/D1/R2 + AI 调用）
 ```
 
-### 单向数据流原则
+**单向铁律：**
 
-- **UI 只读 hooks** → hooks 订阅 context → context 唯一 Provider
-- **写操作走 services**：组件不直接调 api，组件 → services → api
-- **api 只负责传输**：不在 api 层判业务条件、不缓存
-- **services 是业务的家**：所有 GPA / 风险 / 推荐计算都在 services 写
+- UI 只读 hooks，hooks 订阅 context（唯一 Provider）
+- 写操作走 services；组件不直接调 api
+- api 只做传输：不判业务、不缓存
+- services 是业务的家：GPA / 风险 / 推荐计算都在这层
 
 ---
 
-## 5. API 怎么走
-
-### 命名约定
-
-```
-src/api/<domain>Api.ts
-```
-
-每个 domain 一个文件，导出函数命名 `<verb><Noun>`：
+## 4. API 约定
 
 ```ts
 // src/api/courseApi.ts
 export async function listCourses(params: ListCoursesParams): Promise<Course[]> {
   return fetchJson("/api/courses", params);
 }
-
-export async function getCourse(id: string): Promise<Course> {
-  return fetchJson(`/api/courses/${id}`);
-}
 ```
 
-### 与后端约定
-
+- 文件：`src/api/<domain>Api.ts`，函数名 `<verb><Noun>`
 - 路径前缀：`/api/`（Worker 路由）
-- 返回 JSON，错误结构统一：`{ error: { code, message } }`
+- 错误结构：`{ error: { code, message } }`
 - 鉴权：cookie session（Worker 颁发）
 
-### TBD（待定）
-
-- ⏳ Worker 项目骨架还没建（`/workers/` 目录会和 `/src/` 平级）
-- ⏳ 数据库选型：D1 (SQLite) vs KV，看场景
-- ⏳ 学校手册 RAG：用 Cloudflare Vectorize 还是外部向量库
+**TBD：** Worker 骨架未建（计划与 `src/` 平级 `workers/`）；DB 选型 D1 vs KV；RAG 用 Cloudflare Vectorize 还是外部库。
 
 ---
 
-## 6. 状态管理
-
-### 选型：React Context（项目当前规模够用）
+## 5. 状态管理（React Context）
 
 ```ts
 // src/context/AuthContext.tsx
@@ -231,124 +141,85 @@ export function useAuth() {
 }
 ```
 
-### Provider 挂载点
-
-`src/routes/__root.tsx` 的 `RootShell` 是包所有 Provider 的地方：
+Provider 挂载在 `src/routes/__root.tsx`：
 
 ```tsx
 <AuthProvider>
-  <UserProvider>
-    {children}
-  </UserProvider>
+  <UserProvider>{children}</UserProvider>
 </AuthProvider>
 ```
-
-### 拆 Context 的原则
 
 | Context | 内容 |
 |---|---|
 | `AuthContext` | login / logout / 当前用户 id / token |
-| `UserContext` | 用户画像（学校、专业、年级、目标 GPA） |
-| 后续可加 `PlannerContext` | 当前选课草稿 |
-| 后续可加 `ToastContext` | 全局提示 |
+| `UserContext` | 用户画像（学校 / 专业 / 年级 / 目标 GPA） |
+| 后续 | `PlannerContext`（选课草稿）/ `ToastContext`（全局提示） |
 
-### 什么时候升级到 Zustand / Redux？
-
-- Context 触发的 re-render 影响性能
-- 需要跨页面 atomic update（不太可能）
-- 当前项目**短期不需要**
+**升级到 Zustand / Redux：当前规模不需要。**
 
 ---
 
-## 7. 路由
-
-### TanStack Router 文件式
+## 6. 路由（TanStack Router 文件式）
 
 ```
 src/routes/
-├─ __root.tsx       ← 根布局（HTML / head / meta / Provider 挂载点）
-├─ index.tsx        ← `/`
-└─ (auto-gen) routeTree.gen.ts
+├─ __root.tsx       根布局（HTML / head / Provider 挂载）
+└─ index.tsx        `/`
 ```
 
-### 增加新路由
-
-直接在 `routes/` 创建 `.tsx`：
+**新加路由：**
 
 ```tsx
 // src/routes/dashboard.tsx
 import { createFileRoute } from "@tanstack/react-router";
 import DashboardPage from "@/pages/Dashboard";
-
-export const Route = createFileRoute("/dashboard")({
-  component: DashboardPage,
-});
+export const Route = createFileRoute("/dashboard")({ component: DashboardPage });
 ```
 
-`routeTree.gen.ts` 自动重生成，不要手改。
+`routeTree.gen.ts` 自动重生成，**禁手改**。
 
 ---
 
-## 8. 多 agent 协作（这个项目的真实使用场景）
+## 7. 多 agent 协作
 
-### 协作约定
-
-| 区域 | 风险 | 谁能改 |
-|---|---|---|
-| `pages/Home/<Section>.tsx` | 各自独立 | 任意 agent，不冲突 |
-| `pages/Home/index.tsx` | 加新 section 时改 | 协调点，约定一人改 |
-| `components/layout/Navbar.tsx` | 全站影响 | layout owner |
-| `styles/globals.css` `variables.css` | 设计系统全局 | design system owner |
-| `package.json` | 依赖锁定 | 慎用 `bun add` |
-| `routes/__root.tsx` | 路由根 | 路由 owner |
-| `services/*` | 业务规则 | 一个业务一个 owner |
-
-### 分支命名
-
-```
-feature/<page>-<area>     → feature/home-feedback, feature/dashboard-gpa
-fix/<area>                → fix/laptop-front-edge
-chore/<thing>             → chore/upgrade-deps
-```
-
-### 锁文件
-
-项目用 `bun`，但当前 `bun.lockb` 跟 `node_modules` 可能不同步（混用过 npm）。**主分支建议先 `bun install` 重生 lockb 后再让 agent 各自拉分支。**
-
----
-
-## 9. 构建 / 部署
-
-### 本地开发
-
-```bash
-bun dev          # 或 npm run dev — 启动 Vite 开发服 (默认 8080)
-bun run lint     # eslint
-bun run format   # prettier
-```
-
-### 生产构建
-
-```bash
-bun run build              # SSR build for production
-bun run build:dev          # dev mode build
-bun run preview            # 本地预览构建产物
-```
-
-### 部署目标
-
-**Cloudflare Workers**（`wrangler.jsonc`）—— Vite 构建产物直接部署，前后端同栈。
-
----
-
-## 10. 常见任务速查
-
-| 想做什么 | 改哪里 |
+| 区域 | 谁能改 |
 |---|---|
-| 加新落地页 section | `src/pages/Home/<Name>.tsx` + 在 `index.tsx` 引入 |
+| `pages/Home/<Section>.tsx` | 任意 agent，互不冲突 |
+| `pages/Home/index.tsx` | 加新 section 时是协调点，约定一人改 |
+| `components/layout/Navbar.tsx` | layout owner |
+| `styles/globals.css` `variables.css` | design system owner |
+| `package.json` | 慎用 `bun add` |
+| `routes/__root.tsx` | 路由 owner |
+| `services/*` | 一业务一 owner |
+
+**分支：** `feature/<page>-<area>` / `fix/<area>` / `chore/<thing>`
+**Lock：** 项目用 bun，但 `bun.lockb` 与 `node_modules` 历史上混用过 npm。主分支若异常先 `bun install` 重生 lockb。
+
+---
+
+## 8. 构建 / 部署
+
+```bash
+bun dev                # vite dev server
+bun run build          # 生产构建
+bun run build:dev      # dev mode build
+bun run preview        # 本地预览构建产物
+bun run lint           # eslint
+bun run format         # prettier
+```
+
+**部署目标：Cloudflare Workers**（`wrangler.jsonc`）—— 前后端同栈。
+
+---
+
+## 9. 常见任务速查
+
+| 想做 | 改哪里 |
+|---|---|
+| 加新落地页 section | `src/pages/Home/<Name>.tsx` + `index.tsx` 引入 |
 | 加新页面 | `src/pages/<Name>/` + `src/routes/<name>.tsx` |
 | 加新 API | `src/api/<domain>Api.ts` + `src/services/<domain>Service.ts` |
-| 加新色号 | `styles/variables.css` 加 `--<name>` + `globals.css` 的 `@theme inline` 注册 |
-| 加新动画 | `styles/animations.css` 加 keyframe + 工具类 |
-| 加新 shadcn 组件 | `bunx shadcn add <name>` 自动放进 `components/ui/` |
-| 全局状态 | 新增 `context/<Name>Context.tsx` + 在 `__root.tsx` 包 Provider |
+| 加新色号 | `styles/variables.css` 加 `--<name>` + `globals.css` `@theme inline` 注册 |
+| 加新动画 | `styles/animations.css` 加 keyframe + `.animate-*` 工具类 |
+| 加新 shadcn 组件 | `bunx shadcn add <name>` 自动放入 `components/ui/` |
+| 全局状态 | 新建 `context/<Name>Context.tsx` + 在 `__root.tsx` 包 Provider |

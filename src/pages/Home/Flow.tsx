@@ -23,7 +23,7 @@ export default function Flow() {
     },
   ];
   return (
-    <section id="flow" className="px-6 py-24 max-w-7xl mx-auto">
+    <section id="flow" className="relative z-10 px-6 pt-0 pb-24 max-w-7xl mx-auto -mt-[20vh]">
       <div className="text-center mb-14">
         <p className="text-xs font-medium text-gray-500 tracking-widest uppercase mb-4">
           去黑箱

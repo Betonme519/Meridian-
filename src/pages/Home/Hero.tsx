@@ -41,52 +41,17 @@ export default function Hero() {
 
       <div className="relative z-20 flex flex-col min-h-screen">
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-20 max-w-5xl mx-auto text-center w-full">
-          <div
-            className="inline-flex items-center gap-2 mb-8 px-3 py-1.5 rounded-full animate-fade-in-up"
-            style={{
-              opacity: 0,
-              animationDelay: "0.1s",
-              border: "1px solid rgba(255,255,255,0.2)",
-              background: "rgba(255,255,255,0.08)",
-              backdropFilter: "blur(12px)",
-            }}
+          <p
+            className="text-sm md:text-base font-medium tracking-wide text-white/60 mb-6 animate-fade-in-up"
+            style={{ opacity: 0, animationDelay: "0.1s" }}
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span className="text-xs font-medium text-white/80">
-              为大学选课设计 · 选课前 3 分钟搞清所有规则
-            </span>
-          </div>
+            Academics should not be your entire focus.
+          </p>
 
           <h1 className="text-4xl md:text-6xl lg:text-[68px] font-semibold leading-[1.1] tracking-tight mb-6 text-white">
             <div>
               <SplitText
-                text="你不需要为成绩焦虑，"
-                splitType="chars"
-                delay={40}
-                duration={0.9}
-                from={{ opacity: 0, y: 50 }}
-                to={{ opacity: 1, y: 0 }}
-                threshold={0.05}
-                rootMargin="0px"
-                textAlign="center"
-              />
-            </div>
-            <div>
-              <SplitText
-                text="你只需要在选课时"
-                splitType="chars"
-                delay={40}
-                duration={0.9}
-                from={{ opacity: 0, y: 50 }}
-                to={{ opacity: 1, y: 0 }}
-                threshold={0.05}
-                rootMargin="0px"
-                textAlign="center"
-              />
-            </div>
-            <div className="bg-gradient-to-r from-white via-white/80 to-white/50 bg-clip-text text-transparent">
-              <SplitText
-                text="做对几个决定"
+                text="学业不应该成为你的全部"
                 splitType="chars"
                 delay={40}
                 duration={0.9}
@@ -103,9 +68,9 @@ export default function Hero() {
             className="text-lg md:text-xl text-white/60 mb-10 max-w-2xl mx-auto leading-relaxed animate-fade-in-up"
             style={{ opacity: 0, animationDelay: "0.3s" }}
           >
-            大多数学生在四年中都未完全搞清绩点与学分规则
+            Meridian 解析学校规则、培养方案与绩点逻辑，
             <br />
-            这个系统让你用最轻松的方式顺利结业
+            帮你用更轻松的方式完成学业。
           </p>
 
           <div
