@@ -170,10 +170,15 @@
 
 ```
 docs/
-├─ CURRENT_TASK.md       ← ★ 本会话/今天要做什么、不要碰什么。最先读。
+├─ CURRENT_TASK.md       ← ★★★ 本会话/今天要做什么、不要碰什么。最先读。
+├─ AI_MEMORY.md          ← ★★ 项目长期记忆。新对话 onboarding 一键贴这份。
 ├─ PROJECT_OVERVIEW.md   ← 你正在看：项目是什么 / 用户 / 商业 / 风格关键词
 ├─ ARCHITECTURE.md       ← 文件结构 / 数据流 / API / 状态管理
 └─ DESIGN_SYSTEM.md      ← 颜色 / 字体 / 动画规范，写 UI 前必读
 ```
 
-**`CURRENT_TASK.md` 优先级最高。** 它告诉 AI 这次会话的边界。其它三份是稳定参考，几周才更新一次；CURRENT_TASK 每次任务前更新。
+**优先级：**
+
+- `CURRENT_TASK.md` 每会话更新，告诉 AI 这次的**边界**
+- `AI_MEMORY.md` 每里程碑更新，告诉 AI **当前状态 + 踩过的坑 + TBD**
+- 后三份**稳定**，定义不变量，几周才更新一次
