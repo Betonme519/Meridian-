@@ -1,0 +1,206 @@
+/* Laptop frame with translateZ depth — viewable from a range of angles. */
+
+.embedded-laptop {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+/* ---- Lid front plate (the dark plastic surrounding the bezel) -------- */
+.embedded-laptop::before {
+  content: "";
+  position: absolute;
+  inset: -1.8vw -1.8vw -1vw -1.8vw;
+  background: linear-gradient(155deg, #2c2c2c 0%, #0a0a0a 100%);
+  border-radius: 1vw 1vw 0.3vw 0.3vw;
+  z-index: 0;
+  transform: translateZ(0);
+  box-shadow:
+    0 3vw 6vw rgba(0, 0, 0, 0.45),
+    inset 0 0 0 0.08vw rgba(255, 255, 255, 0.06);
+}
+
+/* ---- Lid back plate (only visible when laptop is rotated) ------------ */
+.embedded-laptop-lid-back {
+  position: absolute;
+  inset: -1.8vw -1.8vw -1vw -1.8vw;
+  background: linear-gradient(155deg, #1a1a1a 0%, #050505 100%);
+  border-radius: 1vw 1vw 0.3vw 0.3vw;
+  z-index: -1;
+  transform: translateZ(-0.5vw);
+}
+
+/* ---- 4 side strips of the lid (the thickness, ~0.5vw deep) ----------- */
+.embedded-laptop-edge {
+  position: absolute;
+  background: linear-gradient(180deg, #1f1f1f 0%, #080808 100%);
+  z-index: -1;
+}
+
+/* Top edge: lying flat at the lid's top, facing up */
+.embedded-laptop-edge-top {
+  top: -1.8vw;
+  left: -1.8vw;
+  right: -1.8vw;
+  height: 0.5vw;
+  transform-origin: top;
+  transform: rotateX(-90deg);
+}
+
+/* Bottom edge: lying flat at the lid's bottom, facing down */
+.embedded-laptop-edge-bottom {
+  bottom: -1vw;
+  left: -1.8vw;
+  right: -1.8vw;
+  height: 0.5vw;
+  transform-origin: bottom;
+  transform: rotateX(90deg);
+}
+
+/* Left edge: lying flat at the lid's left, facing left */
+.embedded-laptop-edge-left {
+  left: -1.8vw;
+  top: -1.8vw;
+  bottom: -1vw;
+  width: 0.5vw;
+  transform-origin: left;
+  transform: rotateY(90deg);
+}
+
+/* Right edge: lying flat at the lid's right, facing right */
+.embedded-laptop-edge-right {
+  right: -1.8vw;
+  top: -1.8vw;
+  bottom: -1vw;
+  width: 0.5vw;
+  transform-origin: right;
+  transform: rotateY(-90deg);
+}
+
+/* ---- Base (horizontal panel with keyboard) --------------------------- */
+/* Anchored at the lid's bottom edge, rotated +95° so it lies flat extending
+ * forward (toward viewer). The "front face" of this rotated panel ends up
+ * facing UP — that's where the keyboard texture goes. */
+.embedded-laptop-base-3d {
+  position: absolute;
+  top: calc(100% + 0.5vw);
+  left: -1.8vw;
+  right: -1.8vw;
+  height: 14vw;
+  transform-origin: top center;
+  transform: rotateX(95deg);
+  background: linear-gradient(
+    180deg,
+    #d6d6d6 0%,
+    #b8b8b8 30%,
+    #8a8a8a 70%,
+    #5a5a5a 100%
+  );
+  border-radius: 0 0 0.6vw 0.6vw;
+  box-shadow:
+    inset 0 0.08vw 0 rgba(255, 255, 255, 0.55),
+    0 -0.4vw 1vw rgba(0, 0, 0, 0.25);
+  z-index: -2;
+}
+
+/* Underside of the base (rendered behind, slightly darker) for thickness */
+.embedded-laptop-base-bottom {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #6a6a6a 0%, #2a2a2a 100%);
+  transform: translateZ(-0.5vw);
+  border-radius: 0 0 0.6vw 0.6vw;
+}
+
+/* Keyboard well — recessed dark area with key grid drawn via gradients */
+.embedded-laptop-keyboard {
+  position: absolute;
+  top: 1.2vw;
+  left: 6%;
+  right: 6%;
+  height: 6vw;
+  background-color: #181818;
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent calc(100% / 14 - 0.05vw),
+      rgba(220, 220, 220, 0.18) calc(100% / 14 - 0.05vw),
+      rgba(220, 220, 220, 0.18) calc(100% / 14)
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      transparent calc(100% / 5 - 0.05vw),
+      rgba(220, 220, 220, 0.18) calc(100% / 5 - 0.05vw),
+      rgba(220, 220, 220, 0.18) calc(100% / 5)
+    );
+  border-radius: 0.25vw;
+  box-shadow:
+    inset 0 0.1vw 0.3vw rgba(0, 0, 0, 0.55),
+    inset 0 -0.05vw 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Trackpad below the keyboard */
+.embedded-laptop-trackpad {
+  position: absolute;
+  bottom: 1.2vw;
+  left: 32%;
+  right: 32%;
+  height: 4.6vw;
+  background: linear-gradient(180deg, #d8d8d8 0%, #a0a0a0 100%);
+  border: 0.05vw solid rgba(0, 0, 0, 0.18);
+  border-radius: 0.3vw;
+  box-shadow: inset 0 0.06vw 0.2vw rgba(0, 0, 0, 0.18);
+}
+
+/* ---- Bezel + screen (the front-most face) ---------------------------- */
+.embedded-laptop-bezel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 0.55vw;
+  background: #000;
+  border-radius: 0.35vw;
+  z-index: 1;
+  transform: translateZ(0.05vw);
+}
+
+/* Camera dot near top of bezel */
+.embedded-laptop-bezel::before {
+  content: "";
+  position: absolute;
+  top: 0.18vw;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0.32vw;
+  height: 0.32vw;
+  background: #1a1a1a;
+  border-radius: 50%;
+  z-index: 2;
+  box-shadow: inset 0 0 0 0.06vw #444;
+}
+
+.embedded-laptop-screen {
+  width: 100%;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Subtle screen reflection */
+.embedded-laptop-screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0) 35%,
+    rgba(255, 255, 255, 0) 65%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  z-index: 5;
+}

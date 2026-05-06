@@ -16,32 +16,35 @@ import {
   Star,
 } from "lucide-react";
 import GridMotion from "@/components/effects/GridMotion";
-import LaptopFrame from "@/components/effects/LaptopFrame";
+import EmbeddedLaptop from "@/components/effects/EmbeddedLaptop";
 
 function Nav() {
   return (
-    <div style={{
-      background: 'rgba(0,0,0,0.25)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
-      borderBottom: '1px solid rgba(255,255,255,0.08)',
-    }}>
-      <nav className="px-6 py-5 flex items-center justify-between max-w-7xl mx-auto">
+    <div
+      className="fixed top-0 left-0 right-0 z-[60]"
+      style={{
+        background: 'rgba(255,255,255,0.82)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(0,0,0,0.06)',
+      }}
+    >
+      <nav className="px-6 py-4 flex items-center justify-between max-w-7xl mx-auto">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md bg-white flex items-center justify-center">
-            <span className="text-black text-xs font-bold">M</span>
+          <div className="w-7 h-7 rounded-md bg-black flex items-center justify-center">
+            <span className="text-white text-xs font-bold">M</span>
           </div>
-          <span className="text-base font-semibold tracking-tight text-white">Meridian</span>
+          <span className="text-base font-semibold tracking-tight text-gray-900">Meridian</span>
         </div>
-        <div className="hidden md:flex items-center gap-12 text-sm text-white/70">
-          <a href="#flow" className="hover:text-white transition-colors">首页概览</a>
-          <a href="#explain" className="hover:text-white transition-colors">我的计划</a>
-          <a href="#honesty" className="hover:text-white transition-colors">课程库</a>
-          <a href="#feedback" className="hover:text-white transition-colors">评价社区</a>
+        <div className="hidden md:flex items-center gap-12 text-sm text-gray-600">
+          <a href="#flow" className="hover:text-gray-900 transition-colors">首页概览</a>
+          <a href="#explain" className="hover:text-gray-900 transition-colors">我的计划</a>
+          <a href="#honesty" className="hover:text-gray-900 transition-colors">课程库</a>
+          <a href="#feedback" className="hover:text-gray-900 transition-colors">评价社区</a>
         </div>
         <a
           href="#cta"
-          className="bg-white text-black px-5 py-2.5 rounded-full text-sm font-medium hover:bg-white/90 transition-colors"
+          className="bg-black text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition-colors"
         >
           开始分析
         </a>
@@ -83,7 +86,6 @@ function Hero() {
       />
 
       <div className="relative z-20 flex flex-col min-h-screen">
-        <Nav />
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-20 max-w-5xl mx-auto text-center w-full">
         <div
           className="inline-flex items-center gap-2 mb-8 px-3 py-1.5 rounded-full animate-fade-in-up"
@@ -587,9 +589,9 @@ function Footer() {
 /* ---------- Hero → Laptop scroll showcase (replaces standalone Trust) ----- */
 function HeroLaptopShowcase() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const heroRef = useRef<HTMLDivElement>(null);
+  const compositeRef = useRef<HTMLDivElement>(null);
+  const hoverTiltRef = useRef<HTMLDivElement>(null);
   const trustRef = useRef<HTMLDivElement>(null);
-  const laptopRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -605,65 +607,98 @@ function HeroLaptopShowcase() {
         },
       });
 
-      // Hero: full-screen → shrink and tilt into the laptop screen on the right.
-      // Timeline runs 0 → 1 across the pinned scroll. Hero is static for the
-      // first 35% so the user gets a moment to read the headline.
+      // Composite (laptop frame + Hero on screen) shrinks and rotates as one
+      // unit. Starts almost immediately (offset 0.05) and uses power2.out so
+      // the early movement is brisk and the second half decelerates — fast
+      // start, slow tail.
       tl.to(
-        heroRef.current,
+        compositeRef.current,
         {
-          scale: 0.34,
-          xPercent: 25,
-          yPercent: -2,
-          rotateX: -2.5,
-          ease: "power2.inOut",
+          scale: 0.32,
+          xPercent: 26,
+          rotateY: -14,
+          rotateX: -4,
+          duration: 1.2,
+          ease: "power2.out",
         },
-        0.35,
+        0.05,
       );
 
       tl.fromTo(
         trustRef.current,
         { opacity: 0, x: -40 },
-        { opacity: 1, x: 0, ease: "power2.out" },
-        0.5,
-      );
-
-      tl.fromTo(
-        laptopRef.current,
-        { opacity: 0, scale: 0.96 },
-        { opacity: 1, scale: 1, ease: "power2.out" },
-        0.45,
+        { opacity: 1, x: 0, duration: 0.8, ease: "power2.out" },
+        0.6,
       );
     }, containerRef);
 
     return () => ctx.revert();
   }, []);
 
+  // Mouse tracking: laptop yaw/pitch follows cursor position relative to its
+  // own bounding rect. Composes with the parent composite's scroll-driven
+  // transform via translateZ-aware preserve-3d on the laptop. CSS transition
+  // smooths the snap; no JS lerp needed.
+  useEffect(() => {
+    const el = hoverTiltRef.current;
+    if (!el) return;
+
+    const onMove = (e: MouseEvent) => {
+      const rect = el.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width - 0.5;
+      const y = (e.clientY - rect.top) / rect.height - 0.5;
+      const ry = (x * 24).toFixed(2); // ±12° yaw
+      const rx = (-y * 24).toFixed(2); // ±12° pitch — mouse-at-top exposes keyboard
+      el.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
+    };
+
+    const onLeave = () => {
+      el.style.transform = "rotateX(0deg) rotateY(0deg)";
+    };
+
+    el.addEventListener("mousemove", onMove);
+    el.addEventListener("mouseleave", onLeave);
+
+    return () => {
+      el.removeEventListener("mousemove", onMove);
+      el.removeEventListener("mouseleave", onLeave);
+    };
+  }, []);
+
   return (
-    <section ref={containerRef} className="relative" style={{ height: "200vh" }}>
-      <div className="sticky top-0 h-screen w-full overflow-hidden bg-white">
-        {/* Layer 1: Hero — starts full-screen, shrinks toward laptop screen */}
+    <section ref={containerRef} className="relative" style={{ height: "220vh" }}>
+      <div
+        className="sticky top-0 h-screen w-full overflow-hidden bg-white"
+        style={{ perspective: "1800px" }}
+      >
+        {/* Composite: laptop frame + Hero on screen, animated as one unit.
+         * Inner hoverTilt layer composes a small mouse-driven rotation on top
+         * of the scroll-driven transform. */}
         <div
-          ref={heroRef}
+          ref={compositeRef}
           className="absolute inset-0 z-10"
           style={{
             transformOrigin: "center center",
-            perspective: "1500px",
+            transformStyle: "preserve-3d",
             willChange: "transform",
           }}
         >
-          <Hero />
+          <div
+            ref={hoverTiltRef}
+            className="w-full h-full"
+            style={{
+              transformStyle: "preserve-3d",
+              willChange: "transform",
+              transition: "transform 0.18s ease-out",
+            }}
+          >
+            <EmbeddedLaptop>
+              <Hero />
+            </EmbeddedLaptop>
+          </div>
         </div>
 
-        {/* Layer 2: Laptop frame — fades in on the right (transparent screen) */}
-        <div
-          ref={laptopRef}
-          className="absolute right-0 top-0 w-1/2 h-full flex items-center justify-center pl-4 z-20 pointer-events-none"
-          style={{ opacity: 0 }}
-        >
-          <LaptopFrame />
-        </div>
-
-        {/* Layer 3: Trust copy — fades in on the left */}
+        {/* Trust copy on the left half, fades in */}
         <div
           ref={trustRef}
           className="absolute left-0 top-0 w-1/2 h-full flex items-center justify-end pr-8 lg:pr-16 z-30"
@@ -704,6 +739,7 @@ function HeroLaptopShowcase() {
 export default function HomePage() {
   return (
     <main className="bg-white min-h-screen">
+      <Nav />
       <HeroLaptopShowcase />
       <Flow />
       <Explain />
