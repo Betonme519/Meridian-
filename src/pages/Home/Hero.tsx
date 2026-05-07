@@ -79,11 +79,10 @@ export default function Hero() {
           >
             <a
               href="#cta"
-              className="inline-flex items-center gap-2 text-black px-7 py-3.5 rounded-full text-base font-medium transition-colors"
-              style={{ background: "rgba(255,255,255,0.95)" }}
+              className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-full text-base font-medium border border-white bg-transparent text-white hover:bg-white/95 hover:text-black hover:border-white/95 transition-colors duration-300"
             >
               开始分析
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
             </a>
             <p className="text-xs text-white/40">免费 · 无需注册 · 支持导出</p>
           </div>
