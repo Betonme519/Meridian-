@@ -9,8 +9,44 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ScheduleRouteImport } from './routes/schedule'
+import { Route as InsightsRouteImport } from './routes/insights'
+import { Route as GpaSimulatorRouteImport } from './routes/gpa-simulator'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CoursePlannerRouteImport } from './routes/course-planner'
+import { Route as AiAdvisorRouteImport } from './routes/ai-advisor'
 import { Route as IndexRouteImport } from './routes/index'
 
+const ScheduleRoute = ScheduleRouteImport.update({
+  id: '/schedule',
+  path: '/schedule',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InsightsRoute = InsightsRouteImport.update({
+  id: '/insights',
+  path: '/insights',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GpaSimulatorRoute = GpaSimulatorRouteImport.update({
+  id: '/gpa-simulator',
+  path: '/gpa-simulator',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CoursePlannerRoute = CoursePlannerRouteImport.update({
+  id: '/course-planner',
+  path: '/course-planner',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AiAdvisorRoute = AiAdvisorRouteImport.update({
+  id: '/ai-advisor',
+  path: '/ai-advisor',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -19,28 +55,116 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ai-advisor': typeof AiAdvisorRoute
+  '/course-planner': typeof CoursePlannerRoute
+  '/dashboard': typeof DashboardRoute
+  '/gpa-simulator': typeof GpaSimulatorRoute
+  '/insights': typeof InsightsRoute
+  '/schedule': typeof ScheduleRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ai-advisor': typeof AiAdvisorRoute
+  '/course-planner': typeof CoursePlannerRoute
+  '/dashboard': typeof DashboardRoute
+  '/gpa-simulator': typeof GpaSimulatorRoute
+  '/insights': typeof InsightsRoute
+  '/schedule': typeof ScheduleRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ai-advisor': typeof AiAdvisorRoute
+  '/course-planner': typeof CoursePlannerRoute
+  '/dashboard': typeof DashboardRoute
+  '/gpa-simulator': typeof GpaSimulatorRoute
+  '/insights': typeof InsightsRoute
+  '/schedule': typeof ScheduleRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/ai-advisor'
+    | '/course-planner'
+    | '/dashboard'
+    | '/gpa-simulator'
+    | '/insights'
+    | '/schedule'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/ai-advisor'
+    | '/course-planner'
+    | '/dashboard'
+    | '/gpa-simulator'
+    | '/insights'
+    | '/schedule'
+  id:
+    | '__root__'
+    | '/'
+    | '/ai-advisor'
+    | '/course-planner'
+    | '/dashboard'
+    | '/gpa-simulator'
+    | '/insights'
+    | '/schedule'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AiAdvisorRoute: typeof AiAdvisorRoute
+  CoursePlannerRoute: typeof CoursePlannerRoute
+  DashboardRoute: typeof DashboardRoute
+  GpaSimulatorRoute: typeof GpaSimulatorRoute
+  InsightsRoute: typeof InsightsRoute
+  ScheduleRoute: typeof ScheduleRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/schedule': {
+      id: '/schedule'
+      path: '/schedule'
+      fullPath: '/schedule'
+      preLoaderRoute: typeof ScheduleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/insights': {
+      id: '/insights'
+      path: '/insights'
+      fullPath: '/insights'
+      preLoaderRoute: typeof InsightsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gpa-simulator': {
+      id: '/gpa-simulator'
+      path: '/gpa-simulator'
+      fullPath: '/gpa-simulator'
+      preLoaderRoute: typeof GpaSimulatorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/course-planner': {
+      id: '/course-planner'
+      path: '/course-planner'
+      fullPath: '/course-planner'
+      preLoaderRoute: typeof CoursePlannerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ai-advisor': {
+      id: '/ai-advisor'
+      path: '/ai-advisor'
+      fullPath: '/ai-advisor'
+      preLoaderRoute: typeof AiAdvisorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -53,6 +177,12 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AiAdvisorRoute: AiAdvisorRoute,
+  CoursePlannerRoute: CoursePlannerRoute,
+  DashboardRoute: DashboardRoute,
+  GpaSimulatorRoute: GpaSimulatorRoute,
+  InsightsRoute: InsightsRoute,
+  ScheduleRoute: ScheduleRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

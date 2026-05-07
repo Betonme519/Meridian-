@@ -121,17 +121,38 @@ export default function Navbar() {
             评价社区
           </a>
         </div>
-        <a
-          href="#cta"
-          className="px-5 py-2.5 rounded-full text-sm font-medium"
-          style={{
-            background: scrolled ? "#000" : "rgba(255,255,255,0.95)",
-            color: scrolled ? "#fff" : "#000",
-            transition: "background 0.3s ease, color 0.3s ease",
-          }}
-        >
-          开始分析
-        </a>
+        <div className="flex items-center gap-2">
+          <a
+            href="#"
+            className="px-4 py-2.5 rounded-full text-sm font-medium"
+            style={{
+              color: scrolled ? "#111827" : "rgba(255,255,255,0.9)",
+              background: "transparent",
+              transition: "color 0.3s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = scrolled
+                ? "rgba(0,0,0,0.05)"
+                : "rgba(255,255,255,0.12)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+            }}
+          >
+            登录
+          </a>
+          <a
+            href="#"
+            className="px-5 py-2.5 rounded-full text-sm font-medium"
+            style={{
+              background: scrolled ? "#000" : "rgba(255,255,255,0.95)",
+              color: scrolled ? "#fff" : "#000",
+              transition: "background 0.3s ease, color 0.3s ease",
+            }}
+          >
+            注册
+          </a>
+        </div>
       </nav>
     </div>
   );

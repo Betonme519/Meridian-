@@ -14,7 +14,7 @@ export default function FinalCTA() {
           上传学校手册，查看你的绩点计算方式与选课风险。
         </p>
         <a
-          href="#"
+          href="/dashboard"
           className="inline-flex items-center gap-2 bg-black text-white px-8 py-4 rounded-full text-base font-medium hover:bg-gray-800 transition-colors"
         >
           立即开始

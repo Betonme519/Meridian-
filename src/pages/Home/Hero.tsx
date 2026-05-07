@@ -78,7 +78,7 @@ export default function Hero() {
             style={{ opacity: 0, animationDelay: "0.4s" }}
           >
             <a
-              href="#cta"
+              href="/dashboard"
               className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-full text-base font-medium border border-white bg-transparent text-white hover:bg-white/95 hover:text-black hover:border-white/95 transition-colors duration-300"
             >
               开始分析
