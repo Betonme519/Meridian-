@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import DashboardLayout from "@/layouts/DashboardLayout";
 import {
   ArrowRightLeft,
   BarChart3,
@@ -98,104 +97,174 @@ export default function GPASimulatorPage() {
   );
 
   return (
-    <DashboardLayout>
-      <section className="mx-auto max-w-7xl px-5 py-6 sm:px-8">
-        <div className="rounded-xl border border-slate-200 bg-white p-6">
-          <p className="text-sm font-medium text-slate-500">方案模拟</p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight">如果这样选，会发生什么</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-            你可以模拟 drop 课、换课、P/F、暑校与替代学分。系统实时计算
-            GPA、毕业进度、时间压力与风险变化。
-          </p>
-        </div>
+    <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
+      {/* Hero */}
+      <header className="animate-fade-in-up-soft">
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+          如果这样选，会发生什么
+        </h1>
+        <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+          你可以模拟 drop 课、换课、P/F、暑校与替代学分。系统实时计算
+          GPA、毕业进度、时间压力与风险变化。
+        </p>
+      </header>
 
-        <div className="mt-5 grid gap-5 lg:grid-cols-4">
-          {activeAction.metrics.map(([label, value], index) => {
-            const Icon = metricIcons[index];
-            return (
-              <div key={label} className="rounded-xl border border-slate-200 bg-white p-5">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-slate-500">{label}</p>
-                  <Icon className="h-5 w-5 text-slate-400" />
-                </div>
-                <p className="mt-4 text-3xl font-semibold">{value}</p>
+      {/* Top metrics — large readouts; key positive/negative with subtle accent line */}
+      <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {activeAction.metrics.map(([label, value], index) => {
+          const Icon = metricIcons[index];
+          const positive = value.startsWith("+");
+          const negative = value.startsWith("-");
+          return (
+            <div
+              key={label}
+              className="animate-fade-in-up-soft relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5"
+              style={{ animationDelay: `${60 + index * 50}ms` }}
+            >
+              <span
+                className={`absolute inset-x-0 top-0 h-px ${
+                  positive
+                    ? "bg-emerald-400/70"
+                    : negative
+                      ? "bg-amber-400/70"
+                      : "bg-slate-200"
+                }`}
+              />
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-slate-500">{label}</p>
+                <Icon className="h-4 w-4 text-slate-400" strokeWidth={1.7} />
               </div>
-            );
-          })}
-        </div>
-
-        <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_360px]">
-          <main className="rounded-xl border border-slate-200 bg-white p-5">
-            <div className="flex items-center gap-2">
-              <ArrowRightLeft className="h-5 w-5 text-slate-500" />
-              <h2 className="font-semibold">可模拟动作</h2>
+              <p
+                key={value}
+                className="animate-fade-in-up-soft mt-4 text-3xl font-semibold tracking-tight tabular-nums"
+              >
+                {value}
+              </p>
             </div>
-            <div className="mt-5 space-y-3">
-              {actions.map((action) => {
-                const active = action.type === selectedAction;
-                return (
-                  <button
-                    key={action.type}
-                    type="button"
-                    onClick={() => setSelectedAction(action.type)}
-                    className={`grid w-full gap-3 rounded-lg border p-4 text-left transition-colors md:grid-cols-[120px_1fr_120px_160px_24px] md:items-center ${
+          );
+        })}
+      </div>
+
+      <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_360px]">
+        <main className="rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="flex items-center gap-2">
+            <ArrowRightLeft className="h-5 w-5 text-slate-500" />
+            <h2 className="font-semibold">可模拟动作</h2>
+            <span className="ml-auto text-xs text-slate-400 tabular-nums">
+              {actions.length} 个动作
+            </span>
+          </div>
+          <div className="mt-5 space-y-2.5">
+            {actions.map((action, i) => {
+              const active = action.type === selectedAction;
+              const positive = action.primary.startsWith("GPA +") || action.primary.startsWith("毕业") || action.primary.startsWith("Requirement");
+              return (
+                <button
+                  key={action.type}
+                  type="button"
+                  onClick={() => setSelectedAction(action.type)}
+                  aria-pressed={active}
+                  className={`animate-fade-in-up-soft grid w-full gap-3 rounded-xl border p-4 text-left transition-colors duration-300 md:grid-cols-[110px_1fr_120px_160px_24px] md:items-center ${
+                    active
+                      ? "border-slate-950 bg-slate-950 text-white"
+                      : "border-slate-200 hover:border-slate-400"
+                  }`}
+                  style={{ animationDelay: `${80 + i * 40}ms` }}
+                >
+                  <span
+                    className={`inline-flex h-6 items-center self-start rounded-full px-2.5 text-[11px] font-semibold tracking-wide md:self-center ${
                       active
-                        ? "border-slate-950 bg-slate-950 text-white"
-                        : "border-slate-200 hover:border-slate-400"
+                        ? "bg-white/10 text-slate-200"
+                        : "bg-slate-100 text-slate-600"
                     }`}
                   >
-                    <span
-                      className={`text-sm font-semibold ${active ? "text-slate-200" : "text-slate-500"}`}
-                    >
-                      {action.type}
-                    </span>
-                    <span className="text-sm font-medium">{action.title}</span>
-                    <span
-                      className={`text-sm font-semibold ${active ? "text-emerald-300" : "text-emerald-700"}`}
-                    >
-                      {action.primary}
-                    </span>
-                    <span className={`text-sm ${active ? "text-slate-300" : "text-slate-500"}`}>
-                      {action.secondary}
-                    </span>
-                    {active ? <CheckCircle2 className="h-5 w-5 text-emerald-300" /> : <span />}
-                  </button>
+                    {action.type}
+                  </span>
+                  <span className="text-sm font-medium">{action.title}</span>
+                  <span
+                    className={`text-sm font-semibold tabular-nums ${
+                      active
+                        ? positive
+                          ? "text-emerald-300"
+                          : "text-amber-200"
+                        : positive
+                          ? "text-emerald-700"
+                          : "text-amber-700"
+                    }`}
+                  >
+                    {action.primary}
+                  </span>
+                  <span
+                    className={`text-sm tabular-nums ${
+                      active ? "text-slate-300" : "text-slate-500"
+                    }`}
+                  >
+                    {action.secondary}
+                  </span>
+                  {active ? (
+                    <CheckCircle2 className="h-5 w-5 text-emerald-300" />
+                  ) : (
+                    <span className="hidden md:block" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </main>
+
+        <aside className="space-y-5">
+          {/* Animated bar chart — bars rise on mount + on action change */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="flex items-center gap-2">
+              <LineChart className="h-5 w-5 text-slate-500" />
+              <h2 className="font-semibold">实时推演</h2>
+              <span className="ml-auto text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                未来 6 学期
+              </span>
+            </div>
+            <div
+              key={selectedAction}
+              className="mt-6 flex h-52 items-end gap-3"
+            >
+              {[52, 61, 66, 73, 69, 82].map((height, index) => {
+                const h = height + (selectedAction.length % 4) * 3;
+                const isLast = index === 5;
+                return (
+                  <div key={index} className="flex flex-1 flex-col items-center gap-3">
+                    <div className="relative flex w-full flex-1 items-end">
+                      <div
+                        className={`animate-bar-rise w-full rounded-t-md ${
+                          isLast ? "bg-slate-950" : "bg-slate-300"
+                        }`}
+                        style={{
+                          height: `${h}%`,
+                          animationDelay: `${index * 90}ms`,
+                        }}
+                      >
+                        {isLast && (
+                          <span className="absolute -top-6 right-0 text-[11px] font-semibold tabular-nums text-slate-900">
+                            3.{40 + (selectedAction.length % 9)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-xs text-slate-400 tabular-nums">S{index + 1}</span>
+                  </div>
                 );
               })}
             </div>
-          </main>
+          </div>
 
-          <aside className="space-y-5">
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <div className="flex items-center gap-2">
-                <LineChart className="h-5 w-5 text-slate-500" />
-                <h2 className="font-semibold">实时推演</h2>
-              </div>
-              <div className="mt-6 flex h-52 items-end gap-3">
-                {[52, 61, 66, 73, 69, 82].map((height, index) => (
-                  <div key={index} className="flex flex-1 flex-col items-center gap-3">
-                    <div
-                      className="w-full rounded-t-md bg-slate-950"
-                      style={{
-                        height: `${height + (selectedAction.length % 4) * 3}%`,
-                        opacity: 0.45 + index * 0.07,
-                      }}
-                    />
-                    <span className="text-xs text-slate-400">S{index + 1}</span>
-                  </div>
-                ))}
-              </div>
+          {/* Path judgment */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-slate-500" />
+              <h2 className="font-semibold">当前路径判断</h2>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-slate-500" />
-                <h2 className="font-semibold">当前路径判断</h2>
-              </div>
-              <p className="mt-4 text-sm leading-7 text-slate-700">{activeAction.summary}</p>
-            </div>
-          </aside>
-        </div>
-      </section>
-    </DashboardLayout>
+            <p className="mt-4 text-sm leading-7 text-slate-700">{activeAction.summary}</p>
+          </div>
+        </aside>
+      </div>
+    </section>
   );
 }

@@ -1,14 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import {
-  BookOpenCheck,
-  Compass,
-  GitBranch,
-  GraduationCap,
-  Route as RouteIcon,
-  Target,
-  type LucideIcon,
-} from "lucide-react";
+import { MENU_ITEMS } from "@/config/menu";
 
 /**
  * Adaptive top navigation bar.
@@ -17,23 +9,8 @@ import {
  *    + dark text + subtle separator. Smooth color transition between states.
  *  - Left-side hamburger opens a drawer with feature routes.
  *
- * 菜单项的中文 label 与 icon 与 DashboardLayout 中 sidebar 保持一致，
- * 这样左侧 drawer 与正式 dashboard sidebar 在视觉上是同一套导航。
+ * 菜单数据来自 src/config/menu.ts，与 DashboardLayout 共用同一份。
  */
-
-const MENU_ITEMS: {
-  label: string;
-  desc: string;
-  to: string;
-  icon: LucideIcon;
-}[] = [
-  { label: "策略中心", desc: "AI 当前建议与状态", to: "/dashboard", icon: Compass },
-  { label: "目标模式", desc: "决定整个系统推荐逻辑", to: "/ai-advisor", icon: Target },
-  { label: "学校规则", desc: "学校规则结构树", to: "/course-planner", icon: GitBranch },
-  { label: "毕业路径", desc: "毕业 requirement 追踪", to: "/schedule", icon: GraduationCap },
-  { label: "课程策略", desc: "课程价值分析", to: "/insights", icon: BookOpenCheck },
-  { label: "方案模拟", desc: "不同路径实时推演", to: "/gpa-simulator", icon: RouteIcon },
-];
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);

@@ -12,6 +12,17 @@
   }
 }
 
+@keyframes fadeInUpSoft {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes fadeInOverlay {
   from {
     opacity: 0;
@@ -30,8 +41,49 @@
   }
 }
 
+@keyframes pulseHalo {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+@keyframes barRise {
+  from {
+    transform: scaleY(0);
+    opacity: 0.35;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+@keyframes barFillX {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
 .animate-fade-in-up {
   animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.animate-fade-in-up-soft {
+  opacity: 0;
+  animation: fadeInUpSoft 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
 }
 
 .animate-fade-in-overlay {
@@ -41,4 +93,27 @@
 .animate-slide-up-overlay {
   animation: fadeInDialog 0.5s ease-out forwards;
   transform: translate(-50%, -50%);
+}
+
+.animate-pulse-halo {
+  animation: pulseHalo 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-bar-rise {
+  transform-origin: bottom;
+  animation: barRise 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+.animate-bar-fill {
+  transform-origin: left;
+  animation: barFillX 1.1s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+.animate-breathe {
+  animation: breathe 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* tabular numerals for stat readouts — keeps digits aligned during transitions */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }

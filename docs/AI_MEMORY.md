@@ -3,8 +3,8 @@
 > **新 AI 会话 / 新 agent 接手时直接贴这一份。** 等于是给新对话灌入"项目长期记忆"。
 > 重大里程碑后更新；不是每次都改。CURRENT_TASK.md 是每会话的；这份是跨会话的。
 
-> Last snapshot: **2026-05-06**
-> Latest commit: `c826436` (docs)
+> Last snapshot: **2026-05-07**
+> Latest commit: `7f1210c` (菜单栏修改完成) ＋ 未提交：一级结构债收敛
 > Active branch: `main`
 
 ---
@@ -12,9 +12,9 @@
 ## 1. 当前项目状态（一图速览）
 
 ```
-阶段        →  落地页基本完成，进入产品页扩展期
-今日重点    →  无具体编码任务（刚做完文档体系）
-下一里程碑  →  CourseAnalyzer 真实数据流 / Dashboard 完整 / 后端 Worker
+阶段        →  落地页完成 + 一级结构债收敛完毕，进入业务接入期
+今日重点    →  架构审计后做了 4 件结构事：menu 单一真理 / _app layout route / 删旧 stub / Providers 壳
+下一里程碑  →  决定 BFF vs Supabase / AI provider 抽象 / Dashboard 真实数据
 风险点      →  bun.lockb 与 node_modules 可能不同步；中国高校本地化未做
 ```
 
@@ -24,17 +24,35 @@
 |---|---|
 | 落地页（Home） | ✅ 90%（视觉/动画完成，文案需本地化为中国高校） |
 | 笔记本 3D 展示 | ✅ 100%（CSS 伪 3D，含厚度 / 键盘 / hover lift） |
-| 文档体系 | ✅ 100%（4 份文档完整） |
-| Dashboard 页 | 🟡 5%（仅骨架文件） |
-| CourseAnalyzer 页 | 🟡 5%（仅骨架文件） |
-| 后端 Worker | ❌ 0%（未建项目） |
-| 鉴权 / 用户系统 | ❌ 0%（仅 context 占位） |
+| 文档体系 | ✅ 100%（CURRENT_TASK / AI_MEMORY / OVERVIEW / ARCHITECTURE / DESIGN_SYSTEM / TECH_DEBT / ARCHITECTURE_AUDIT） |
+| 路由架构 | ✅ pathless `_app` layout，6 个功能页统一套 DashboardLayout |
+| 全局菜单单一真理 | ✅ `src/config/menu.ts`（Navbar + DashboardLayout 共用） |
+| Providers 壳 | ✅ `__root.tsx` 已挂 pass-through `<Providers>`（5 个 TODO 挂点） |
+| Dashboard / 6 个功能页 | 🟡 静态 demo（写死 const，等真实数据） |
+| CourseAnalyzer 页 | 🟡 5%（骨架，无 route） |
+| 后端 Worker | ❌ 0%（未建项目；BFF vs Supabase 方向未定） |
+| AI provider 抽象 | ❌ 0%（`src/api/aiApi.ts` 全空 stub，streaming 协议未定） |
+| 鉴权 / 用户系统 | ❌ 0%（context 占位 + `useAuth` 未读 context） |
 | 学校手册 RAG pipeline | ❌ 0% |
 | 真实数据接入 | ❌ 0% |
 
 ---
 
 ## 2. 已完成（按 commit 倒序）
+
+### **2026-05-07** — 一级结构债收敛（未提交）
+做了架构审计 + 处理 4 件最高优先级结构问题，**严格不动 UI 与业务逻辑**：
+
+- `src/config/menu.ts` 单一真理：6 项功能菜单（label/desc/to/icon）抽出，`Navbar` 与 `DashboardLayout` 共用
+- TanStack Router `_app` pathless layout：新建 `routes/_app.tsx` 包 `<Outlet>` in `DashboardLayout`，6 个功能页 route 移入 `routes/_app/`，**page 不再 import DashboardLayout**
+  - URL 不变（仍 `/dashboard` 等，`_app` 段被 pathless 吃掉）
+  - `routeTree.gen.ts` 由 router-plugin 自动重生成
+- 删除旧 stub：`src/components/Navbar/`、`src/components/Sidebar/`（确认零引用）
+- `__root.tsx` 加 `<Providers>` pass-through 函数：5 个 JSDoc 挂点（QueryClient / Auth / Theme / Toaster / ErrorBoundary）。**未引入任何新依赖、无业务逻辑**
+- 派生文档：`docs/ARCHITECTURE_AUDIT.md`（一次性深度审计，4 章 + 14 节）+ `docs/TECH_DEBT.md`（持续追踪）
+- 验证：`tsc --noEmit` clean
+
+**未做（用户明确要求不做）：** 真接 react-query / Supabase / AI provider；不抽业务组件；不改 api/services/hooks。
 
 ### `c826436` — docs: AI handoff documentation
 四份文档：
@@ -101,6 +119,16 @@
 **阈值：** 30vh（笔记本展示已缩小到右下，主视野是白色 sticky 舞台）。
 **坑：** 直接 setState 在快速滚动时频繁触发；当前用了 `passive: true` listener 没明显问题。如果以后卡，改成 RAF 节流。
 
+### 路由分组：TanStack Router pathless `_app` layout
+**为什么：** 6 个功能页都需要 `DashboardLayout`（左侧 rail + drawer）。原本每个 page 各自 `import DashboardLayout` 后手动包裹——layout 决策被泄露到 page 里，新增功能页要记得包，新增全局壳要改 6 处。
+**当前：** `routes/_app.tsx` 是 pathless layout（`_` 前缀），内部 `<DashboardLayout><Outlet/></DashboardLayout>`。功能页 route 全在 `routes/_app/` 下，URL 不变（`_app` 段被 pathless 吃掉）。
+**坑：** `routeTree.gen.ts` 由 router-plugin 自动生成；移动 route 文件后 plugin 会自动改写 `createFileRoute` 路径字符串到 `/_app/<name>`，但**别手改 routeTree.gen.ts**，重启 dev 会被覆盖。
+
+### 全局菜单：单一真理 `src/config/menu.ts`
+**为什么：** Navbar（首页 drawer）和 DashboardLayout（功能页左侧 rail + drawer）显示**完全相同**的功能菜单。改一处忘另一处 = UI 不一致。
+**当前：** `src/config/menu.ts` 导出 `MENU_ITEMS: MenuItem[]`，字段统一为 `{ label, desc, to, icon }`。两处 import 同一份。
+**新加菜单项：** 只动 `src/config/menu.ts`，Navbar 和 DashboardLayout 自动同步。
+
 ### 项目结构：一 section 一文件
 **为什么：** 多 agent 用 git 分支并行开发同一项目。Home/index.tsx 730 行的单文件会冲突。
 **协作模式：** `feature/home-flow`、`feature/home-feedback` 各自分支互不冲突。
@@ -159,13 +187,16 @@
 - ❓ 鉴权：cookie session（推荐）还是 JWT（移动端友好）
 
 ### 历史包袱（不影响功能但乱）
-- `src/components/{Navbar,Sidebar,CourseCard,GPAChart,UploadBox,ChatPanel}/` 早期占位骨架，与新结构重复
-- `src/components/effects/LaptopFrame.tsx + .css` 旧版 CSS 笔记本（已不用）
-- `src/layouts/` 旧版页面壳（与 `components/layout/` 重复）
-- `src/pages/{Planner,Courses,Upload,AIAdvisor,Profile}/` 早期占位
-- `src/styles.css` 早期入口（已被 globals.css 取代，但还在文件树里？要确认）
+- ~~`src/components/{Navbar,Sidebar}/`~~ 已删除（2026-05-07）
+- `src/components/{CourseCard,GPAChart,UploadBox,ChatPanel}/` 仍是空 `<div />` stub，留待业务接入时实做或删
+- `src/components/effects/LaptopFrame.tsx + .css` 旧版 CSS 笔记本（已不用，保留作 fallback）
+- `src/components/effects/LiquidEther.css` 孤儿 CSS（无对应 .tsx，可删）
+- `src/layouts/MainLayout.tsx` 旧版页面壳（与 `components/layout/PageShell` 重复且都无人用）
+- `src/components/layout/PageShell.tsx` 写完无人引用（Home 直接拼 Navbar+Footer）
+- `src/pages/{Courses,Upload,AIAdvisor,Profile,CourseAnalyzer}/` 中无 route 的 4 个：早期占位（AIAdvisor 已通过 `/ai-advisor` route 接入）
+- `components.json` tailwind css 入口指 `src/styles.css`，实际是 `src/styles/globals.css`——`shadcn add` 会出错
 
-**清理时机：** 等 CourseAnalyzer / Dashboard 真实开发完，再统一清理 — 现在动可能误删要复用的。
+**清理时机：** 等业务方向定下来（BFF vs Supabase + AI provider）后统一清理。详见 `docs/TECH_DEBT.md`。
 
 ---
 

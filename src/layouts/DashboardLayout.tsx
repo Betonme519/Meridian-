@@ -1,36 +1,14 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import {
-  BookOpenCheck,
-  Compass,
-  GitBranch,
-  GraduationCap,
-  Route as RouteIcon,
-  Target,
-  type LucideIcon,
-} from "lucide-react";
+import { MENU_ITEMS } from "@/config/menu";
 
 /**
  * 功能页面外壳。
  *  - 左侧固定一条 icon-only rail（仅 lg+ 显示），高亮当前所在功能。
  *  - 顶部 sticky 栏带 hamburger，点击展开 drawer，drawer 风格与首页 Navbar 一致。
+ *
+ * 菜单数据来自 src/config/menu.ts，与首页 Navbar 共用同一份。
  */
-
-type NavItem = {
-  href: string;
-  label: string;
-  desc: string;
-  icon: LucideIcon;
-};
-
-const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "策略中心", desc: "AI 当前建议与状态", icon: Compass },
-  { href: "/ai-advisor", label: "目标模式", desc: "决定整个系统推荐逻辑", icon: Target },
-  { href: "/course-planner", label: "学校规则", desc: "学校规则结构树", icon: GitBranch },
-  { href: "/schedule", label: "毕业路径", desc: "毕业 requirement 追踪", icon: GraduationCap },
-  { href: "/insights", label: "课程策略", desc: "课程价值分析", icon: BookOpenCheck },
-  { href: "/gpa-simulator", label: "方案模拟", desc: "不同路径实时推演", icon: RouteIcon },
-];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const currentPath = useRouterState({ select: (state) => state.location.pathname });
@@ -60,7 +38,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     setOpen(false);
   }, [currentPath]);
 
-  const currentItem = NAV_ITEMS.find((i) => i.href === currentPath);
+  const currentItem = MENU_ITEMS.find((i) => i.to === currentPath);
   const CurrentIcon = currentItem?.icon;
 
   return (
@@ -76,13 +54,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           M
         </Link>
         <nav className="mt-6 flex flex-col gap-1.5">
-          {NAV_ITEMS.map((item) => {
+          {MENU_ITEMS.map((item) => {
             const Icon = item.icon;
-            const active = currentPath === item.href;
+            const active = currentPath === item.to;
             return (
               <Link
-                key={item.href}
-                to={item.href}
+                key={item.to}
+                to={item.to}
                 title={item.label}
                 aria-label={item.label}
                 aria-current={active ? "page" : undefined}
@@ -261,13 +239,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               功能导航
             </div>
             <ul className="flex flex-col">
-              {NAV_ITEMS.map((item, i) => {
+              {MENU_ITEMS.map((item, i) => {
                 const Icon = item.icon;
-                const active = currentPath === item.href;
+                const active = currentPath === item.to;
                 return (
-                  <li key={item.href}>
+                  <li key={item.to}>
                     <Link
-                      to={item.href}
+                      to={item.to}
                       onClick={() => setOpen(false)}
                       aria-current={active ? "page" : undefined}
                       className="group flex items-center gap-4 py-4 border-b border-gray-100"
