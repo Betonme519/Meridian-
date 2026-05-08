@@ -164,6 +164,13 @@ export default function HeroLaptopShowcase() {
 
   return (
     <section ref={containerRef} className="relative" style={{ height: "320vh" }}>
+      {/* Anchor target for nav "产品理念" — landing scroll Y here puts the
+          GSAP scrub at the trust-copy peak (≈ progress 0.45). */}
+      <div
+        id="trust"
+        aria-hidden="true"
+        style={{ position: "absolute", top: "100vh", left: 0, pointerEvents: "none" }}
+      />
       <div
         className="sticky top-0 h-screen w-full overflow-hidden bg-white"
         style={{ perspective: "1800px" }}

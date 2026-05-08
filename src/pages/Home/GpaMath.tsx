@@ -80,6 +80,7 @@ export default function GpaMath() {
   return (
     <section
       ref={sectionRef}
+      id="value"
       className="px-6 py-48 md:py-56 bg-white"
     >
       <div className="max-w-7xl mx-auto">

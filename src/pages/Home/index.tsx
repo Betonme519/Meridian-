@@ -7,6 +7,7 @@ import GpaMath from "./GpaMath";
 import Honesty from "./Honesty";
 import Control from "./Control";
 import Feedback from "./Feedback";
+import Faq from "./Faq";
 import FinalCTA from "./FinalCTA";
 import "./Home.css";
 
@@ -32,6 +33,7 @@ export default function HomePage() {
       <Honesty />
       <Control />
       <Feedback />
+      <Faq />
       <FinalCTA />
       <Footer />
     </main>

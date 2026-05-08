@@ -81,7 +81,7 @@ export default function Navbar() {
             "background 0.3s ease, border-bottom-color 0.3s ease, backdrop-filter 0.3s ease",
         }}
       >
-        <nav className="px-6 py-4 flex items-center justify-between max-w-7xl mx-auto">
+        <nav className="relative px-6 py-4 flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-3">
             {/* Hamburger — left side. Both lines use the same integer pixel
                 height so they render with identical thickness on every DPI
@@ -168,14 +168,14 @@ export default function Navbar() {
           </div>
 
           <div
-            className="hidden md:flex items-center gap-12 text-sm"
+            className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-10 lg:gap-12 text-sm"
             style={{
               color: navOpaque ? "#4b5563" : "rgba(255,255,255,0.75)",
               transition: "color 0.3s ease",
             }}
           >
             <a
-              href="#flow"
+              href="#trust"
               className="transition-colors"
               style={{ color: "inherit" }}
               onMouseEnter={(e) => {
@@ -185,7 +185,7 @@ export default function Navbar() {
                 e.currentTarget.style.color = "inherit";
               }}
             >
-              首页概览
+              产品理念
             </a>
             <a
               href="#explain"
@@ -197,10 +197,10 @@ export default function Navbar() {
                 e.currentTarget.style.color = "inherit";
               }}
             >
-              我的计划
+              规则系统
             </a>
             <a
-              href="#honesty"
+              href="#value"
               style={{ color: "inherit" }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.color = navOpaque ? "#111827" : "#fff";
@@ -209,7 +209,7 @@ export default function Navbar() {
                 e.currentTarget.style.color = "inherit";
               }}
             >
-              课程库
+              决策路径
             </a>
             <a
               href="#feedback"
@@ -221,7 +221,7 @@ export default function Navbar() {
                 e.currentTarget.style.color = "inherit";
               }}
             >
-              评价社区
+              用户反馈
             </a>
           </div>
 
