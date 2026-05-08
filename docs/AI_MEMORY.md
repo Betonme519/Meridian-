@@ -4,7 +4,7 @@
 > 重大里程碑后更新；不是每次都改。CURRENT_TASK.md 是每会话的；这份是跨会话的。
 
 > Last snapshot: **2026-05-08**
-> Latest commit: `c60efa1` (第三页完成) ＋ 未提交：登录/注册页 + Mock 鉴权
+> Latest commit: `c60efa1` (第三页完成) ＋ 未提交：登录系统 + 落地页改版（认知落差 / Meridian 本质 / FAQ / Footer 黑底）
 > Active branch: `main`
 
 ---
@@ -22,7 +22,7 @@
 
 | 模块 | 状态 |
 |---|---|
-| 落地页（Home） | ✅ 90%（视觉/动画完成，文案需本地化为中国高校） |
+| 落地页（Home） | ✅ 95%（认知落差 / Meridian 本质 / FAQ / Footer 黑底全部接好；文案需本地化为中国高校） |
 | 笔记本 3D 展示 | ✅ 100%（CSS 伪 3D，含厚度 / 键盘 / hover lift） |
 | 文档体系 | ✅ 100%（CURRENT_TASK / AI_MEMORY / OVERVIEW / ARCHITECTURE / DESIGN_SYSTEM / TECH_DEBT / ARCHITECTURE_AUDIT） |
 | 路由架构 | ✅ pathless `_app` layout，6 个功能页统一套 DashboardLayout |
@@ -39,6 +39,52 @@
 ---
 
 ## 2. 已完成（按 commit 倒序）
+
+### **2026-05-08** — 落地页 Explain / GpaMath / FAQ / Footer 改版（未提交）
+
+落地页 4 个 section 的视觉与交互重做，新增 1 个通用组件 CardSwap。
+
+**Explain.tsx — 「认知落差」（替代旧的"每个推荐都有理由"）：**
+- 黑底 + 磨砂玻璃卡（`bg-gradient-to-br from-white/[0.10] via-white/[0.05] to-white/[0.02] + backdrop-blur-2xl + border-white/15 + inset 高光 shadow`）
+- 两栏并置同一组 6 件事，左栏 emerald check 圆 + 文字由 `#9ca3af → #f8fafc`，右栏白色描边问号圆 + 文字由 `#e5e7eb → #9ca3af` + overlay 横线 `scaleX 0→1` 划过
+- 滚动驱动：GSAP scrub 1，cardRef trigger，`start: "top 90%" end: "center 62%"`，6 项 stagger 0.6 间隔 → 卡片中心碰到视口中心稍前完成全部勾掉/划掉
+- 鼠标 tilt：`perspective 1200 + transformStyle preserve-3d`，quickTo `rotationY ±2.5° / rotationX ±1.75°` (Y 反向)，duration 0.55s power2.out
+- 大标题用 `<SplitText>` 与 Hero 同源参数（splitType chars / delay 40 / duration 0.9 / from y:50）
+- 文案：「为什么大家会焦虑」「在同一个学校中」（无句号）+ 桥接「很多人直到毕业前，才第一次看清这些规则之间的关系」
+
+**GpaMath.tsx — 「Meridian 不只是推荐好课」（替代旧的"绩点不是玄学，是公式"）：**
+- 左栏文字：kicker 「产品价值」+ h2 大字（Meridian / 不只是推荐好课，强制换行）+ 副文 `text-lg md:text-2xl text-gray-700`（而是在你的目标下 / 计算代价最低的路径）+ 三个 bullet 点 `space-y-3 text-gray-600`（目标变化推荐逻辑实时变化 / 规则之间的影响关系被重新展开 / 每一次选择都会被提前推演）
+- 右栏视频堆叠：CardSwap 三张卡（width 720 / height 480 / cardDistance 84 / verticalDistance 96 / delay 3000ms / easing linear），列高 500/580/640px，container `position: absolute top:50% right:0 translate(0,-50%)` 垂直居中锚点
+- 入场顺序：kicker → h2 SplitText → 副文 0.55s → bullets stagger 0.12s → 视频 0.35s 同链 ScrollTrigger `top 80%`
+- `id="value"` 给 Navbar 用（备用，当前未引用）
+
+**新组件 `src/components/effects/CardSwap.{tsx,css}` — React Bits port，TS 化：**
+- 自动循环：`setInterval(swap, delay)`，前卡 y+=500 掉下，余卡 promote，原前卡返回末位
+- 点击跳转：`goToFrontRef` 按 click 把对应 idx 旋到 order[0]，0.55s power2.out 全卡同步重定位，结束后重启 interval（kill 当前 timeline 防冲突）
+- 视口暂停：IntersectionObserver `threshold: 0` 观察 container，离屏 → `tlRef.pause() + clearInterval`，回屏 → `play() + startInterval`，避免滚过去之后卡片继续滑动到下一 section
+- 卡片样式：`linear-gradient(140deg, #1d1d22, #131318)` + `border-white/16` + `box-shadow 0 18px 50px`（不是纯黑），`cursor: pointer`
+- props：`width / height / cardDistance / verticalDistance / delay / pauseOnHover / onCardClick / skewAmount / easing(linear|elastic) / children`
+
+**Faq.tsx — 新 section（在 Feedback 与 FinalCTA 之间）：**
+- 4 条 Q&A，编号 `01-04 text-xl md:text-2xl tabular-nums`，hover 时颜色由 gray-400 → gray-900
+- 鼠标悬停展开答案：`grid-template-rows 0fr → 1fr` 平滑展开 + 答案 opacity 0→1 delay 100ms + Plus 图标 `rotate-45` 变 × + 行 `bg-gray-50` 浅底 + 题目 `translate-x-0.5`
+- 触屏降级：`[@media(hover:none)]:grid-rows-[1fr] + opacity-100`，无 hover 设备答案常驻
+- 入场：kicker / h2 / 4 项 stagger fade-up（duration 0.5/0.75/0.6 + delay 0/150/400ms）
+- 容器宽 `max-w-6xl`，行 padding `px-4 md:px-8 py-8`，列间距 `gap-8 md:gap-14`
+
+**Footer.tsx — 三栏黑底重写：**
+- `bg-black + border-t border-white/10 + py-14`
+- 左栏：M logo 反色（`bg-white + 黑 M`）+ Meridian + `See the rules earlier.` + 「很多规则，只是从来没人把它们连接起来。」
+- 中栏：`Workspace / Rules / Simulation` 一列三行（`<br />` 分行 + leading-7）
+- 右栏：`Built for students.`
+- 字色阶：white / gray-300 / gray-500 三档，重要 white、次重要 gray-300、辅助 gray-500
+- 底部 `border-t border-white/10` + © 版权小字
+
+**Navbar.tsx：**
+- 4 项导航居中：父 `relative`，nav links 容器 `absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`
+- 文案与锚点：产品理念 → `#trust`（HeroLaptopShowcase 内 sentinel `<div id="trust" top:100vh>`，触发 GSAP scrub progress ≈ 0.45）/ 规则系统 → `#explain` / 决策路径 → `#value` / 用户反馈 → `#feedback`
+- 登录态适配（已有）：`useAuth` 拿 user，登录后右上变 DropdownMenu 头像
+- AIAdvisor 一处文案：「口述你的情况」→「描述你的情况」
 
 ### **2026-05-08** — 登录/注册页 + Mock 鉴权（未提交）
 
