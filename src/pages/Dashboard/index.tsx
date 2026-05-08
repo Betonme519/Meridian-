@@ -1,194 +1,396 @@
+import { useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   ArrowRight,
-  CalendarDays,
+  ArrowRightLeft,
+  CalendarClock,
   CheckCircle2,
+  ClipboardList,
+  FileText,
+  GraduationCap,
+  Link2,
   Sparkles,
+  Target,
+  Timer,
+  TrendingUp,
   TriangleAlert,
+  Upload as UploadIcon,
 } from "lucide-react";
-import "./Dashboard.css";
+import type { LucideIcon } from "lucide-react";
 
-const goals = ["保持 GPA 3.7+", "每周学习时间 ≤ 20h", "2027 前完成毕业要求"];
-const suggestions = [
-  "建议用竞赛抵扣劳动教育",
-  "本学期不建议同时修 CS241 与高数",
-  "你有一项未利用 GPA 规则",
+/* ───────────────────────── Section 1 · Import shortcuts ───────────────────────── */
+
+type ImportShortcut = {
+  title: string;
+  desc: string;
+  to: string;
+  icon: LucideIcon;
+  status?: string;
+};
+
+const importShortcuts: ImportShortcut[] = [
+  {
+    title: "上传培养方案",
+    desc: "PDF / Word，AI 自动解析章节",
+    to: "/import",
+    icon: FileText,
+    status: "已上传",
+  },
+  {
+    title: "导入成绩单",
+    desc: "教务导出 / 截图 OCR",
+    to: "/import",
+    icon: ClipboardList,
+    status: "已上传",
+  },
+  {
+    title: "同步教务系统",
+    desc: "授权登录抓取最新数据",
+    to: "/import",
+    icon: Link2,
+    status: "未连接",
+  },
+  {
+    title: "导入课表",
+    desc: "本学期课程 + 时间冲突检测",
+    to: "/import",
+    icon: CalendarClock,
+    status: "未导入",
+  },
+  {
+    title: "输入目标",
+    desc: "保研 / 留学 / 实习…切换推荐逻辑",
+    to: "/ai-advisor",
+    icon: Target,
+    status: "高 GPA",
+  },
 ];
-const risks: Array<[string, string, "高" | "中" | "低"]> = [
-  ["第二课堂", "缺 1.5 分", "高"],
-  ["志愿时长", "不足 8h", "中"],
-  ["Workload", "周四超标 4.5h", "中"],
+
+/* ───────────────────────── Section 2 · Decision state ───────────────────────── */
+
+type DecisionCard = {
+  title: string;
+  body: string;
+  meta: string;
+  tone: "neutral" | "good" | "warn";
+  cta?: { label: string; to: string };
+};
+
+const decisionCards: DecisionCard[] = [
+  {
+    title: "当前目标",
+    body: "高 GPA 模式 · 保研路线",
+    meta: "上次更新 12h 前",
+    tone: "neutral",
+    cta: { label: "调整目标权重", to: "/ai-advisor" },
+  },
+  {
+    title: "AI 最近一次推荐",
+    body: "建议本学期保留 HIST 118 与 MATH 233，谨慎同修 CS 241。",
+    meta: "基于培养方案 v2024 + 你的 workload 上限",
+    tone: "good",
+  },
+  {
+    title: "最近风险变化",
+    body: "压分风险 ↓ 12%（drop CS 241 模拟）",
+    meta: "近 7 天 · 含 3 次模拟",
+    tone: "good",
+  },
+  {
+    title: "卡住的 requirement",
+    body: "第二课堂 还差 2 分 · 劳动教育 1 学分",
+    meta: "毕业进度 86%",
+    tone: "warn",
+    cta: { label: "前往规则", to: "/schedule" },
+  },
+  {
+    title: "下一步建议",
+    body: "在 Workspace 拖动 CS 241 看连锁影响",
+    meta: "AI 综合判断置信度 中-高",
+    tone: "neutral",
+    cta: { label: "打开 Workspace", to: "/course-planner" },
+  },
 ];
-const dates = [
-  ["5月14日", "选课开放"],
-  ["5月22日", "Drop deadline"],
-  ["6月03日", "奖学金审核"],
+
+const toneClass: Record<DecisionCard["tone"], string> = {
+  neutral: "border-slate-200 bg-white",
+  good: "border-emerald-200 bg-emerald-50/60",
+  warn: "border-amber-200 bg-amber-50/60",
+};
+
+const toneText: Record<DecisionCard["tone"], string> = {
+  neutral: "text-slate-500",
+  good: "text-emerald-700",
+  warn: "text-amber-800",
+};
+
+/* ───────────────────────── Section 3 · Simulation actions ───────────────────────── */
+
+type ScenarioAction = {
+  type: string;
+  title: string;
+  primary: string;
+  secondary: string;
+  summary: string;
+  metrics: [string, string][];
+};
+
+const actions: ScenarioAction[] = [
+  {
+    type: "Drop 课",
+    title: "退掉 CS 241",
+    primary: "GPA +0.06",
+    secondary: "毕业进度 -3%",
+    summary: "短期保护 GPA，但会推迟系统课程的先修链。",
+    metrics: [
+      ["GPA 变化", "+0.06"],
+      ["毕业进度", "83%"],
+      ["时间压力", "15h/周"],
+      ["风险变化", "-12%"],
+    ],
+  },
+  {
+    type: "改 P/F",
+    title: "把 MUS 102 改 P/F",
+    primary: "GPA +0.00",
+    secondary: "时间不变",
+    summary: "保留学分但不计入 GPA，对保研无贡献。",
+    metrics: [
+      ["GPA 变化", "+0.00"],
+      ["毕业进度", "86%"],
+      ["时间压力", "20h/周"],
+      ["风险变化", "0%"],
+    ],
+  },
+  {
+    type: "替代",
+    title: "用比赛抵第二课堂",
+    primary: "Requirement +2 分",
+    secondary: "时间成本低",
+    summary: "对毕业 requirement 价值高，几乎不增加课业负担。",
+    metrics: [
+      ["GPA 变化", "+0.00"],
+      ["毕业进度", "92%"],
+      ["时间压力", "18h/周"],
+      ["风险变化", "-10%"],
+    ],
+  },
 ];
+
+const metricIcons: LucideIcon[] = [TrendingUp, GraduationCap, Timer, TriangleAlert];
+
+/* ───────────────────────── Page ───────────────────────── */
 
 export default function DashboardPage() {
+  const [selectedAction, setSelectedAction] = useState(actions[1].type);
+  const activeAction = useMemo(
+    () => actions.find((action) => action.type === selectedAction) ?? actions[1],
+    [selectedAction],
+  );
+
   return (
     <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
-      {/* Hero — typography-first, no card border. Eyebrow + headline + body + CTA. */}
+      {/* Hero */}
       <header className="animate-fade-in-up-soft">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-              AI 当前正在帮你做什么
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-              这里是 Meridian 的真正首页。重点不是数据堆叠，而是你现在下一步该做什么。
-            </p>
-          </div>
-          <a
-            href="/gpa-simulator"
-            className="group inline-flex h-11 items-center justify-center gap-2 rounded-full bg-slate-950 px-5 text-sm font-medium text-white transition-colors hover:bg-slate-800"
-          >
-            模拟一个方案
-            <ArrowRight className="h-4 w-4 transition-transform duration-300 ease-out group-hover:translate-x-0.5" />
-          </a>
-        </div>
+        <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">
+          AI Feed
+        </p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+          AI 当前正在帮你做什么
+        </h1>
+        <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+          先把数据接入 → 再看 AI 当前判断 → 最后用模拟动作验证选择。这是 Meridian 的开局。
+        </p>
       </header>
 
-      <div className="mt-8 grid gap-5 lg:grid-cols-[1fr_360px]">
-        <main className="space-y-5">
-          {/* Goals */}
-          <div
-            className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-6"
-            style={{ animationDelay: "60ms" }}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                <h2 className="font-semibold">当前目标</h2>
-              </div>
-              <span className="text-xs text-slate-400 tabular-nums">3 / 3 已锁定</span>
-            </div>
-            <div className="mt-5 grid gap-3 md:grid-cols-3">
-              {goals.map((goal, i) => (
-                <div
-                  key={goal}
-                  className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 transition-colors hover:border-slate-300"
-                >
-                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400 tabular-nums">
-                    目标 {String(i + 1).padStart(2, "0")}
-                  </p>
-                  <p className="mt-2 text-sm font-medium leading-6 text-slate-900">{goal}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Suggestions — interactive arrow on hover */}
-          <div
-            className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-6"
-            style={{ animationDelay: "120ms" }}
-          >
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-slate-500" />
-              <h2 className="font-semibold">AI 当前建议</h2>
-              <span className="ml-auto text-xs text-slate-400">每 24h 更新</span>
-            </div>
-            <div className="mt-5 space-y-2">
-              {suggestions.map((item, i) => (
-                <div
-                  key={item}
-                  className="group flex items-center gap-4 rounded-xl border border-slate-200 p-4 transition-colors hover:border-slate-900"
-                >
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-700 transition-colors group-hover:bg-slate-900 group-hover:text-white tabular-nums">
-                    {i + 1}
-                  </span>
-                  <p className="flex-1 text-sm leading-6 text-slate-700">{item}</p>
-                  <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition-all duration-300 ease-out group-hover:translate-x-0.5 group-hover:text-slate-900" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </main>
-
-        <aside className="space-y-5">
-          {/* Risks — pulse halo on the highest-severity dot */}
-          <div
-            className="animate-fade-in-up-soft rounded-2xl border border-amber-200 bg-amber-50 p-5"
-            style={{ animationDelay: "180ms" }}
-          >
-            <div className="flex items-center gap-2 text-amber-950">
-              <TriangleAlert className="h-5 w-5" />
-              <h2 className="font-semibold">当前风险</h2>
-              <span className="ml-auto inline-flex h-5 items-center rounded-full bg-amber-200/70 px-2 text-[11px] font-semibold text-amber-900 tabular-nums">
-                3
-              </span>
-            </div>
-            <div className="mt-5 space-y-2.5">
-              {risks.map(([name, value, level]) => {
-                const isHigh = level === "高";
-                return (
-                  <div
-                    key={name}
-                    className="flex items-center justify-between rounded-xl bg-white/75 p-3.5 transition-colors hover:bg-white"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`relative flex h-2 w-2 shrink-0 rounded-full ${
-                          isHigh ? "bg-amber-500" : "bg-amber-300"
-                        }`}
-                      >
-                        {isHigh && (
-                          <span
-                            className="animate-pulse-halo absolute inset-0 rounded-full bg-amber-400"
-                            aria-hidden
-                          />
-                        )}
-                      </span>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">{name}</p>
-                        <p className="text-xs text-slate-600">{value}</p>
-                      </div>
-                    </div>
+      {/* Section 1 · Import shortcuts */}
+      <div className="mt-10">
+        <div className="flex items-center gap-2">
+          <UploadIcon className="h-5 w-5 text-slate-500" />
+          <h2 className="font-semibold tracking-tight">信息导入</h2>
+          <span className="ml-auto text-xs text-slate-400 tabular-nums">
+            5 个入口 · 已接入 2/5
+          </span>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {importShortcuts.map((s, i) => {
+            const Icon = s.icon;
+            const isReady = s.status === "已上传" || s.status === "高 GPA";
+            return (
+              <Link
+                key={s.title}
+                to={s.to}
+                className="animate-fade-in-up-soft group block rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:border-slate-400"
+                style={{ animationDelay: `${60 + i * 40}ms` }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 transition-colors group-hover:bg-slate-900 group-hover:text-white">
+                    <Icon className="h-5 w-5" strokeWidth={1.7} />
+                  </div>
+                  {s.status && (
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                        isHigh
-                          ? "bg-amber-900 text-amber-50"
-                          : "border border-amber-300 text-amber-800"
+                      className={`ml-auto inline-flex h-5 items-center rounded-full px-2 text-[11px] font-semibold ${
+                        isReady
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-slate-100 text-slate-500"
                       }`}
                     >
-                      {level}
+                      {s.status}
                     </span>
-                  </div>
+                  )}
+                </div>
+                <p className="mt-3 text-sm font-medium text-slate-900">{s.title}</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">{s.desc}</p>
+                <div className="mt-3 flex items-center gap-1 text-xs text-slate-500 transition-colors group-hover:text-slate-900">
+                  打开
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 ease-out group-hover:translate-x-0.5" />
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Section 2 · Decision state */}
+      <div className="mt-12">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-slate-500" />
+          <h2 className="font-semibold tracking-tight">当前决策状态</h2>
+          <span className="ml-auto text-xs text-slate-400 tabular-nums">
+            {decisionCards.length} 项
+          </span>
+        </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {decisionCards.map((c, i) => (
+            <article
+              key={c.title}
+              className={`animate-fade-in-up-soft rounded-2xl border p-5 ${toneClass[c.tone]}`}
+              style={{ animationDelay: `${80 + i * 60}ms` }}
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-900">{c.title}</h3>
+                {c.tone === "good" && (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                )}
+                {c.tone === "warn" && (
+                  <TriangleAlert className="h-4 w-4 text-amber-700" />
+                )}
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-800">{c.body}</p>
+              <p className={`mt-2 text-[11px] ${toneText[c.tone]}`}>{c.meta}</p>
+              {c.cta && (
+                <Link
+                  to={c.cta.to}
+                  className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-slate-700 transition-colors hover:text-slate-950"
+                >
+                  {c.cta.label}
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              )}
+            </article>
+          ))}
+        </div>
+      </div>
+
+      {/* Section 3 · Simulation */}
+      <div className="mt-12">
+        <div className="flex items-center gap-2">
+          <ArrowRightLeft className="h-5 w-5 text-slate-500" />
+          <h2 className="font-semibold tracking-tight">模拟动作</h2>
+          <span className="ml-auto text-xs text-slate-400 tabular-nums">
+            {actions.length} 个可选 · 实时推演
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-5 xl:grid-cols-[1fr_420px]">
+          {/* Action list */}
+          <div className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="space-y-2.5">
+              {actions.map((action, i) => {
+                const active = action.type === selectedAction;
+                return (
+                  <button
+                    key={action.type}
+                    type="button"
+                    onClick={() => setSelectedAction(action.type)}
+                    aria-pressed={active}
+                    className={`animate-fade-in-up-soft grid w-full gap-3 rounded-xl border p-4 text-left transition-colors duration-300 md:grid-cols-[110px_1fr_120px_24px] md:items-center ${
+                      active
+                        ? "border-slate-950 bg-slate-950 text-white"
+                        : "border-slate-200 bg-white hover:border-slate-400"
+                    }`}
+                    style={{ animationDelay: `${60 + i * 40}ms` }}
+                  >
+                    <span
+                      className={`inline-flex h-6 w-fit items-center self-start rounded-full px-2.5 text-[11px] font-semibold tracking-wide md:self-center ${
+                        active
+                          ? "bg-white/10 text-slate-200"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {action.type}
+                    </span>
+                    <span className="text-sm font-medium">{action.title}</span>
+                    <span
+                      className={`text-sm font-semibold tabular-nums ${
+                        active ? "text-emerald-300" : "text-emerald-700"
+                      }`}
+                    >
+                      {action.primary}
+                    </span>
+                    <ArrowRight
+                      className={`hidden h-4 w-4 transition-transform duration-300 ease-out md:block ${
+                        active ? "translate-x-0.5 text-white" : "text-slate-400"
+                      }`}
+                    />
+                  </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Dates — vertical timeline */}
-          <div
+          {/* Active scenario detail */}
+          <aside
             className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-5"
-            style={{ animationDelay: "240ms" }}
+            style={{ animationDelay: "120ms" }}
           >
             <div className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-slate-500" />
-              <h2 className="font-semibold">最近关键时间</h2>
+              <Sparkles className="h-5 w-5 text-slate-500" />
+              <h3 className="font-semibold tracking-tight">当前模拟判断</h3>
             </div>
-            <div className="relative mt-5 pl-5">
-              <span
-                className="absolute left-[7px] top-1.5 bottom-1.5 w-px bg-slate-200"
-                aria-hidden
-              />
-              <ul className="space-y-4">
-                {dates.map(([date, title], i) => (
-                  <li key={title} className="relative">
-                    <span
-                      className={`absolute -left-[18px] top-1 h-3 w-3 rounded-full border-2 border-white ${
-                        i === 0 ? "bg-slate-900" : "bg-slate-300"
-                      }`}
-                      aria-hidden
-                    />
-                    <p className="text-sm font-medium text-slate-900">{title}</p>
-                    <p className="mt-0.5 text-xs text-slate-500 tabular-nums">{date}</p>
-                  </li>
-                ))}
-              </ul>
+            <p className="mt-4 text-sm leading-6 text-slate-700">
+              {activeAction.summary}
+            </p>
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              {activeAction.metrics.map(([label, value], idx) => {
+                const Icon = metricIcons[idx] ?? TrendingUp;
+                return (
+                  <div
+                    key={label}
+                    className="rounded-xl border border-slate-200 bg-slate-50/60 p-3"
+                  >
+                    <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">
+                      <Icon className="h-3.5 w-3.5" />
+                      {label}
+                    </div>
+                    <p className="mt-2 text-base font-semibold tabular-nums text-slate-950">
+                      {value}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
-          </div>
-        </aside>
+
+            <Link
+              to="/course-planner"
+              className="mt-5 inline-flex items-center gap-1 text-xs font-medium text-slate-700 transition-colors hover:text-slate-950"
+            >
+              在 Workspace 看连锁影响
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </aside>
+        </div>
       </div>
     </section>
   );

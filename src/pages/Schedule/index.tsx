@@ -1,147 +1,342 @@
-import { CheckCircle2, Clock, GraduationCap, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { Link } from "@tanstack/react-router";
+import {
+  ArrowRight,
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+  FileText,
+  Globe2,
+  ScrollText,
+  ShieldAlert,
+  Sparkles,
+  Users,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-const completed = ["专业必修", "公共必修"];
-const missing: Array<[string, string]> = [
-  ["劳动教育", "1 学分"],
-  ["第二课堂", "2 分"],
-  ["志愿", "8h"],
+/* ───────────────────────── Section 1 · Rule structure tree ───────────────────────── */
+
+type RuleLeaf = {
+  title: string;
+  source: string;
+  page?: string;
+};
+
+type RuleBranch = {
+  title: string;
+  leaves: RuleLeaf[];
+};
+
+const ruleTree: RuleBranch[] = [
+  {
+    title: "GPA 计算规则",
+    leaves: [
+      { title: "必修课全部计入 GPA", source: "培养方案 v2024", page: "第 6 页 §3.1" },
+      { title: "体育课不计入 GPA", source: "教务处官网", page: "学籍 §2" },
+      { title: "P/F 课程不计入 GPA", source: "培养方案 v2024", page: "第 7 页 §3.4" },
+    ],
+  },
+  {
+    title: "学分结构",
+    leaves: [
+      { title: "专业必修 60 学分", source: "培养方案 v2024", page: "第 12 页" },
+      { title: "公选 8 学分", source: "培养方案 v2024", page: "第 13 页" },
+      { title: "第二课堂 6 分（非学分）", source: "学校教务处", page: "二课实施细则" },
+    ],
+  },
+  {
+    title: "替代规则",
+    leaves: [
+      { title: "全国大学生数学建模比赛可抵 2 分二课", source: "AI 推测", page: "规则分析" },
+      { title: "省级志愿者证书 8h 可计入劳动教育", source: "学生评价", page: "匿名社区" },
+    ],
+  },
 ];
 
-const PROGRESS = 86;
+/* ───────────────────────── Section 2 · Trust columns ───────────────────────── */
+
+type TrustLevel = "high" | "med" | "low";
+
+type TrustItem = {
+  title: string;
+  source: string;
+  body: string;
+};
+
+const trustData: Record<TrustLevel, { label: string; cls: string; head: string; body: string; icon: LucideIcon; items: TrustItem[] }> = {
+  high: {
+    label: "官方规则",
+    head: "border-emerald-200 bg-emerald-50",
+    body: "text-emerald-900",
+    cls: "bg-emerald-100 text-emerald-800",
+    icon: ScrollText,
+    items: [
+      { title: "必修课全部计入 GPA", source: "培养方案 v2024 第 6 页", body: "GPA = Σ(学分 × 绩点) / 总学分，所有必修课均参与。" },
+      { title: "毕业总学分 ≥ 158", source: "教务系统学籍模块", body: "包含专业课 60 + 公选 8 + 通识 90。" },
+    ],
+  },
+  med: {
+    label: "AI 推测",
+    head: "border-amber-200 bg-amber-50",
+    body: "text-amber-900",
+    cls: "bg-amber-100 text-amber-800",
+    icon: Sparkles,
+    items: [
+      { title: "数模比赛可抵 2 分二课", source: "AI 规则分析（基于 v2023 案例）", body: "学校尚未在 v2024 明文写入，但同等比赛历史上批准过。" },
+      { title: "MUS 102 可改 P/F", source: "AI 规则分析", body: "公选课通常允许 P/F，但需在第 4 周前申请。" },
+    ],
+  },
+  low: {
+    label: "学生评价",
+    head: "border-slate-200 bg-slate-50",
+    body: "text-slate-700",
+    cls: "bg-slate-200 text-slate-700",
+    icon: Users,
+    items: [
+      { title: "CS 241 压分严重", source: "匿名社区 / 课评网", body: "学生反映均分 B-，建议同修不超过 2 门难课。" },
+      { title: "HIST 118 给分宽松", source: "匿名社区", body: "近 3 年 A 段比例超 40%。" },
+    ],
+  },
+};
+
+/* ───────────────────────── Section 3 · Conflict rules ───────────────────────── */
+
+type Conflict = {
+  title: string;
+  a: { source: string; text: string };
+  b: { source: string; text: string };
+  judgement: string;
+};
+
+const conflicts: Conflict[] = [
+  {
+    title: "体育课是否计入 GPA",
+    a: { source: "培养方案 v2024", text: "全部必修课计入 GPA" },
+    b: { source: "教务处官网", text: "体育课只记是否合格，不计 GPA" },
+    judgement: "AI 倾向教务处口径（实际入库不计），但建议导师/教务确认。",
+  },
+  {
+    title: "比赛能否抵学分",
+    a: { source: "AI 规则分析", text: "数模国赛可抵 2 分二课" },
+    b: { source: "培养方案 v2024", text: "未在替代清单明列" },
+    judgement: "需教务个案审批。其他同学历史成功案例不保证当届有效。",
+  },
+];
+
+/* ───────────────────────── Section 4 · Special policies ───────────────────────── */
+
+type Policy = {
+  scope: string;
+  title: string;
+  body: string;
+};
+
+const policies: Policy[] = [
+  { scope: "港校申请", title: "避免过多 P/F",     body: "港校录取常 case-by-case 看转录里 P/F 比例，超过 15% 会被质疑学业严肃性。" },
+  { scope: "MIT 暑研",   title: "线上实验不替代",  body: "MIT 不接受 fully online 的实验课替代实地实验学分。" },
+  { scope: "保研 985",   title: "排名 + 论文双门槛", body: "多数 985 要求年级前 10% 且至少一作核心期刊或国奖。" },
+  { scope: "出国 GRE",   title: "GRE 有效期 5 年",  body: "提前一年内考完最稳，避免赶申请季。" },
+];
+
+/* ───────────────────────── Page ───────────────────────── */
 
 export default function SchedulePage() {
+  const [openBranch, setOpenBranch] = useState<string | null>(ruleTree[0].title);
+
   return (
     <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
       {/* Hero */}
       <header className="animate-fade-in-up-soft">
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-          你距离毕业还差什么
+        <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">
+          Rule Graph
+        </p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+          规则透明与来源
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-          中国大学真正复杂的是毕业 requirement。这个页面会告诉你还缺什么，以及最轻松怎么完成。
+          告诉你 AI 为什么这么判断。每条规则都有来源、可信度等级，冲突会显式标记。
         </p>
       </header>
 
-      <div className="mt-8 grid gap-5 lg:grid-cols-[1fr_360px]">
-        <main className="space-y-5">
-          {/* Completed + Missing */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <div
-              className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-6"
-              style={{ animationDelay: "60ms" }}
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold tracking-tight">已完成</h2>
-                <span className="inline-flex h-5 items-center rounded-full bg-emerald-50 px-2 text-[11px] font-semibold text-emerald-700 tabular-nums">
-                  {completed.length}
-                </span>
-              </div>
-              <div className="mt-5 space-y-2.5">
-                {completed.map((item) => (
-                  <div
-                    key={item}
-                    className="flex items-center gap-3 rounded-xl bg-emerald-50 p-3.5 text-emerald-800"
-                  >
-                    <CheckCircle2 className="h-5 w-5 shrink-0" />
-                    <span className="text-sm font-medium">{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+      {/* Section 1 + 2 · Tree + Trust */}
+      <div className="mt-8 grid gap-5 lg:grid-cols-[360px_1fr]">
+        {/* Tree */}
+        <aside
+          className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-5"
+          style={{ animationDelay: "60ms" }}
+        >
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-slate-500" />
+            <h2 className="font-semibold tracking-tight">规则结构树</h2>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">培养方案 v2024 + 教务处文件</p>
 
-            <div
-              className="animate-fade-in-up-soft rounded-2xl border border-amber-200 bg-amber-50 p-6"
-              style={{ animationDelay: "120ms" }}
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold tracking-tight text-amber-950">未完成</h2>
-                <span className="inline-flex h-5 items-center rounded-full bg-amber-200/70 px-2 text-[11px] font-semibold text-amber-900 tabular-nums">
-                  {missing.length}
-                </span>
-              </div>
-              <div className="mt-5 space-y-2.5">
-                {missing.map(([name, value]) => (
-                  <div
-                    key={name}
-                    className="flex items-center justify-between rounded-xl bg-white/75 p-3.5 transition-colors hover:bg-white"
+          <div className="mt-4 space-y-2">
+            {ruleTree.map((b) => {
+              const open = openBranch === b.title;
+              return (
+                <div key={b.title} className="rounded-xl border border-slate-200 bg-white">
+                  <button
+                    type="button"
+                    onClick={() => setOpenBranch(open ? null : b.title)}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-slate-50"
                   >
-                    <span className="text-sm font-medium text-slate-800">{name}</span>
-                    <span className="text-sm font-semibold text-amber-800 tabular-nums">
-                      {value}
+                    {open ? (
+                      <ChevronDown className="h-4 w-4 text-slate-400" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-slate-400" />
+                    )}
+                    <span className="text-sm font-medium text-slate-900">{b.title}</span>
+                    <span className="ml-auto text-[11px] tabular-nums text-slate-400">
+                      {b.leaves.length}
                     </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* AI optimal path — emphasized dark card (key insight) */}
-          <div
-            className="animate-fade-in-up-soft relative overflow-hidden rounded-2xl border border-slate-900 bg-slate-950 p-6 text-white"
-            style={{ animationDelay: "180ms" }}
-          >
-            <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.22em] text-slate-400">
-              <Sparkles className="h-4 w-4" strokeWidth={1.7} />
-              AI 最优方案
-            </div>
-            <p className="mt-4 text-base leading-7 text-slate-100">
-              参加&nbsp;<span className="font-semibold text-white">"城市更新志愿项目"</span>
-              &nbsp;可同时完成第二课堂、志愿时长与公选 requirement，预计占用 1 个周末。
-            </p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {["第二课堂 +2", "志愿 +8h", "公选 +1"].map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full border border-white/15 bg-white/5 px-2.5 py-0.5 text-[11px] font-medium text-slate-200 tabular-nums"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          </div>
-        </main>
-
-        <aside className="space-y-5">
-          {/* Animated progress bar — fills 0 → 86% on mount */}
-          <div
-            className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-6"
-            style={{ animationDelay: "60ms" }}
-          >
-            <div className="flex items-center gap-2">
-              <GraduationCap className="h-5 w-5 text-slate-500" />
-              <h2 className="font-semibold">毕业进度</h2>
-            </div>
-            <div className="mt-5 flex items-baseline gap-2">
-              <p className="text-5xl font-semibold tracking-tight tabular-nums">
-                {PROGRESS}
-              </p>
-              <span className="text-2xl font-semibold text-slate-400">%</span>
-            </div>
-            <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="animate-bar-fill h-full rounded-full bg-slate-950"
-                style={{ width: `${PROGRESS}%` }}
-              />
-            </div>
-            <p className="mt-3 text-xs text-slate-500 tabular-nums">
-              较上学期 +4% · 距毕业还需 {100 - PROGRESS}%
-            </p>
-          </div>
-
-          <div
-            className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-6"
-            style={{ animationDelay: "120ms" }}
-          >
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-slate-500" />
-              <h2 className="font-semibold">最轻松完成时间</h2>
-            </div>
-            <p className="mt-4 text-2xl font-semibold tracking-tight">2026 秋季前</p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              不增加核心课程负担，只补齐非课程类 requirement。
-            </p>
+                  </button>
+                  {open && (
+                    <ul className="space-y-1 border-t border-slate-100 px-3 py-2">
+                      {b.leaves.map((leaf) => (
+                        <li
+                          key={leaf.title}
+                          className="rounded-lg px-2 py-2 transition-colors hover:bg-slate-50"
+                        >
+                          <p className="text-xs font-medium text-slate-800">{leaf.title}</p>
+                          <p className="mt-0.5 text-[11px] text-slate-500">
+                            {leaf.source}
+                            {leaf.page && <span className="ml-1 text-slate-400">· {leaf.page}</span>}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </aside>
+
+        {/* Trust columns */}
+        <main className="space-y-4">
+          {(["high", "med", "low"] as TrustLevel[]).map((level, idx) => {
+            const t = trustData[level];
+            const Icon = t.icon;
+            return (
+              <article
+                key={level}
+                className={`animate-fade-in-up-soft rounded-2xl border p-5 ${t.head}`}
+                style={{ animationDelay: `${100 + idx * 80}ms` }}
+              >
+                <div className="flex items-center gap-2">
+                  <Icon className={`h-5 w-5 ${t.body}`} />
+                  <h2 className={`font-semibold tracking-tight ${t.body}`}>{t.label}</h2>
+                  <span
+                    className={`ml-auto inline-flex h-5 items-center rounded-full px-2 text-[11px] font-semibold ${t.cls}`}
+                  >
+                    可信度 {level === "high" ? "高" : level === "med" ? "中" : "低"}
+                  </span>
+                </div>
+                <ul className="mt-4 space-y-2.5">
+                  {t.items.map((it) => (
+                    <li
+                      key={it.title}
+                      className="rounded-xl border border-white/60 bg-white/80 p-3.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-semibold text-slate-900">{it.title}</p>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 transition-colors hover:text-slate-900"
+                        >
+                          查看原文
+                          <ExternalLink className="h-3 w-3" />
+                        </button>
+                      </div>
+                      <p className="mt-1.5 text-xs leading-5 text-slate-700">{it.body}</p>
+                      <p className="mt-2 text-[11px] text-slate-500">来源：{it.source}</p>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            );
+          })}
+        </main>
+      </div>
+
+      {/* Section 3 · Conflicts */}
+      <div className="mt-12">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="h-5 w-5 text-rose-500" />
+          <h2 className="font-semibold tracking-tight">冲突规则</h2>
+          <span className="ml-auto text-xs text-slate-400 tabular-nums">
+            {conflicts.length} 条需要人工确认
+          </span>
+        </div>
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          {conflicts.map((c, i) => (
+            <article
+              key={c.title}
+              className="animate-fade-in-up-soft rounded-2xl border border-rose-200 bg-white p-5"
+              style={{ animationDelay: `${60 + i * 60}ms` }}
+            >
+              <div className="flex items-center gap-2">
+                <span className="inline-flex h-5 items-center rounded-full bg-rose-100 px-2 text-[11px] font-semibold text-rose-800">
+                  冲突
+                </span>
+                <h3 className="text-sm font-semibold text-slate-900">{c.title}</h3>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">A 方</p>
+                  <p className="mt-1 text-xs text-slate-800">{c.a.text}</p>
+                  <p className="mt-2 text-[11px] text-slate-500">来源：{c.a.source}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">B 方</p>
+                  <p className="mt-1 text-xs text-slate-800">{c.b.text}</p>
+                  <p className="mt-2 text-[11px] text-slate-500">来源：{c.b.source}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-xl bg-slate-950 p-3 text-white">
+                <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+                  AI 判断
+                </p>
+                <p className="mt-1 text-xs leading-5 text-slate-100">{c.judgement}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      {/* Section 4 · Special policies */}
+      <div className="mt-12">
+        <div className="flex items-center gap-2">
+          <Globe2 className="h-5 w-5 text-slate-500" />
+          <h2 className="font-semibold tracking-tight">学校特殊政策</h2>
+          <span className="ml-auto text-xs text-slate-400">留学 / 保研专项</span>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {policies.map((p, i) => (
+            <article
+              key={p.title}
+              className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-5"
+              style={{ animationDelay: `${60 + i * 50}ms` }}
+            >
+              <span className="inline-flex h-5 items-center rounded-full bg-indigo-50 px-2 text-[11px] font-semibold text-indigo-800">
+                {p.scope}
+              </span>
+              <h3 className="mt-3 text-sm font-semibold text-slate-900">{p.title}</h3>
+              <p className="mt-2 text-xs leading-5 text-slate-600">{p.body}</p>
+            </article>
+          ))}
+        </div>
+
+        <Link
+          to="/course-planner"
+          className="mt-6 inline-flex items-center gap-1 text-xs font-medium text-slate-700 transition-colors hover:text-slate-950"
+        >
+          回到 Workspace 看影响传播
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
       </div>
     </section>
   );
