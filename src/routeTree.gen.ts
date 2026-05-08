@@ -12,8 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppScheduleRouteImport } from './routes/_app/schedule'
-import { Route as AppInsightsRouteImport } from './routes/_app/insights'
-import { Route as AppGpaSimulatorRouteImport } from './routes/_app/gpa-simulator'
+import { Route as AppImportRouteImport } from './routes/_app/import'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppCoursePlannerRouteImport } from './routes/_app/course-planner'
 import { Route as AppAiAdvisorRouteImport } from './routes/_app/ai-advisor'
@@ -32,14 +31,9 @@ const AppScheduleRoute = AppScheduleRouteImport.update({
   path: '/schedule',
   getParentRoute: () => AppRoute,
 } as any)
-const AppInsightsRoute = AppInsightsRouteImport.update({
-  id: '/insights',
-  path: '/insights',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppGpaSimulatorRoute = AppGpaSimulatorRouteImport.update({
-  id: '/gpa-simulator',
-  path: '/gpa-simulator',
+const AppImportRoute = AppImportRouteImport.update({
+  id: '/import',
+  path: '/import',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
@@ -63,8 +57,7 @@ export interface FileRoutesByFullPath {
   '/ai-advisor': typeof AppAiAdvisorRoute
   '/course-planner': typeof AppCoursePlannerRoute
   '/dashboard': typeof AppDashboardRoute
-  '/gpa-simulator': typeof AppGpaSimulatorRoute
-  '/insights': typeof AppInsightsRoute
+  '/import': typeof AppImportRoute
   '/schedule': typeof AppScheduleRoute
 }
 export interface FileRoutesByTo {
@@ -72,8 +65,7 @@ export interface FileRoutesByTo {
   '/ai-advisor': typeof AppAiAdvisorRoute
   '/course-planner': typeof AppCoursePlannerRoute
   '/dashboard': typeof AppDashboardRoute
-  '/gpa-simulator': typeof AppGpaSimulatorRoute
-  '/insights': typeof AppInsightsRoute
+  '/import': typeof AppImportRoute
   '/schedule': typeof AppScheduleRoute
 }
 export interface FileRoutesById {
@@ -83,8 +75,7 @@ export interface FileRoutesById {
   '/_app/ai-advisor': typeof AppAiAdvisorRoute
   '/_app/course-planner': typeof AppCoursePlannerRoute
   '/_app/dashboard': typeof AppDashboardRoute
-  '/_app/gpa-simulator': typeof AppGpaSimulatorRoute
-  '/_app/insights': typeof AppInsightsRoute
+  '/_app/import': typeof AppImportRoute
   '/_app/schedule': typeof AppScheduleRoute
 }
 export interface FileRouteTypes {
@@ -94,8 +85,7 @@ export interface FileRouteTypes {
     | '/ai-advisor'
     | '/course-planner'
     | '/dashboard'
-    | '/gpa-simulator'
-    | '/insights'
+    | '/import'
     | '/schedule'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -103,8 +93,7 @@ export interface FileRouteTypes {
     | '/ai-advisor'
     | '/course-planner'
     | '/dashboard'
-    | '/gpa-simulator'
-    | '/insights'
+    | '/import'
     | '/schedule'
   id:
     | '__root__'
@@ -113,8 +102,7 @@ export interface FileRouteTypes {
     | '/_app/ai-advisor'
     | '/_app/course-planner'
     | '/_app/dashboard'
-    | '/_app/gpa-simulator'
-    | '/_app/insights'
+    | '/_app/import'
     | '/_app/schedule'
   fileRoutesById: FileRoutesById
 }
@@ -146,18 +134,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppScheduleRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/insights': {
-      id: '/_app/insights'
-      path: '/insights'
-      fullPath: '/insights'
-      preLoaderRoute: typeof AppInsightsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/gpa-simulator': {
-      id: '/_app/gpa-simulator'
-      path: '/gpa-simulator'
-      fullPath: '/gpa-simulator'
-      preLoaderRoute: typeof AppGpaSimulatorRouteImport
+    '/_app/import': {
+      id: '/_app/import'
+      path: '/import'
+      fullPath: '/import'
+      preLoaderRoute: typeof AppImportRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/dashboard': {
@@ -188,8 +169,7 @@ interface AppRouteChildren {
   AppAiAdvisorRoute: typeof AppAiAdvisorRoute
   AppCoursePlannerRoute: typeof AppCoursePlannerRoute
   AppDashboardRoute: typeof AppDashboardRoute
-  AppGpaSimulatorRoute: typeof AppGpaSimulatorRoute
-  AppInsightsRoute: typeof AppInsightsRoute
+  AppImportRoute: typeof AppImportRoute
   AppScheduleRoute: typeof AppScheduleRoute
 }
 
@@ -197,8 +177,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAiAdvisorRoute: AppAiAdvisorRoute,
   AppCoursePlannerRoute: AppCoursePlannerRoute,
   AppDashboardRoute: AppDashboardRoute,
-  AppGpaSimulatorRoute: AppGpaSimulatorRoute,
-  AppInsightsRoute: AppInsightsRoute,
+  AppImportRoute: AppImportRoute,
   AppScheduleRoute: AppScheduleRoute,
 }
 

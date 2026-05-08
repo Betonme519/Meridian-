@@ -116,11 +116,14 @@ export default function AIAdvisorPage() {
     <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
       {/* Hero */}
       <header className="animate-fade-in-up-soft">
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-          整个系统的核心逻辑控制器
+        <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">
+          Goal Mode
+        </p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+          目标与价值权重
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-          你可以直接选择一个目标，也可以口述自己的复杂情况，让 AI 解析后选择最适合你的推荐逻辑。
+          目标决定整个系统的推荐逻辑。选一个固定模式，或在右侧用自然语言口述，AI 自动匹配。
         </p>
       </header>
 

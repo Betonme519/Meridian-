@@ -1,10 +1,9 @@
 import {
-  BookOpenCheck,
   Compass,
-  GitBranch,
-  GraduationCap,
-  Route as RouteIcon,
+  Network,
+  ScrollText,
   Target,
+  Upload,
   type LucideIcon,
 } from "lucide-react";
 
@@ -22,10 +21,9 @@ export type MenuItem = {
 };
 
 export const MENU_ITEMS: MenuItem[] = [
-  { label: "策略中心", desc: "AI 当前建议与状态", to: "/dashboard", icon: Compass },
-  { label: "目标模式", desc: "决定整个系统推荐逻辑", to: "/ai-advisor", icon: Target },
-  { label: "学校规则", desc: "学校规则结构树", to: "/course-planner", icon: GitBranch },
-  { label: "毕业路径", desc: "毕业 requirement 追踪", to: "/schedule", icon: GraduationCap },
-  { label: "课程策略", desc: "课程价值分析", to: "/insights", icon: BookOpenCheck },
-  { label: "方案模拟", desc: "不同路径实时推演", to: "/gpa-simulator", icon: RouteIcon },
+  { label: "AI Feed", desc: "决策状态与建议", to: "/dashboard", icon: Compass },
+  { label: "Workspace", desc: "决策图谱可视化", to: "/course-planner", icon: Network },
+  { label: "Goal Mode", desc: "目标与权重定制", to: "/ai-advisor", icon: Target },
+  { label: "Rule Graph", desc: "规则透明与来源", to: "/schedule", icon: ScrollText },
+  { label: "Import", desc: "导入数据与设置", to: "/import", icon: Upload },
 ];
