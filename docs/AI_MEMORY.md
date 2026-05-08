@@ -3,8 +3,8 @@
 > **新 AI 会话 / 新 agent 接手时直接贴这一份。** 等于是给新对话灌入"项目长期记忆"。
 > 重大里程碑后更新；不是每次都改。CURRENT_TASK.md 是每会话的；这份是跨会话的。
 
-> Last snapshot: **2026-05-07**
-> Latest commit: `7f1210c` (菜单栏修改完成) ＋ 未提交：一级结构债收敛
+> Last snapshot: **2026-05-08**
+> Latest commit: `c60efa1` (第三页完成) ＋ 未提交：登录/注册页 + Mock 鉴权
 > Active branch: `main`
 
 ---
@@ -32,13 +32,54 @@
 | CourseAnalyzer 页 | 🟡 5%（骨架，无 route） |
 | 后端 Worker | ❌ 0%（未建项目；BFF vs Supabase 方向未定） |
 | AI provider 抽象 | ❌ 0%（`src/api/aiApi.ts` 全空 stub，streaming 协议未定） |
-| 鉴权 / 用户系统 | ❌ 0%（context 占位 + `useAuth` 未读 context） |
+| 鉴权 / 用户系统 | 🟡 30%（**Mock 实现**，localStorage-backed；详见下文 2026-05-08 条目） |
 | 学校手册 RAG pipeline | ❌ 0% |
 | 真实数据接入 | ❌ 0% |
 
 ---
 
 ## 2. 已完成（按 commit 倒序）
+
+### **2026-05-08** — 登录/注册页 + Mock 鉴权（未提交）
+
+把 auth 系统从「全空 stub」推到「能点登录、能跳 dashboard、刷新仍登录」。**全部是 mock，不是真后端**。
+
+**视觉：**
+- 新页 `src/pages/Login/`、`src/pages/Register/`：白卡 + Apple-like 字体规范（Inter / `font-semibold tracking-tight` / `text-3xl` 大标题 / `text-sm` 正文 / `text-xs` 小字）+ rounded-full 输入与按钮
+- 两卡尺寸锁死：`max-w-[440px] min-h-[640px]`，登录↔注册切换零跳动
+- 入场用项目内 `animate-fade-in-up-soft`，子元素阶梯延时 80/140/200/260/460ms（社交按钮额外 520ms，仅登录页）
+- 输入框 `hover:border-gray-400` + `focus:border-gray-900 + ring-gray-900/10`
+- 路由：`src/routes/login.tsx`、`src/routes/register.tsx`（不挂 `_app`，绕开 DashboardLayout）
+
+**鉴权流：**
+- `src/api/authApi.ts` ←  **完整 mock**：login/register/logout/getCurrentUser；session 存 `localStorage["meridian:auth"]`，包含 `{ user: { id, email, name, createdAt }, token: "mock_..." }`；带 300ms 假延迟模拟网络
+  - 校验规则：login 密码 ≥6 位；register 密码 ≥8 位；邮箱必须含 `@`
+  - **不校验唯一性、不存密码、token 是随机字符串**——上线必换
+- `src/context/AuthContext.tsx` ← 改成真 Provider，暴露 `{ user, isAuthenticated, loading, login, register, logout }`；mount 时 `getCurrentUser()` 恢复 session
+- `src/hooks/useAuth.ts` ← 一行 re-export `useAuthContext`
+- `src/routes/__root.tsx` ← `<Providers>` 改成 `<AuthProvider>` 包裹（不再 pass-through）
+
+**入口接通：**
+- 首页 Navbar 「登录/注册」按钮 → `/login`、`/register`；登录态自动切换为头像首字母 + DropdownMenu（与 DashboardLayout 同一组项），颜色随 scrolled 状态自适应（白底深色 / 透明白色）
+- DashboardLayout 右上头像：`isAuthenticated` 时是头像首字母 + shadcn DropdownMenu（用户名 / 邮箱 / 我的面板 / 退出登录）；未登录时显示 "登录" 按钮链到 `/login`
+- Login 提交 → `useAuth().login()` → `navigate({ to: "/dashboard" })`，错误显示在按钮上方
+- Register 提交 → `useAuth().register()` → 同上（即"注册→自动登录→跳 dashboard"）
+- 提交期间按钮 disabled + 文案改为「登录中…」/「创建中…」
+
+**接真后端时改这几处：**
+1. **改 `src/api/authApi.ts`**：四个函数的函数体替换成 `fetch("/api/auth/login", ...)` 真实调用。返回类型保持 `MockSession` / `AuthUser` 形状，或同步修改 `AuthContext` 的 `setUser` 数据结构
+2. **token**：当前 token 是 `mock_xxx` 随机串，无 expiry。换真 JWT 时考虑：
+   - 存储位置：localStorage（XSS 风险）vs httpOnly cookie（推荐）
+   - Refresh token 流程：在 `AuthProvider` 加 axios/fetch 拦截器或 react-query mutation
+   - 401 全局处理：TanStack Router 的 beforeLoad / route guards
+3. **路由守卫**：`/_app/*` 下的 dashboard/ai-advisor 等当前对未登录用户也开放。真上线时在 `routes/_app.tsx` 加 `beforeLoad` 检查 `isAuthenticated`，否则 throw redirect 到 `/login?redirect=...`
+4. **DESIGN_SYSTEM 同步**：登录卡片用了 `shadow-[0_5px_20px_rgba(0,0,0,0.04)]`，违反"落地页几乎不用 box-shadow"——auth 页是浮层卡片，特例。如要彻底纯 border 风，删除 shadow class
+5. **Apple/Google 登录按钮**：UI 已有，未接 OAuth provider。接入时走 `src/services/` 业务层 + `authApi.ts` 新方法
+
+**没做：**
+- 没加 `/forgot-password` 流程（按钮目前是 `<button type="button">` 无 href）
+- 没加路由守卫（dashboard 等页面对未登录用户仍可访问）
+- 没接 OAuth
 
 ### **2026-05-07** — 一级结构债收敛（未提交）
 做了架构审计 + 处理 4 件最高优先级结构问题，**严格不动 UI 与业务逻辑**：

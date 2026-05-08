@@ -1,6 +1,7 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 
 import appCss from "../styles/globals.css?url";
+import { AuthProvider } from "@/context/AuthContext";
 
 function NotFoundComponent() {
   return (
@@ -71,18 +72,17 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * 全局 Provider 壳。当前为 pass-through，作为后续接入挂点：
+ * 全局 Provider 壳。挂点列表：
+ *   - AuthProvider        ✅ 已挂（mock 实现，见 src/api/authApi.ts）
  *   - QueryClientProvider (react-query — 已装但未启用)
- *   - AuthProvider        (Supabase / 自建 BFF 二选一)
  *   - ThemeProvider       (light/dark 切换)
  *   - <Toaster />         (sonner — 已装)
  *   - ErrorBoundary       (页面级错误兜底)
  *
  * 接入新 Provider 时统一在这里包，避免 root 持续膨胀且保持层级清晰。
- * 真实 Provider 上线前不要往这里塞业务逻辑。
  */
 function Providers({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return <AuthProvider>{children}</AuthProvider>;
 }
 
 function RootComponent() {

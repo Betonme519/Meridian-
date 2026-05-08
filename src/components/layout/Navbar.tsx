@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { MENU_ITEMS } from "@/config/menu";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 /**
  * Adaptive top navigation bar.
@@ -15,6 +24,14 @@ import { MENU_ITEMS } from "@/config/menu";
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const { user, isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
+  const initial = (user?.name || user?.email || "?").trim().charAt(0).toUpperCase();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate({ to: "/login" });
+  };
 
   useEffect(() => {
     const onScroll = () => {
@@ -209,36 +226,80 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Link
-              to="/login"
-              className="px-4 py-2.5 rounded-full text-sm font-medium"
-              style={{
-                color: navOpaque ? "#111827" : "rgba(255,255,255,0.9)",
-                background: "transparent",
-                transition: "color 0.3s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = navOpaque
-                  ? "rgba(0,0,0,0.05)"
-                  : "rgba(255,255,255,0.12)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
-              }}
-            >
-              登录
-            </Link>
-            <Link
-              to="/register"
-              className="px-5 py-2.5 rounded-full text-sm font-medium"
-              style={{
-                background: navOpaque ? "#000" : "rgba(255,255,255,0.95)",
-                color: navOpaque ? "#fff" : "#000",
-                transition: "background 0.3s ease, color 0.3s ease",
-              }}
-            >
-              注册
-            </Link>
+            {isAuthenticated ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="个人菜单"
+                    title={user?.name ?? "个人菜单"}
+                    className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 transition-[background,color] duration-300"
+                    style={{
+                      background: navOpaque ? "#000" : "rgba(255,255,255,0.95)",
+                      color: navOpaque ? "#fff" : "#000",
+                    }}
+                  >
+                    {initial}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium text-slate-900">
+                      {user?.name}
+                    </span>
+                    <span className="text-xs font-normal text-slate-500 truncate">
+                      {user?.email}
+                    </span>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={() => navigate({ to: "/dashboard" })}
+                  >
+                    我的面板
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={handleLogout}
+                    className="text-red-600 focus:text-red-600"
+                  >
+                    退出登录
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="px-4 py-2.5 rounded-full text-sm font-medium"
+                  style={{
+                    color: navOpaque ? "#111827" : "rgba(255,255,255,0.9)",
+                    background: "transparent",
+                    transition: "color 0.3s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = navOpaque
+                      ? "rgba(0,0,0,0.05)"
+                      : "rgba(255,255,255,0.12)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  登录
+                </Link>
+                <Link
+                  to="/register"
+                  className="px-5 py-2.5 rounded-full text-sm font-medium"
+                  style={{
+                    background: navOpaque ? "#000" : "rgba(255,255,255,0.95)",
+                    color: navOpaque ? "#fff" : "#000",
+                    transition: "background 0.3s ease, color 0.3s ease",
+                  }}
+                >
+                  注册
+                </Link>
+              </>
+            )}
           </div>
         </nav>
       </div>

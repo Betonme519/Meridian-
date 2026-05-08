@@ -1,20 +1,38 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 /**
  * Login page — standalone auth surface, not wrapped by DashboardLayout.
  * Card composition reuses the Uiverse "akshat-patel28" pill-input layout,
  * but typography & spacing follow docs/DESIGN_SYSTEM.md (Inter,
  * font-semibold tracking-tight, text-* scale, rounded-2xl card / rounded-full
- * pill controls). Submit handler is a stub — wiring to the real auth
- * service is intentionally out of scope.
+ * pill controls).
+ *
+ * Auth wiring talks to the AuthContext which currently uses a mock backend
+ * (任意 ≥6 位密码即可通过). See src/api/authApi.ts + docs/AI_MEMORY.md.
  */
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (submitting) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      await login(email, password);
+      navigate({ to: "/dashboard" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "登录失败，请稍后再试");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -80,11 +98,16 @@ export default function LoginPage() {
             </button>
           </p>
 
+          {error && (
+            <p className="m-0 text-xs text-red-600 text-center">{error}</p>
+          )}
+
           <button
             type="submit"
-            className="rounded-full bg-black px-7 py-3.5 text-white text-base font-medium hover:bg-gray-800 transition-colors cursor-pointer"
+            disabled={submitting}
+            className="rounded-full bg-black px-7 py-3.5 text-white text-base font-medium hover:bg-gray-800 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            登录
+            {submitting ? "登录中…" : "登录"}
           </button>
         </form>
 

@@ -1,13 +1,14 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 /**
  * Register page — visual sibling of Login. Same typography rules per
- * docs/DESIGN_SYSTEM.md (Inter, font-semibold tracking-tight, text-* scale,
- * rounded-2xl card / rounded-full pill controls). Holds the minimum
- * fields a future auth backend would expect (name / email / password /
- * confirm) plus a terms checkbox. Submission is a stub; password mismatch
- * and missing-consent are checked client-side.
+ * docs/DESIGN_SYSTEM.md.
+ *
+ * Auth wiring: 注册成功后 AuthContext 已经把 user 写进 state（mock 实现
+ * 一步到位），直接跳 /dashboard，等价于"注册→自动登录"。后端接真实接口
+ * 后此处无需改动。
  */
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -16,9 +17,13 @@ export default function RegisterPage() {
   const [confirm, setConfirm] = useState("");
   const [agree, setAgree] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const { register } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (submitting) return;
     setError(null);
     if (password !== confirm) {
       setError("两次输入的密码不一致");
@@ -27,6 +32,15 @@ export default function RegisterPage() {
     if (!agree) {
       setError("请先同意服务条款");
       return;
+    }
+    setSubmitting(true);
+    try {
+      await register(email, password, name);
+      navigate({ to: "/dashboard" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "注册失败，请稍后再试");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -135,9 +149,10 @@ export default function RegisterPage() {
 
           <button
             type="submit"
-            className="rounded-full bg-black px-7 py-3.5 text-white text-base font-medium hover:bg-gray-800 transition-colors cursor-pointer"
+            disabled={submitting}
+            className="rounded-full bg-black px-7 py-3.5 text-white text-base font-medium hover:bg-gray-800 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            创建账户
+            {submitting ? "创建中…" : "创建账户"}
           </button>
         </form>
 
