@@ -209,8 +209,8 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center gap-2">
-            <a
-              href="#"
+            <Link
+              to="/login"
               className="px-4 py-2.5 rounded-full text-sm font-medium"
               style={{
                 color: navOpaque ? "#111827" : "rgba(255,255,255,0.9)",
@@ -227,9 +227,9 @@ export default function Navbar() {
               }}
             >
               登录
-            </a>
-            <a
-              href="#"
+            </Link>
+            <Link
+              to="/register"
               className="px-5 py-2.5 rounded-full text-sm font-medium"
               style={{
                 background: navOpaque ? "#000" : "rgba(255,255,255,0.95)",
@@ -238,7 +238,7 @@ export default function Navbar() {
               }}
             >
               注册
-            </a>
+            </Link>
           </div>
         </nav>
       </div>

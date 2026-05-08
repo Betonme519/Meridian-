@@ -203,7 +203,7 @@ export default function AIAdvisorPage() {
           >
             <div className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-slate-500" />
-              <h2 className="font-semibold">口述你的情况</h2>
+              <h2 className="font-semibold">描述你的情况</h2>
             </div>
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-1 transition-colors focus-within:border-slate-400">
               <textarea

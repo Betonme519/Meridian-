@@ -197,9 +197,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <span className="hidden text-sm text-slate-500 sm:inline">
               2026 春季学期
             </span>
-            <div className="h-9 w-9 rounded-full bg-slate-950 text-center text-sm font-semibold leading-9 text-white">
+            <Link
+              to="/login"
+              aria-label="登录或个人中心"
+              title="登录"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-950 text-sm font-semibold text-white transition-opacity hover:opacity-85"
+            >
               J
-            </div>
+            </Link>
           </div>
         </div>
       </header>
