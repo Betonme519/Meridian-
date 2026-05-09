@@ -1,2 +1,19 @@
 /* Page-specific styles for Home. Most styling is Tailwind in JSX; reserve
  * this file for Home-only overrides or custom classes that don't fit there. */
+
+/* Transparency section — marching-ants dashed connector lines.
+ * `stroke-dasharray` set inline (so we can vary by viewBox scale); this only
+ * provides the loop that shifts the dash pattern along the path. */
+@keyframes transparency-ants {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+.transparency-ants {
+  animation: transparency-ants 1.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .transparency-ants {
+    animation: none;
+  }
+}

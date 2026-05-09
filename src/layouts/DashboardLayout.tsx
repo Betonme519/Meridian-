@@ -1,15 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { MENU_ITEMS } from "@/config/menu";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { UserMenu } from "@/components/layout/UserMenu";
 
 /**
  * 功能页面外壳。
@@ -22,14 +15,8 @@ import {
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const currentPath = useRouterState({ select: (state) => state.location.pathname });
   const [open, setOpen] = useState(false);
-  const { user, isAuthenticated, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
   const initial = (user?.name || user?.email || "?").trim().charAt(0).toUpperCase();
-
-  const handleLogout = async () => {
-    await logout();
-    navigate({ to: "/login" });
-  };
 
   // Body scroll lock while drawer is open
   useEffect(() => {
@@ -215,8 +202,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               2026 春季学期
             </span>
             {isAuthenticated ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+              <UserMenu
+                trigger={
                   <button
                     type="button"
                     aria-label="个人菜单"
@@ -225,31 +212,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   >
                     {initial}
                   </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel className="flex flex-col gap-0.5">
-                    <span className="text-sm font-medium text-slate-900">
-                      {user?.name}
-                    </span>
-                    <span className="text-xs font-normal text-slate-500 truncate">
-                      {user?.email}
-                    </span>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onSelect={() => navigate({ to: "/dashboard" })}
-                  >
-                    我的面板
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onSelect={handleLogout}
-                    className="text-red-600 focus:text-red-600"
-                  >
-                    退出登录
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                }
+              />
             ) : (
               <Link
                 to="/login"

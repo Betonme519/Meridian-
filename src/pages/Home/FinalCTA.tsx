@@ -15,10 +15,10 @@ export default function FinalCTA() {
         </p>
         <a
           href="/dashboard"
-          className="inline-flex items-center gap-2 bg-black text-white px-8 py-4 rounded-full text-base font-medium hover:bg-gray-800 transition-colors"
+          className="group inline-flex items-center gap-2 border-[1.5px] border-black bg-transparent text-black px-8 py-4 rounded-full text-base font-medium transition-colors duration-200 hover:bg-black hover:text-white"
         >
           立即开始
-          <ArrowRight className="w-4 h-4" />
+          <ArrowRight className="w-4 h-4 transition-transform duration-200 ease-out group-hover:translate-x-1" />
         </a>
         <p className="text-xs text-gray-500 mt-5">
           无需注册 · 无风险 · 可随时关闭

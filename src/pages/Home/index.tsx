@@ -4,7 +4,7 @@ import HeroLaptopShowcase from "./HeroLaptopShowcase";
 import Flow from "./Flow";
 import Explain from "./Explain";
 import GpaMath from "./GpaMath";
-import Honesty from "./Honesty";
+import Transparency from "./Transparency";
 import Control from "./Control";
 import Feedback from "./Feedback";
 import Faq from "./Faq";
@@ -30,7 +30,7 @@ export default function HomePage() {
       <Flow />
       <Explain />
       <GpaMath />
-      <Honesty />
+      <Transparency />
       <Control />
       <Feedback />
       <Faq />
