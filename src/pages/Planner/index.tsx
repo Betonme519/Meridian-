@@ -355,17 +355,6 @@ function WorkspaceInner() {
   return (
     <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
       {/* Hero — 与其他页面一致 */}
-      <header className="animate-fade-in-up-soft">
-        <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">
-          Workspace
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-          可视化决策空间
-        </h1>
-        <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-          AI 自动生成节点与关系。拖拽、缩放、点击节点查看影响传播。规则可追溯到培养方案与教务系统。
-        </p>
-      </header>
 
       {/* Canvas — 主舞台，至少撑满 5 层内容；视口大时往下扩展 */}
       <div

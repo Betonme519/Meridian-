@@ -146,17 +146,6 @@ export default function SchedulePage() {
   return (
     <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
       {/* Hero */}
-      <header className="animate-fade-in-up-soft">
-        <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">
-          Rule Graph
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-          规则透明与来源
-        </h1>
-        <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-          告诉你 AI 为什么这么判断。每条规则都有来源、可信度等级，冲突会显式标记。
-        </p>
-      </header>
 
       {/* Section 1 + 2 · Tree + Trust */}
       <div className="mt-8 grid gap-5 lg:grid-cols-[360px_1fr]">

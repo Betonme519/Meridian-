@@ -3,6 +3,11 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { MENU_ITEMS } from "@/config/menu";
 import { useAuth } from "@/hooks/useAuth";
 import { UserMenu } from "@/components/layout/UserMenu";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 
 /**
  * 功能页面外壳。
@@ -191,10 +196,34 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             </Link>
 
             {currentItem && CurrentIcon && (
-              <div className="hidden items-center gap-2 text-sm font-medium text-slate-700 lg:flex">
-                <CurrentIcon className="h-4 w-4 text-slate-400" strokeWidth={1.6} />
-                {currentItem.label}
-              </div>
+              <HoverCard openDelay={120} closeDelay={120}>
+                <HoverCardTrigger asChild>
+                  <button
+                    type="button"
+                    tabIndex={0}
+                    aria-label={`${currentItem.label} — ${currentItem.title}`}
+                    className="hidden lg:inline-flex items-center gap-2 rounded-md text-sm font-medium text-slate-700 cursor-default transition-colors duration-300 hover:text-slate-950 focus-visible:text-slate-950 focus-visible:outline-none"
+                  >
+                    <CurrentIcon
+                      className="h-4 w-4 text-slate-400 transition-colors duration-300 group-hover:text-slate-700"
+                      strokeWidth={1.6}
+                    />
+                    {currentItem.label}
+                  </button>
+                </HoverCardTrigger>
+                <HoverCardContent
+                  align="start"
+                  sideOffset={12}
+                  className="w-[360px] rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-[0_18px_44px_rgba(15,23,42,0.10)] backdrop-blur-xl"
+                >
+                  <h2 className="text-base font-semibold tracking-tight text-slate-950">
+                    {currentItem.title}
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {currentItem.intro}
+                  </p>
+                </HoverCardContent>
+              </HoverCard>
             )}
           </div>
           <div className="ml-auto flex items-center gap-3">

@@ -108,17 +108,6 @@ export default function UploadPage() {
   return (
     <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
       {/* Hero */}
-      <header className="animate-fade-in-up-soft">
-        <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">
-          Import Center
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-          把所有数据接入 Meridian
-        </h1>
-        <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-          文件、教务、社区、个人偏好。所有规则的可信度来源都从这里建立。
-        </p>
-      </header>
 
       {/* Section 2 · File slots */}
       <div className="mt-10">

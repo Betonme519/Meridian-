@@ -190,19 +190,6 @@ export default function DashboardPage() {
 
   return (
     <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
-      {/* Hero */}
-      <header className="animate-fade-in-up-soft">
-        <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">
-          AI Feed
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-          AI 当前正在帮你做什么
-        </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-          先把数据接入 → 再看 AI 当前判断 → 最后用模拟动作验证选择。这是 Meridian 的开局。
-        </p>
-      </header>
-
       {/* Section 1 · Import shortcuts */}
       <div className="mt-10">
         <div className="flex items-center gap-2">
