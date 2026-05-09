@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 /** "风险与控制权" — split layout, headline left + 3 numbered cards right. */
 export default function Control() {
   const items = [
@@ -15,7 +17,7 @@ export default function Control() {
     },
   ];
   return (
-    <section className="px-6 py-24 max-w-6xl mx-auto">
+    <section className="px-6 pt-12 pb-48 max-w-6xl mx-auto">
       <div className="grid md:grid-cols-2 gap-12 items-center">
         <div>
           <p className="text-xs font-medium text-gray-500 tracking-widest uppercase mb-4">
@@ -29,21 +31,64 @@ export default function Control() {
         </div>
         <div className="space-y-4">
           {items.map((it, i) => (
-            <div
-              key={it.title}
-              className="flex gap-4 p-5 rounded-xl border border-gray-200 hover:border-black transition-colors"
-            >
-              <div className="w-7 h-7 rounded-full bg-black text-white flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                {i + 1}
-              </div>
-              <div>
-                <h3 className="font-semibold mb-1">{it.title}</h3>
-                <p className="text-sm text-gray-600">{it.desc}</p>
-              </div>
-            </div>
+            <ControlCard key={it.title} idx={i} title={it.title} desc={it.desc} />
           ))}
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * Module-level component — defined OUTSIDE Control so its function reference
+ * is stable across re-renders. Otherwise React would tear it down on every
+ * hover and the CSS transitions wouldn't have a "from" state to interpolate.
+ *
+ * Hover uses layered inline transitions (transform / border / shadow with
+ * stagger delays) for a slow "lighting up" feel — same recipe as the
+ * Transparency pillars.
+ */
+function ControlCard({
+  idx,
+  title,
+  desc,
+}: {
+  idx: number;
+  title: string;
+  desc: string;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="relative flex gap-4 p-5 rounded-2xl border bg-white cursor-default"
+      style={{
+        borderColor: hovered ? "#111827" : "#e5e7eb",
+        transform: hovered ? "translateY(-3px)" : "translateY(0)",
+        boxShadow: hovered
+          ? "0 22px 50px rgba(15,23,42,0.10)"
+          : "0 1px 2px rgba(15,23,42,0.03)",
+        transition: [
+          "transform 0.85s cubic-bezier(0.16, 1, 0.3, 1)",
+          "border-color 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.06s",
+          "box-shadow 1s cubic-bezier(0.16, 1, 0.3, 1) 0.1s",
+        ].join(", "),
+      }}
+    >
+      <div
+        className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center text-xs font-semibold flex-shrink-0"
+        style={{
+          transform: hovered ? "scale(1.08)" : "scale(1)",
+          transition: "transform 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.1s",
+        }}
+      >
+        {idx + 1}
+      </div>
+      <div>
+        <h3 className="font-semibold mb-1">{title}</h3>
+        <p className="text-sm text-gray-600 leading-relaxed">{desc}</p>
+      </div>
+    </div>
   );
 }

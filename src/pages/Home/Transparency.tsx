@@ -221,7 +221,7 @@ export default function Transparency() {
     <section
       ref={sectionRef}
       id="transparency"
-      className="relative px-6 py-28 border-y border-gray-100 bg-gradient-to-b from-white via-[#fafafa] to-white overflow-hidden"
+      className="relative px-6 py-28 border-t border-gray-100 bg-gradient-to-b from-white via-[#fafafa] to-white overflow-hidden"
     >
       <div
         aria-hidden
@@ -234,12 +234,14 @@ export default function Transparency() {
 
       <div className="relative max-w-6xl mx-auto">
         <div ref={hubRef} className="relative lg:min-h-[680px]">
-          {/* SVG dashed connectors — pixel-coord viewBox so endpoints sit exactly on edges */}
+          {/* SVG dashed connectors — pixel-coord viewBox so endpoints sit exactly on edges.
+              overflow-visible: cards are visually translated 40px down via transform, so
+              line endpoints can land outside the hub's layout box. */}
           {size.w > 0 && size.h > 0 && (
             <svg
               aria-hidden
               viewBox={`0 0 ${size.w} ${size.h}`}
-              className="absolute inset-0 hidden h-full w-full lg:block pointer-events-none"
+              className="absolute inset-0 hidden h-full w-full lg:block pointer-events-none overflow-visible"
             >
               {paths.map((d, i) =>
                 d ? (
@@ -268,7 +270,7 @@ export default function Transparency() {
           <div className="grid grid-cols-1 gap-y-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)_minmax(0,1fr)] lg:grid-rows-[auto_1fr_auto] lg:gap-x-12 lg:gap-y-10">
             {/* Row 1 */}
             <div className="order-3 lg:order-none lg:col-start-1 lg:row-start-1 lg:flex lg:items-center lg:justify-end">
-              <div className="lg:w-full lg:max-w-[360px]">
+              <div className="lg:w-full lg:max-w-[360px] lg:translate-y-10">
                 {renderPillar(0, "left", 0.5)}
               </div>
             </div>
@@ -295,7 +297,7 @@ export default function Transparency() {
             </div>
 
             <div className="order-4 lg:order-none lg:col-start-3 lg:row-start-1 lg:flex lg:items-center lg:justify-start">
-              <div className="lg:w-full lg:max-w-[360px]">
+              <div className="lg:w-full lg:max-w-[360px] lg:translate-y-10">
                 {renderPillar(1, "right", 0.6)}
               </div>
             </div>
@@ -305,7 +307,7 @@ export default function Transparency() {
               className="order-2 lg:order-none lg:col-start-2 lg:row-start-2 relative lg:flex lg:items-center lg:justify-center"
               style={fadeUp(0.2)}
             >
-              <div ref={cardRef} className="w-full">
+              <div ref={cardRef} className="w-full lg:translate-y-10">
                 <TiltedCard rotateAmplitude={6} scaleOnHover={1.015} perspective={1200}>
                   <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_10px_40px_rgba(15,23,42,0.06)]">
                     <div className="flex items-baseline justify-between mb-1">
@@ -352,13 +354,13 @@ export default function Transparency() {
 
             {/* Row 3 */}
             <div className="order-5 lg:order-none lg:col-start-1 lg:row-start-3 lg:flex lg:items-center lg:justify-end">
-              <div className="lg:w-full lg:max-w-[360px]">
+              <div className="lg:w-full lg:max-w-[360px] lg:translate-y-10">
                 {renderPillar(2, "left", 0.7)}
               </div>
             </div>
 
             <div className="order-6 lg:order-none lg:col-start-3 lg:row-start-3 lg:flex lg:items-center lg:justify-start">
-              <div className="lg:w-full lg:max-w-[360px]">
+              <div className="lg:w-full lg:max-w-[360px] lg:translate-y-10">
                 {renderPillar(3, "right", 0.8)}
               </div>
             </div>
