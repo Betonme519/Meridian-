@@ -26,34 +26,31 @@
 
 > 一句话，要具体到能验证。
 
-落地页 + 5 个功能页静态 demo 全部完成。下一步进入「业务接入期」：开 Cloudflare Worker 项目骨架 + 决定鉴权后端方案 + AI provider 抽象层规范，把 Dashboard / Planner / AIAdvisor / Schedule / Upload 从写死的 `const` 数据替换成真实 API。
+Supabase auth 已接入（mock 退役），架构审计 + 死文件清扫已完成。**当前无主动任务**——等用户拍板下一步：(1) `_app.tsx beforeLoad` 鉴权门禁，(2) AI provider 抽象 + streaming 协议，(3) 5 功能页接真实数据，或 (4) 起草 `docs/DATA_MODEL.md` 为 Supabase 业务表做准备。
 
 ### 需要做
 
-> 每条要小到能在一次会话内完成。
+> 等用户授权后再开任务。
 
-- [ ] 决定鉴权后端方案（Supabase Auth / 自建 BFF / Cloudflare Access），先写决策文档（`docs/AUTH_DECISION.md`）
-- [ ] 把 `src/api/authApi.ts` 的 mock 实现替换成真后端调用（参考 `AI_MEMORY.md` → 2026-05-08 「Mock 鉴权」条目里的 6 步迁移清单）
-- [ ] 加路由守卫：`routes/_app.tsx` 的 `beforeLoad` 检查 `isAuthenticated`，未登录 throw redirect 到 `/login?redirect=...`
-- [ ] AI provider 抽象：`src/api/aiApi.ts` 当前全空 stub，先定 streaming 协议（SSE / WebSocket）+ 一个 mock provider 让 ai-advisor 跑通
-- [ ] Dashboard / Planner / AIAdvisor / Schedule / Upload 5 个功能页当前是写死 `const`，业务方向定了后逐页替换为 fetch hooks（保留视觉与交互不动）
+- [ ] _等待用户指令_
 
 ### 不要修改
 
 - 全局 Nav / Footer (`src/components/layout/`)
-- 落地页 (`src/pages/Home/*`)（最近一轮改完，包括新增 `Transparency.tsx` + `TiltedCard` + Feedback 5 卡扇形 + Control 缓动 hover）
+- 落地页 (`src/pages/Home/*`)（包括 `Transparency.tsx` + `TiltedCard` + Feedback 5 卡扇形 + Control 缓动 hover）
 - 共享 UserMenu (`src/components/layout/UserMenu.tsx`)（Navbar + DashboardLayout 两处共用，改一处影响两处）
 - 路由根 / 配置 (`src/routes/__root.tsx`、`src/router.tsx`、`src/routes/_app.tsx`)（除非任务要求加 beforeLoad）
 - 路由分组 (`src/routes/_app/*` pathless layout 结构)
 - 菜单单一真理 (`src/config/menu.ts`)（除非要新增菜单项 / 调整 title/intro 文案）
 - 设计令牌 (`src/styles/variables.css`、`globals.css`)
 - 笔记本相关 (`src/components/effects/EmbeddedLaptop.*`、`GridMotion.*`、`CardSwap.*`、`TiltedCard.*`)
+- Supabase 接入面 (`src/lib/supabase.ts`、`src/api/authApi.ts`、`src/context/AuthContext.tsx`)（公共 API 已稳定，扩展时不要破坏 `AuthUser` shape 与 `useAuth` 签名）
 - 自动生成 (`src/routeTree.gen.ts`)
 - 已有 commit 历史（禁 `git reset` / `git rebase`）
 
 ### 完成标准
 
-- [ ] `tsc --noEmit` 干净通过
+- [ ] `npm run build` 干净通过（client + Worker SSR）
 - [ ] 视觉符合 `DESIGN_SYSTEM.md`（圆角 / 字号 / 按钮 / 语气）
 - [ ] 所有「需要做」打钩
 - [ ] 没碰「不要修改」
@@ -61,17 +58,25 @@
 
 ### 备注 / 参考
 
-- 持续技术债追踪：`docs/TECH_DEBT.md`
-- 一次性深度审计：`docs/ARCHITECTURE_AUDIT.md`
-- 当前 Mock 鉴权说明：`AI_MEMORY.md` → 2026-05-08「Mock 鉴权」条目
-- 落地页改版细节：`AI_MEMORY.md` → 2026-05-09「Transparency / TiltedCard / Feedback 扇形 / Control 缓动 / 功能页 breadcrumb HoverCard」条目
-- 共享 UserMenu / Navbar layout-shift 修复细节：`AI_MEMORY.md` → 2026-05-09 同上条目
+- 持续技术债追踪：`docs/TECH_DEBT.md`（高优先级 3 条 + 中优先级 5 条）
+- 一次性深度审计：`docs/ARCHITECTURE_AUDIT.md`（2026-05-09 已刷新）
+- Supabase 接入说明 + 部署 env 策略：`docs/AI_MEMORY.md` → 2026-05-09「Supabase auth 接入」条目
+- 落地页改版细节：`docs/AI_MEMORY.md` → 2026-05-09「Transparency / TiltedCard / Feedback 扇形 / Control 缓动 / 功能页 breadcrumb HoverCard」条目
+- 共享 UserMenu / Navbar layout-shift 修复细节：`docs/AI_MEMORY.md` → 2026-05-09 同上条目
 
 ---
 
 ## 完成归档
 
 > 保留最近 5–10 条；权威记录在 `git log`，这里只留人话摘要。
+
+- **2026-05-09** — Supabase auth 接入（mock 退役）+ 架构审计 + 死文件清扫：
+  - **架构审计** `docs/ARCHITECTURE_AUDIT.md` 全文刷新（2026-05-07 → 2026-05-09），按炸药当量列出 12 处死文件 / 幽灵抽象 + 4 项决策点。
+  - **死文件清扫**（21 文件 + 8 目录，全部 0 引用确认后删）：`MainLayout` / `PageShell` / `common/` / `ChatPanel` / `CourseCard` / `GPAChart` / `UploadBox` / `LaptopFrame` / `LiquidEther.css` / 3 个无 route 页（Profile / Courses / CourseAnalyzer）/ `UserContext` / `mockCourses` / `format.ts` / 3 个 stub api（aiApi / courseApi / plannerApi）/ `services/` 整目录 / `useCourses` / `usePlanner`。
+  - **react-query 移除**：全项目 0 `useQuery` / `QueryClient`，从 `package.json` 删除；`__root.tsx Providers` 注释同步更新。
+  - **Supabase auth 接入**（决策 D1–D4 全走默认 (a)）：新建 `src/lib/supabase.ts` 单例（含 SSR 守卫 + fail-soft env 缺失警告 + `isSupabaseConfigured` 标志）；`src/api/authApi.ts` 4 函数体 mock → Supabase + 新增 `onAuthChange(cb): unsubscribe`；`src/context/AuthContext.tsx` 加订阅，公共 API 不变（Login / Register / UserMenu 0 修改）；`MockSession` → `AuthSession`（去 token 字段）；`AuthUser` shape 不变。
+  - **环境变量**：新建 `.env.example`，`.gitignore` 显式 `.env` 规则；`wrangler.jsonc` 加注释说明 Vite `VITE_*` 是构建时内联（不要放 wrangler `vars`）。
+  - **未做（明确推迟）**：`_app.tsx beforeLoad` 鉴权门禁、`profiles` 表 + RLS、邮件确认 / 忘记密码 / OAuth、AI provider 抽象、RAG 设计、5 功能页接真实数据。
 
 - **2026-05-09** — 落地页 Transparency 区 + Feedback 重做 + Control 缓动 + 5 功能页 breadcrumb HoverCard：
   - **新 section `Transparency.tsx`**（替代旧 `Honesty.tsx`）：hub-and-spoke 布局，3×3 grid（标题 / 卡 / pillar 在中央列；4 个 pillar 落在四角），SVG bezier 连线 + dashed marching-ants 关键帧（`transparency-ants` in `Home.css`）；连线坐标用 `getBoundingClientRect()` + `ResizeObserver` 实时测算，端点精准落在 pillar 内边中点和卡的左右边中点；卡左/右两个连接点各承接两条线（Y 字形）；hover pillar 联动卡片中对应 chip 浮起 + 连线变彩；中央卡用 `<TiltedCard>` 3D tilt；overflow-visible 让卡片视觉下移 40px 不被裁掉。

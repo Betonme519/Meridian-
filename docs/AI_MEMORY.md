@@ -42,6 +42,48 @@
 
 ## 2. 已完成（按 commit 倒序）
 
+### **2026-05-09** — Supabase auth 接入（mock 退役）
+
+**决策（D1–D4 全部走默认建议路径）：**
+- **D1 = (a)** 暂不建 `profiles` 表；profile 字段（name 等）暂存 `auth.users.user_metadata`
+- **D2 = (a)** 关闭邮件确认（Supabase Dashboard → Authentication → Email → "Confirm email" 关）
+- **D3 = (a)** 纯浏览器 `@supabase/supabase-js`（不上 `@supabase/ssr`）；`_app.tsx beforeLoad` 鉴权门禁推迟
+- **D4 = (a)** 保留本地 `AuthUser` shape，在 `authApi.ts` 内做 Supabase User → AuthUser 映射（解耦）
+
+**改动（最小化）：**
+- 新建 `src/lib/supabase.ts`：客户端单例 + SSR 守卫（`typeof window !== "undefined"`），缺 env 时启动报错
+- 新建 `.env.example`：`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` 模板
+- `.gitignore`：补 `.env` 显式规则（`.env.local` 已被 `*.local` 覆盖）
+- `package.json`：+ `@supabase/supabase-js: ^2.45.0`
+- `src/api/authApi.ts`：4 个函数体替换为 `supabase.auth.*` 调用，新增 `onAuthChange(cb): unsubscribe` 包 `onAuthStateChange`，删除所有 localStorage / mock 助手；`MockSession` → `AuthSession`（去 `token` 字段，AuthContext 不消费）；`AuthUser` shape 不变（id / email / name / createdAt）
+- `src/context/AuthContext.tsx`：`useEffect` 内首次 `getCurrentUser` 后再订阅 `onAuthChange(setUser)`，cleanup 时 unsubscribe；公共 API（login / register / logout / user / isAuthenticated / loading）**完全不变**——Login / Register 页 0 修改
+
+**校验：**
+- `npm run build` 通过（client + Cloudflare Worker SSR 双端均无 type 错）
+- `lib/supabase.ts` 的 env 缺失校验只在**运行时**触发（dev / SSR 第一次请求），build 不爆——dev 前必须先建 `.env.local`
+
+**未做（明确推迟到下一轮）：**
+- `_app.tsx beforeLoad` 鉴权门禁（CLAUDE.md 标"不要修改"，且 D3 浏览器侧 auth 需先解决路由 context 注入或升级 SSR）
+- `profiles` 表 + RLS（D1 = a，等 UI 真要写业务字段再建 + 先起草 `docs/DATA_MODEL.md`）
+- 邮件确认 / 忘记密码 / OAuth / `/auth/callback` 路由（D2 = a）
+- AI provider 抽象 / RAG（明确不在本轮）
+
+**部署 env 策略（重要）：**
+Vite 的 `import.meta.env.VITE_*` 是 **构建时静态替换**，不是 Worker 运行时变量。所以 `wrangler.jsonc` 里加 `vars` 块**没用**——Worker 拿到的 bundle 里值已经被字面量替换。正确流程：
+- **本地开发**：`.env.local`（gitignore 已盖）
+- **CI / 本地部署**：在 `npm run build` 之前导出环境变量，例如：
+  ```bash
+  export VITE_SUPABASE_URL=https://xxx.supabase.co
+  export VITE_SUPABASE_ANON_KEY=eyJ...
+  npm run build
+  wrangler deploy
+  ```
+- **GitHub Actions**：在 build step 用 `env:` 注入 secrets
+- **anon key 公开安全**：可以提交到 git（如想"零配置"的话），但本项目目前选择不提交，按 CI/CD 注入
+
+**已踩过的坑 — env 缺失导致整站打不开（2026-05-09 当天修复）：**
+最早 `lib/supabase.ts` 在 env 缺失时硬抛错，导致 `__root.tsx Providers` 链崩溃 → SSR 启动失败 → 整站包括 Home 都加载不了。修复：fail-soft——env 缺失只 `console.warn`，`isSupabaseConfigured` 标志在 `authApi.ts` 里检查，未配置时 `getCurrentUser` 返回 null、`logout` no-op、`onAuthChange` 返回空 unsubscribe，只有 `login` / `register` 抛清晰错（用户点登录按钮才看到）。
+
 ### **2026-05-09** — Transparency / TiltedCard / Feedback 扇形 + 滚动星 / Control 缓动 / 共享 UserMenu / 5 功能页 breadcrumb HoverCard（未提交）
 
 **`Transparency.tsx`（替代旧 `Honesty.tsx`，已删除）** — 落地页"透明性"区，hub-and-spoke 布局：
@@ -332,9 +374,9 @@
 
 ### 技术侧
 - ❓ 学校手册 OCR + 解析 pipeline（用 Cloudflare AI / OpenAI / 自建？）
-- ❓ Worker 项目结构（在 `/workers/` 平级目录还是嵌入 `/src/`）
-- ❓ D1 还是 KV：用户数据用 D1（关系型），手册解析结果用 KV / Vectorize
-- ❓ 鉴权：cookie session（推荐）还是 JWT（移动端友好）
+- ~~Worker 项目结构~~ → Supabase 路线下不再需要独立 Worker BFF；TanStack Start SSR 仍跑 Cloudflare Worker
+- ~~D1 还是 KV~~ → 走 Supabase Postgres；向量库（pgvector / Vectorize）等 RAG 阶段再定
+- ~~鉴权方式~~ → 已选 Supabase 浏览器 auth（D3 = a）；session 由 supabase-js 自管 localStorage
 
 ### 历史包袱（不影响功能但乱）
 - ~~`src/components/{Navbar,Sidebar}/`~~ 已删除（2026-05-07）

@@ -3,5 +3,16 @@
   "name": "tanstack-start-app",
   "compatibility_date": "2025-09-24",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "@tanstack/react-start/server-entry",
+  "main": "@tanstack/react-start/server-entry"
+
+  // ⚠️ 不要在这里加 VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY 之类的 vars。
+  //    Vite `VITE_*` 前缀变量是【构建时】内联到 bundle，部署给 CF Worker 的
+  //    server-entry 已包含了字面量值。Worker 运行时不需要这些 env。
+  //
+  //    部署 env 策略：
+  //      • 本地：在项目根放 .env.local（已被 .gitignore 忽略）
+  //      • CI/CD：在 build 步骤之前导出 VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+  //      • 然后再 `npm run build` → `wrangler deploy`
+  //
+  //    详见 docs/AI_MEMORY.md → "Supabase 接入（2026-05-09）" → 部署 env 策略
 }

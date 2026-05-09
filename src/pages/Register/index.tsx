@@ -6,9 +6,10 @@ import { useAuth } from "@/hooks/useAuth";
  * Register page — visual sibling of Login. Same typography rules per
  * docs/DESIGN_SYSTEM.md.
  *
- * Auth wiring: 注册成功后 AuthContext 已经把 user 写进 state（mock 实现
- * 一步到位），直接跳 /dashboard，等价于"注册→自动登录"。后端接真实接口
- * 后此处无需改动。
+ * Auth wiring: Supabase 后端 + D2 = (a)（关闭邮件确认），signUp 立即返回
+ * user 与 session，AuthContext setUser 后直接跳 /dashboard，等价于"注册→
+ * 自动登录"。如果 Supabase 项目里忘记关 "Confirm email"，会出现"看似登录
+ * 成功但下次刷新被登出"——见 docs/AI_MEMORY.md → "Supabase 接入"。
  */
 export default function RegisterPage() {
   const [name, setName] = useState("");

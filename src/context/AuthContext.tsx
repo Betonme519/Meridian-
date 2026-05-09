@@ -9,9 +9,13 @@ import * as authApi from "@/api/authApi";
 import type { AuthUser } from "@/api/authApi";
 
 /**
- * AuthContext — 应用级用户态。当前后端是 mock（见 src/api/authApi.ts）。
- * 切换真实后端时此文件大概率不需要改：login / register / logout 直接调
- * authApi 的同名函数，把返回的 user 写进 state 即可。
+ * AuthContext — 应用级用户态。后端是 Supabase（见 src/api/authApi.ts）。
+ *
+ *  - 首次加载：调 `getCurrentUser` 拉当前 session
+ *  - 订阅 `onAuthChange`：多 tab 同步登出 / 静默刷新 token / 跨页签登录
+ *  - login / register / logout 主动 setUser，避免等订阅事件的一次 tick 延迟
+ *
+ * 切后端只动 `authApi.ts`，本文件不变。
  */
 
 export interface AuthContextValue {
@@ -31,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
       const u = await authApi.getCurrentUser();
       if (!cancelled) {
@@ -38,8 +43,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     })();
+
+    const unsubscribe = authApi.onAuthChange((u) => {
+      if (!cancelled) setUser(u);
+    });
+
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, []);
 

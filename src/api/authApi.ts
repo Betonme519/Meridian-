@@ -1,22 +1,22 @@
 /**
- * Auth API — MOCK IMPLEMENTATION (localStorage-backed).
+ * Auth API — Supabase 实现。
  *
- * ⚠️ 这是开发期占位实现，**不是真实后端**。
- *  - 任意邮箱 + 任意 ≥6 位密码即可"登录"
- *  - 注册同样不校验唯一性，只生成 mock user
- *  - session 存 `localStorage["meridian:auth"]`，刷新仍在登录态
+ * 4 个公开函数 + 1 个订阅，是 AuthContext 与 Supabase 之间的薄壳：
+ *   - login / register / logout / getCurrentUser
+ *   - onAuthChange(cb): 订阅多 tab 同步 / token 静默刷新
  *
- * 上线时替换为真后端：
- *  1. 把这四个函数体替换成 `fetch("/api/auth/login", ...)` 等真实调用
- *  2. 返回类型保持 `MockSession` / `AuthUser` 的形状，或调整后同步更新
- *     `src/context/AuthContext.tsx` 的 setUser 数据结构
- *  3. token 改成真 JWT；可选：加 refresh token 流程
- *  4. 上层（AuthContext / Login / Register）零修改即可工作
+ * 把 Supabase 的 `User` 映射到本地 `AuthUser` shape，让 AuthContext / Login /
+ * Register / 任何 useAuth 调用方都不需要知道具体后端。后端要换（CF Workers BFF
+ * 等）只动这一文件，公共 API 不变。
  *
- * 详见 docs/AI_MEMORY.md → "Mock 鉴权（2026-05-08）"
+ * 详见 docs/AI_MEMORY.md → "Supabase 接入（2026-05-09）"
  */
 
-const STORAGE_KEY = "meridian:auth";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
+
+const NOT_CONFIGURED_MSG =
+  "Supabase 未配置：请在 .env.local 设置 VITE_SUPABASE_URL 和 VITE_SUPABASE_ANON_KEY 后重启 dev server。";
 
 export interface AuthUser {
   id: string;
@@ -25,74 +25,77 @@ export interface AuthUser {
   createdAt: string;
 }
 
-export interface MockSession {
+export interface AuthSession {
   user: AuthUser;
-  token: string;
 }
 
-function makeSession(email: string, name?: string): MockSession {
+function mapUser(u: SupabaseUser | null): AuthUser | null {
+  if (!u || !u.email) return null;
+  const meta = (u.user_metadata ?? {}) as { name?: string };
   return {
-    user: {
-      id:
-        typeof crypto !== "undefined" && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `u_${Math.random().toString(36).slice(2)}`,
-      email,
-      name: (name && name.trim()) || email.split("@")[0],
-      createdAt: new Date().toISOString(),
-    },
-    token: `mock_${Math.random().toString(36).slice(2)}`,
+    id: u.id,
+    email: u.email,
+    name: (meta.name && meta.name.trim()) || u.email.split("@")[0],
+    createdAt: u.created_at,
   };
 }
 
-function persist(session: MockSession) {
-  if (typeof localStorage === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-}
-
-function delay(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
+function requireUser(u: AuthUser | null): AuthUser {
+  if (!u) throw new Error("Supabase 未返回用户信息（请检查邮箱确认设置）");
+  return u;
 }
 
 export async function login(
   email: string,
   password: string,
-): Promise<MockSession> {
-  await delay(300);
-  if (!email.includes("@")) throw new Error("请输入有效邮箱");
-  if (!password || password.length < 6) throw new Error("密码至少 6 位");
-  const session = makeSession(email);
-  persist(session);
-  return session;
+): Promise<AuthSession> {
+  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+  if (error) throw new Error(error.message);
+  return { user: requireUser(mapUser(data.user)) };
 }
 
 export async function register(
   email: string,
   password: string,
   name: string,
-): Promise<MockSession> {
-  await delay(300);
-  if (!email.includes("@")) throw new Error("请输入有效邮箱");
-  if (!password || password.length < 8) throw new Error("密码至少 8 位");
-  const session = makeSession(email, name);
-  persist(session);
-  return session;
+): Promise<AuthSession> {
+  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { name } },
+  });
+  if (error) throw new Error(error.message);
+  // Supabase 项目设置中已关闭 "Confirm email"（D2 = a），data.user 立即可用
+  return { user: requireUser(mapUser(data.user)) };
 }
 
 export async function logout(): Promise<void> {
-  if (typeof localStorage !== "undefined") {
-    localStorage.removeItem(STORAGE_KEY);
-  }
+  if (!isSupabaseConfigured) return;
+  const { error } = await supabase.auth.signOut();
+  if (error) throw new Error(error.message);
 }
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  if (typeof localStorage === "undefined") return null;
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return null;
-  try {
-    const session = JSON.parse(raw) as MockSession;
-    return session.user ?? null;
-  } catch {
-    return null;
-  }
+  if (!isSupabaseConfigured) return null;
+  const { data } = await supabase.auth.getUser();
+  return mapUser(data.user);
+}
+
+/**
+ * 订阅 Supabase auth 状态变化（SIGNED_IN / SIGNED_OUT / TOKEN_REFRESHED 等）。
+ * 返回 unsubscribe 函数，必须在 useEffect cleanup 中调用。
+ */
+export function onAuthChange(
+  cb: (user: AuthUser | null) => void,
+): () => void {
+  if (!isSupabaseConfigured) return () => {};
+  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+    cb(mapUser(session?.user ?? null));
+  });
+  return () => data.subscription.unsubscribe();
 }

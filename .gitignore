@@ -16,6 +16,9 @@ dist-ssr
 .nitro
 *.local
 
+# Env files (.env.local is covered by *.local; .env.example stays committed)
+.env
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars

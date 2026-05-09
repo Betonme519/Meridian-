@@ -9,11 +9,9 @@
 
 > 业务接入前会爆，必须先解。
 
-- [ ] **后端方向定锤（Supabase / Cloudflare Workers BFF / 混合）** —— 决定 `src/api/*` 重生形态、AI key 归属、数据库 schema 起点。当前 `src/api/` 仅剩 `authApi.ts`（mock 实现），其余 stub 已于 2026-05-09 删除——真接入前必须先选路线再加文件，避免再次堆出 stub 假象。
 - [ ] **AI provider 抽象 + streaming 协议** —— 即使先用 mock，先把 `chat()` 签名固化成 `({ messages, signal }) => AsyncIterable<Token>` + zod schema（`Recommendation` / `ChatMessage` / `RagAnswer`），让 7 个 caller 不再各自发明。建议预留 `src/ai/{providers,prompts,stream,schema,index}.ts` 骨架。
-- [ ] **`_app.tsx` 路由级鉴权门禁** —— 当前未登录可直达 `/dashboard /ai-advisor /course-planner /import /schedule`。加 `beforeLoad: () => { if (!isAuthenticated) throw redirect({ to: "/login" }) }`；mock 阶段无影响，真用户进来即裸奔。CLAUDE.md 把 `_app.tsx` 列为"不要修改"，需用户授权后再动。
-- [ ] **API key 归属：BFF / Edge Function 强制中转** —— 浏览器侧（`src/api/*`）严禁直 fetch 第三方持密；选定后端方向后立刻确立 `src/server/` 与 `src/api/` 边界。
-- [ ] **数据 schema 起草** —— `docs/DATA_MODEL.md` 不存在。Supabase 第一天要写 5–7 张表（user / course / plan / rule / chat_message / rag_source）的字段；先文档化、再 SQL，比写代码便宜 10 倍。
+- [ ] **`_app.tsx` 路由级鉴权门禁** —— 当前未登录可直达 `/dashboard /ai-advisor /course-planner /import /schedule`。加 `beforeLoad: () => { if (!isAuthenticated) throw redirect({ to: "/login" }) }`；Supabase 已接入但 D3 = 纯浏览器 auth，路由 beforeLoad 拿不到 token，需要先把 `_app.tsx` 的 beforeLoad context 与 AuthContext 同步（或升级到 `@supabase/ssr`）。CLAUDE.md 把 `_app.tsx` 列为"不要修改"，需用户授权后再动。
+- [ ] **数据 schema 起草** —— `docs/DATA_MODEL.md` 不存在。本轮 Supabase 接入按 D1 = (a) 暂用 `auth.users.user_metadata` 存 name，未建 `profiles` / `course` / `plan` 等业务表；真要在 UI 写入业务字段时先文档化、再 SQL。
 
 ---
 
@@ -42,6 +40,16 @@
 ---
 
 ## 已解决
+
+### 2026-05-09 — Supabase auth 接入（mock 退役）
+
+> 决策：D1 = (a) 暂不建 profiles 表 / D2 = (a) 关邮件确认 / D3 = (a) 纯浏览器 auth / D4 = (a) 保 AuthUser shape 解耦后端
+
+- [x] **后端方向定锤** —— Supabase（auth + 未来数据层）。Cloudflare Worker SSR 仍由 TanStack Start 处理；浏览器侧 anon key 设计上即公开，RLS 在 Supabase 端把守。`src/server/` 暂不需要。
+- [x] **API key 归属** —— Supabase URL + anon key 走 `VITE_*` 环境变量在客户端使用（anon key 公开安全）；真敏感 secret（service_role / 第三方 AI key）一律由 Supabase Edge Function / Worker 中转，不放浏览器。
+- [x] **`@supabase/supabase-js` 接入** —— 新建 `src/lib/supabase.ts` 单例（含 SSR 守卫）；`src/api/authApi.ts` 4 个函数体替换 + 新增 `onAuthChange`；`src/context/AuthContext.tsx` 加订阅，公共 API 不变；登录 / 注册 / 登出 / 多 tab 同步全链路打通。
+- [x] **`.env.example` + `.gitignore`** —— `.env.local` 已被 `*.local` 覆盖，新增 `.env` 显式规则防误提交。
+- [x] **类型全部对齐** —— `MockSession` → `AuthSession`（去 token 字段）；`AuthUser` shape 不变；`build` 通过（client + Cloudflare Worker SSR）。
 
 ### 2026-05-09 — 接 Supabase 前清扫
 
