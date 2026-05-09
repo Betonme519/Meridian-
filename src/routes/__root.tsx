@@ -74,7 +74,8 @@ function RootShell({ children }: { children: React.ReactNode }) {
 /**
  * 全局 Provider 壳。挂点列表：
  *   - AuthProvider        ✅ 已挂（mock 实现，见 src/api/authApi.ts）
- *   - QueryClientProvider (react-query — 已装但未启用)
+ *   - QueryClientProvider 未挂（@tanstack/react-query 依赖已于 2026-05-09 移除；
+ *                          真有 server-state 缓存需求时再装回 + 在此挂）
  *   - ThemeProvider       (light/dark 切换)
  *   - <Toaster />         (sonner — 已装)
  *   - ErrorBoundary       (页面级错误兜底)
