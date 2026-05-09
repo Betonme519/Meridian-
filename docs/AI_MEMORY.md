@@ -3,8 +3,8 @@
 > **新 AI 会话 / 新 agent 接手时直接贴这一份。** 等于是给新对话灌入"项目长期记忆"。
 > 重大里程碑后更新；不是每次都改。CURRENT_TASK.md 是每会话的；这份是跨会话的。
 
-> Last snapshot: **2026-05-08**
-> Latest commit: `c60efa1` (第三页完成) ＋ 未提交：登录系统 + 落地页改版（认知落差 / Meridian 本质 / FAQ / Footer 黑底）
+> Last snapshot: **2026-05-09**
+> Latest commit: `ded270d` (前端完成准备审计) ＋ 未提交：Transparency hub-and-spoke / TiltedCard / Feedback 5 卡扇形 + 滚动星 / Control 缓动 hover / UserMenu 共享 / 5 功能页 breadcrumb HoverCard
 > Active branch: `main`
 
 ---
@@ -12,23 +12,25 @@
 ## 1. 当前项目状态（一图速览）
 
 ```
-阶段        →  落地页完成 + 一级结构债收敛完毕，进入业务接入期
-今日重点    →  架构审计后做了 4 件结构事：menu 单一真理 / _app layout route / 删旧 stub / Providers 壳
-下一里程碑  →  决定 BFF vs Supabase / AI provider 抽象 / Dashboard 真实数据
-风险点      →  bun.lockb 与 node_modules 可能不同步；中国高校本地化未做
+阶段        →  前端 demo 全部完成（落地页 + 5 功能页），进入业务接入期
+近期重点    →  Transparency 视觉重做、Feedback / Control 交互打磨、共享 UserMenu、功能页顶栏 breadcrumb HoverCard
+下一里程碑  →  决定 BFF vs Supabase / AI provider 抽象 / 5 功能页接真实数据
+风险点      →  bun.lockb 与 node_modules 可能不同步；中国高校本地化未做；功能页全是写死 const
 ```
 
 **完成度估计：**
 
 | 模块 | 状态 |
 |---|---|
-| 落地页（Home） | ✅ 95%（认知落差 / Meridian 本质 / FAQ / Footer 黑底全部接好；文案需本地化为中国高校） |
+| 落地页（Home） | ✅ 98%（Hero / Flow / Explain / GpaMath / **Transparency**（替代 Honesty） / Control / Feedback / FAQ / FinalCTA / Footer 全部接好；文案需本地化为中国高校） |
 | 笔记本 3D 展示 | ✅ 100%（CSS 伪 3D，含厚度 / 键盘 / hover lift） |
+| TiltedCard 3D tilt 组件 | ✅ 100%（React Bits TS port，无 `motion` 依赖） |
+| 共享 UserMenu | ✅ 100%（`components/layout/UserMenu.tsx`，Navbar + DashboardLayout 两处共用） |
 | 文档体系 | ✅ 100%（CURRENT_TASK / AI_MEMORY / OVERVIEW / ARCHITECTURE / DESIGN_SYSTEM / TECH_DEBT / ARCHITECTURE_AUDIT） |
-| 路由架构 | ✅ pathless `_app` layout，6 个功能页统一套 DashboardLayout |
-| 全局菜单单一真理 | ✅ `src/config/menu.ts`（Navbar + DashboardLayout 共用） |
-| Providers 壳 | ✅ `__root.tsx` 已挂 pass-through `<Providers>`（5 个 TODO 挂点） |
-| Dashboard / 6 个功能页 | 🟡 静态 demo（写死 const，等真实数据） |
+| 路由架构 | ✅ pathless `_app` layout，5 个功能页统一套 DashboardLayout |
+| 全局菜单单一真理 | ✅ `src/config/menu.ts`（label/desc + **新增** title/intro 给 breadcrumb hover 用） |
+| Providers 壳 | ✅ `__root.tsx` 已挂 `<AuthProvider>`（其余 TODO 挂点） |
+| 5 功能页（Dashboard / Planner / AIAdvisor / Schedule / Upload） | 🟡 demo 完成（feature/dashboard 合并），全是写死 const，等真实数据 |
 | CourseAnalyzer 页 | 🟡 5%（骨架，无 route） |
 | 后端 Worker | ❌ 0%（未建项目；BFF vs Supabase 方向未定） |
 | AI provider 抽象 | ❌ 0%（`src/api/aiApi.ts` 全空 stub，streaming 协议未定） |
@@ -39,6 +41,67 @@
 ---
 
 ## 2. 已完成（按 commit 倒序）
+
+### **2026-05-09** — Transparency / TiltedCard / Feedback 扇形 + 滚动星 / Control 缓动 / 共享 UserMenu / 5 功能页 breadcrumb HoverCard（未提交）
+
+**`Transparency.tsx`（替代旧 `Honesty.tsx`，已删除）** — 落地页"透明性"区，hub-and-spoke 布局：
+- 3×3 grid（lg+）：Row 1 [P0 / 标题 / P1] / Row 2 [· / 卡 / ·] / Row 3 [P2 / · / P3]
+- 4 个 pillar 在四角，标题 + 推荐示例卡在中央列；移动端单列堆叠（`order-` 重排），SVG 隐藏
+- 卡片视觉下移 40px：5 个包装层 `lg:translate-y-10`（transform 不改 layout box，下方 Control 不被推下）；SVG 加 `overflow-visible` 让线端不被 hub 边界裁掉
+- **SVG bezier dashed marching-ants 连线**：用 `getBoundingClientRect()` + `ResizeObserver` 实时测算 pillar 内边中点和卡的左右边中点，写到 SVG 的真实像素 viewBox；卡只有 2 个连接点（左中 / 右中），TL+BL 汇聚于左中，TR+BR 汇聚于右中（Y 字形）；marching-ants 用 `transparency-ants` 关键帧（`Home.css`），1.4s 线性循环 `stroke-dashoffset 0 → -12` 与 `stroke-dasharray="6 6"` 同步
+- **Hover 联动**：进入 pillar → 该 pillar 描边深 + 阴影、对应 chip 浮起 + 描边变彩、对应连线变彩 + 加粗、端点小圆变大变彩；4 处同步反应强调"同一条信息流"
+- **Pillar 缓缓亮起**：内联 layered transitions（transform 0.85s / border 0.85s+0.06s 延迟 / shadow 1s+0.1s 延迟 / icon 方框 bg 0.95s+0.18s / icon color 0.95s+0.22s），全 `cubic-bezier(0.16,1,0.3,1)` —— 修了"一下子跳起来变黑"的 bug（之前 `<Pillar>` 定义在 `Transparency` 函数体内，每次父级 re-render 函数引用变了 → React 卸载重挂 → CSS transition 完全没机会跑）。改成 `renderPillar()` 函数调用（返回 JSX 而不是组件），就在原 DOM 节点上 update style，transitions 正常生效
+- **中央卡用 `<TiltedCard>`** rotateAmplitude=6 / scaleOnHover=1.015 / perspective=1200
+- 入场 IntersectionObserver 触发，stagger：headline 0s → 卡 0.15s → chip 0.45s+0.08·i → pillar 0.7s+0.1·i → 连线 0.7s+0.12·i → 端点小圆 0.9s+0.12·i
+
+**新组件 `TiltedCard.{tsx,css}`（`components/effects/`）** — React Bits 的 TS port：
+- **零依赖**：原版用 `motion`（30KB+ 弹簧库）；本项目已有 React Bits TS port 先例（`CardSwap`、`SplitText`），保持惯例不引 motion，spring 物理感用 CSS `cubic-bezier(0.22,0.61,0.36,1)` 600ms 长缓动近似
+- 鼠标 tracking 期 90ms 微缓动（消抖不延迟），离场 600ms 长缓动（模拟 spring 回弹无 overshoot）
+- shine overlay：`mix-blend-mode: soft-light` + `radial-gradient(400px circle at var(--shine-x) var(--shine-y), rgba(255,255,255,0.55), transparent 45%)`，仅 `:hover` 时不透明
+- 接 `children` 而非 `imageSrc`（原版只支持图片），方便包任意 JSX
+- `prefers-reduced-motion: reduce` 自动停用所有 transform 与 shine
+
+**`Feedback.tsx` 全面重做** — 5 张 testimonial 卡（增 Tao 大三数学 / Sara 国际学生）：
+- 评分调整：Lin 5⭐ / Tao 4⭐ / Marcus **3→4⭐** / Aisha **4→5⭐** / Sara 5⭐
+- **xl 单行扇形布局**：`xl:grid-cols-5`，rotate `-3.5° / -1.5° / 0 / +1.5° / +3.5°`，外两张 scale 0.95 + translate-x ±12px + z-0；中心卡 z-20、内侧卡 z-10；hover 任一张 → rotate 归零 + translate 归零 + scale 1 + z-30 抽出，700ms `cubic-bezier(0.16,1,0.3,1)`；容器 `max-w-[1700px]` 让 5 卡有舒展空间
+- **滚动驱动星星 cascade**：12 颗 lit 星（5+4+4+5+5 → 实际 23 总星）每颗有阈值 `(globalIdx + 0.5) / TOTAL_LIT`，进度公式 `(vh - sectionTop) / (vh/2 + sectionHeight/2)` clamp 0-1（section 顶进入视口底 → 0；section 中心到达视口中心 → 1，之后保持 1）。rAF 节流 scroll 监听。filled `#fbbf24`（amber-400）/ unfilled `#e2e8f0`（slate-200）→ 后改 `#f59e0b`（amber-500）/ `#e5e7eb`（gray-200）按 design system 对齐。无 scale-pop（避免抽搐）
+- **`FeedbackCard` 模块顶层定义**：父级每帧 scroll re-render，组件函数引用稳定，本地 hover state 持久化，CSS transitions 正常运行
+- **设计系统对齐**：tone 色从 blue/slate 改回 emerald/amber/gray；highlight 卡从 `border-amber-200/70 ring-1` 改成 `border-amber-300 ring-2 ring-amber-100`；section bg 从渐变改成 `bg-gray-50`；hover 从 scale + shadow 改成只 translateY(-3px) + 边框深；eyebrow 标准化 `text-xs tracking-widest mb-4`；标题 `text-3xl md:text-5xl mb-4`；头像渐变改 `bg-gray-100` 单色
+
+**`Control.tsx` 缓动 hover** — 3 张编号卡：
+- 之前 Tailwind `hover:` arbitrary value `hover:-translate-y-0.5 transition-[border-color,transform,box-shadow] ease-[cubic-bezier(0.16,1,0.3,1)]` "卡卡的"——原因：Tailwind arbitrary values 在某些情况下没解析全 + 2px translate 太微小读不出动感
+- 改成 `ControlCard` 模块顶层组件 + `useState` hover + 内联分层过渡：transform 0.85s / border 0.85s+0.06s / shadow 1s+0.1s / 数字圆 scale(1.08) 0.85s+0.1s，全部 `cubic-bezier(0.16, 1, 0.3, 1)` expo-out（前快后慢）
+- Section padding `py-24 → pt-12 pb-48`：移上去贴近 Transparency + 整体加高
+- Transparency 与 Control 之间的横线删了（`border-y → border-t`）
+
+**`FinalCTA.tsx` 按钮反向** — 实心黑底 → 黑色描边 + 黑字；hover 反相为黑底白字 + 箭头 `group-hover:translate-x-1`；200ms `transition-colors` + `transition-transform ease-out`
+
+**`Footer.tsx`** — 3 列改 2 列，删掉中间 Workspace/Rules/Simulation 块，保留左品牌 + 右"Built for students."
+
+**共享 `UserMenu.tsx`（新增 `components/layout/`）** — Navbar + DashboardLayout 两处头像下拉单一组件：
+- **`modal={false}`**（关键 bug 修复）：默认 Radix DropdownMenu `modal={true}` 打开时锁 body scroll + 注入 `padding-right` 抵消滚动条消失，**导致 fixed 定位的首页 Navbar 整条向右跳 ~15px** 同时入场动画在首帧 reflow 中被吃掉。`modal={false}` 直接绕过 body lock，两个 bug 一起消失
+- 菜单项（用户头像点击）：用户名 + 邮箱 → 个人资料 / 个性化 / **Upgrade plan**（amber 渐变高亮）/ 设置 / 帮助 / 退出登录（red）。后两次迭代删掉了「个性化」并按用户要求重排为 个人资料 / Upgrade plan / 设置 / 帮助 / 退出登录
+- 入场 220ms `cubic-bezier(0.22,0.61,0.36,1)` from `origin-top-right`（从头像位置展开），shadcn 默认 fade + zoom-95 + slide-from-top-2 复合
+- Hover 交互：底色 + 文字 + 图标颜色平滑过渡，**图标不做 transform**（之前 0.5px sub-pixel translate 看起来是抽搐 bug），upgrade 项 amber 渐变加深，logout 项红底 + 红字
+- Trigger 按钮在调用方各自定义（Navbar 适应 dark/light hero / DashboardLayout 实心 slate-950），通过 `trigger` prop 传入
+
+**5 功能页 breadcrumb HoverCard**（Dashboard / AIAdvisor / Planner / Schedule / Upload）：
+- 删掉每页顶部 `<header>` 块（eyebrow + h1 + intro 段落）
+- 内容搬到 `MENU_ITEMS` 的新 `title` + `intro` 字段（`src/config/menu.ts`），单一真理源
+- `DashboardLayout` 顶栏的 `[CurrentIcon] {currentItem.label}` breadcrumb 外包 shadcn `HoverCard`，hover 弹出圆角白卡（`rounded-2xl border-slate-200/70 bg-white/95 backdrop-blur-xl shadow-[0_18px_44px_...]`）显示 `currentItem.title` + `currentItem.intro`，sideOffset 12，`openDelay/closeDelay` 各 120ms
+- 中间短命的 `PageIntro.tsx` 已删除
+
+### **2026-05-09**（早些）— **feature/dashboard 分支合并**（commit `d4c10c5`）：5 个功能页从骨架推进到可演示状态
+
+每页仍是写死 `const`（无 fetch），但视觉与 state 交互完整：
+
+- **`pages/Dashboard/index.tsx`**（384 行，路由 `/dashboard`）：4 区——信息导入快捷入口（5 入口 + 状态徽章）+ 决策卡（3 张可点切换 tone）+ 场景动作选择（`useState` selectedAction，活跃态切换 metric 文案）+ 指标卡（4 项 GPA / 学位进度 / 学习时长 / 风险）。`metricIcons` 数组 + tone class 映射。
+- **`pages/Planner/index.tsx`**（676 行，路由 `/course-planner`，菜单 label "Workspace"）：基于 `@xyflow/react` 的 ReactFlow 决策图谱。多种节点类型 `course / requirement / gpa / risk / goal / workload / abroad / internship / second-class / volunteer / alternative`，lane 分层（L0 培养目标 / L1 课程 / L2 GPA / L3 风险 等），自定义 `MeridianFlowNode`，背景 `BackgroundVariant.Dots` + `MiniMap` + `Controls`，节点 `MarkerType.ArrowClosed`，可拖拽缩放。
+- **`pages/AIAdvisor/index.tsx`**（256 行，路由 `/ai-advisor`，菜单 label "Goal Mode"）：左侧 4 个固定 Mode 卡（GPA 优先 / 学习兴趣 / 留学准备 / 实习就业，各带 logic 逻辑说明）+ 右侧自然语言输入框，输入框上方状态指示器「中文 · 自然语言」+ pulse halo 效果（`animate-pulse-halo`）。
+- **`pages/Schedule/index.tsx`**（332 行，路由 `/schedule`，菜单 label "Rule Graph"）：左侧规则树（按培养方案分组的可折叠 RuleLeaf + ConflictRule + ExternalLink）+ 右侧冲突详情卡（A 方文案 + B 方文案 + AI 判断 + 来源链接），冲突卡黑底白字（`bg-slate-950`）。
+- **`pages/Upload/index.tsx`**（355 行，路由 `/import`，菜单 label "Import"）：学校选择器 + 当前连接状态（教务 / 个人 / 社区数据源）+ 文件上传槽（5 种类型 + 格式提示）+ 已导入文件表格（带导入日期、类型、状态）。
+
+合并产生的路由文件：`routes/_app/{ai-advisor,course-planner,dashboard,import,schedule}.tsx`，全部走 pathless `_app` layout 套 `DashboardLayout`。
 
 ### **2026-05-08** — 落地页 Explain / GpaMath / FAQ / Footer 改版（未提交）
 
