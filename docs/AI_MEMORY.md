@@ -4,7 +4,7 @@
 > 重大里程碑后更新；不是每次都改。CURRENT_TASK.md 是每会话的；这份是跨会话的。
 
 > Last snapshot: **2026-05-10**
-> Latest commit: `6983787` (完成接后端前准备) ＋ 未提交：`_app.tsx beforeLoad` 路由鉴权门禁 / 访客模式（guest mode）/ 退出登录跳首页 / Home CTA 鉴权门禁 / Login 暂时跳过按钮
+> Latest commit: `6983787` (完成接后端前准备) ＋ 未提交：`_app.tsx beforeLoad` 路由鉴权门禁 / 访客模式（guest mode）/ 退出登录跳首页 / Home CTA 鉴权门禁 / Login 暂时跳过按钮 / **`docs/DATA_MODEL.md` 起草 + 审计 + 决策确认**
 > Active branch: `main`
 
 ---
@@ -26,7 +26,9 @@
 | 笔记本 3D 展示 | ✅ 100%（CSS 伪 3D，含厚度 / 键盘 / hover lift） |
 | TiltedCard 3D tilt 组件 | ✅ 100%（React Bits TS port，无 `motion` 依赖） |
 | 共享 UserMenu | ✅ 100%（`components/layout/UserMenu.tsx`，Navbar + DashboardLayout 两处共用） |
-| 文档体系 | ✅ 100%（CURRENT_TASK / AI_MEMORY / OVERVIEW / ARCHITECTURE / DESIGN_SYSTEM / TECH_DEBT / ARCHITECTURE_AUDIT） |
+| 文档体系 | ✅ 100%（CURRENT_TASK / AI_MEMORY / OVERVIEW / ARCHITECTURE / DESIGN_SYSTEM / TECH_DEBT / ARCHITECTURE_AUDIT / **DATA_MODEL**） |
+| 数据库 schema 设计 | ✅ 100%（`docs/DATA_MODEL.md`，6 张表 + 决策已确认 + 审计过；待落 SQL migration） |
+| 数据库 schema 落地 | ❌ 0%（Supabase 项目里还只有 `auth.users`，业务表全空） |
 | 路由架构 | ✅ pathless `_app` layout，5 个功能页统一套 DashboardLayout |
 | 全局菜单单一真理 | ✅ `src/config/menu.ts`（label/desc + **新增** title/intro 给 breadcrumb hover 用） |
 | Providers 壳 | ✅ `__root.tsx` 已挂 `<AuthProvider>`（其余 TODO 挂点） |
@@ -41,6 +43,65 @@
 ---
 
 ## 2. 已完成（按 commit 倒序）
+
+### **2026-05-10** — `docs/DATA_MODEL.md` 起草 + 工程审计 + 6 处决策确认（未提交）
+
+排队 3 任务。给 Supabase Postgres 设计了完整的 schema 文档，6 张主表 + 1 张可选表，配 RLS / 索引 / trigger / DDL 速查。
+
+**6 张表 + 1 可选：**
+- `profiles` — 1:1 扩展 auth.users，存 school / major / grade / target_gpa / goal_mode（中文 enum 与 `AIAdvisor/index.tsx` 字面量对齐）/ goal_weights JSONB（个性化模式权重）
+- `course` — 用户私有修课记录（不是学校 catalog；catalog 走 RAG 解析），code / name / credits / category / semester / status (planned/enrolled/completed/dropped/failed) / grade_letter / grade_point / counts_in_gpa
+- `plan` — ReactFlow 决策图整存 JSONB（nodes / edges / viewport），不拆 plan_node / plan_edge
+- `rule` — 用户私有规则知识库，trust 三级 (high/med/low) + source 自由文本 + 可选 FK 到 `rag_source`
+- `rule_conflict` — 规则冲突独立表（不嵌进 rule.conflicts_with[]），含 judgement / confidence / resolved_by
+- `chat_message` — AI 对话历史，conversation_id 字段分组（不开 parent `chat_conversation` 表），不可改不可 UPDATE
+- `rag_source`（可选但推荐建）— 上传文件清单 + 解析状态，bytes 在 Supabase Storage（bucket `rag_sources`），表里只存 `<auth_uid>/<rag_source_id>.<ext>` 相对路径 + parsed_text 文本兜底
+
+**6 处决策点用户确认：**
+- **D1=b** 建 profiles（升级原 D1=a 的"塞 metadata"决定，因为 school/major/grade 等已超出 metadata 用法）
+- **D5=a** course 用户私有修课记录（不是学校 catalog）
+- **D6=a** plan JSONB 整存（不拆 plan_node / plan_edge）
+- **D7=a** rule 用户私有（不做同校共享，未来加 `school_rules` public 表升级）
+- **D8=b** 冲突独立 `rule_conflict` 表（不嵌进 `rule.conflicts_with[]`）
+- **D9=a** chat_message 不开 parent table，conversation_id 字段直接挂 message 上
+
+**工程审计修了 4 处真问题：**
+1. § 9 SQL DDL 顺序错（`rule.rag_source_id` FK 引用了下方 9.7 才建的 `rag_source`）→ 加"建表顺序 ≠ 编号顺序"说明，正确序：`profiles → rag_source → course → plan → rule → rule_conflict → chat_message`
+2. `rule_conflict` UNIQUE 不对称（A↔B 与 B↔A 可重复）→ 加 `CHECK (rule_a_id < rule_b_id)` 字典序规范化（前端插入前必须先 swap min/max）
+3. `rule_conflict` 用户一致性无 DB 校验（理论上拼凑别人 rule_id 不会泄漏数据但污染表）→ 加 `check_rule_conflict_owner` BEFORE INSERT/UPDATE trigger
+4. `rag_source.storage_path` 格式含混（含不含 bucket 前缀）→ 明确 = `<auth_uid>/<rag_source_id>.<ext>` 相对路径，bucket 名 `rag_sources` 由代码常量持有不入库
+
+**审计还覆盖（无问题，记录设计意图）：**
+- `course` 无 `UNIQUE (user_id, code, semester)`：故意，允许撤选重选 / 导入纠错，业务层去重
+- `chat_message.conversation_id default gen_random_uuid()`：故意，"未指定 = 单消息独立会话"的保守默认
+- `goal_mode` 用中文 enum：与 `AIAdvisor/index.tsx` 字面量对齐，i18n 时再换 ASCII
+- JSONB 字段不建 GIN 索引：当前查询用不到，建了浪费写入
+- `SECURITY DEFINER` + `search_path = public`：handle_new_user trigger 的标准 Supabase 写法
+- `ON DELETE CASCADE` 全链路：删账号即清干净
+- timestamps 全 `timestamptz`：UTC 存，时区无关
+
+**设计纪律确立：**
+- 表名单数（`course` 而非 `courses`）—— Supabase 客户端 `.from("course")` 读起来像句子
+- `text + CHECK IN (...)` 替代 Postgres ENUM 类型 —— 改起来不要 ALTER TYPE 反复折腾
+- JSONB 只给"图状/树状/用户自定义形状"字段（plan.nodes / edges / chat_message.metadata）—— 要查的字段必拆列
+- 字段命名：snake_case，时间戳 `*_at` 后缀，布尔 `is_*` / `has_*` 前缀（例外 `counts_in_gpa`），FK `<other_table>_id`
+- 主键 `uuid default gen_random_uuid()`（Postgres 13+ 内置 `pgcrypto`-free，不要 `uuid-ossp`）
+- 软删不做：删就是真删
+
+**新加 § 5b — service_role bypass RLS 注意：**
+Cloudflare Worker 端跑 AI 抽数据 / RAG 解析时会用 `SUPABASE_SERVICE_ROLE_KEY` 直连，绕过所有 RLS。原则：service_role 只在 server-side 用，绝不进 client bundle（Vite `VITE_*` 会被字面量替换 → 直接泄漏）；写入业务表时手动校验 `user_id`（RLS 帮不了你）。与排队 2（AI provider 抽象）一起设计。
+
+**未做（明确推迟）：**
+- 学校字典 `schools` 表：profiles.school 暂用自由文本
+- 学期字典 `semesters` 表：course.semester 暂用 `'2025-fall'` 字符串
+- `school_rules` public 共享表（D7=b 升级路径）
+- `rag_chunk` + pgvector embedding：等单文档超 1MB 再做
+- 审计 / 操作日志 `audit_log` 表
+- `course.grade_score numeric(5,2)`（百分比原始分）：当前只 4.0 制点，原始百分比塞 `notes`
+- `authApi.mapUser` 改读 `profiles.name` 而非 `auth.users.user_metadata.name`：schema 落地后再改
+
+**下一步（排队 3a）：**
+SQL Editor 走一遍 DDL 验证 → 生成 `supabase/migrations/<timestamp>_init_schema.sql` → 旧账号补一句 `INSERT INTO profiles (id) SELECT id FROM auth.users ON CONFLICT DO NOTHING;` backfill。
 
 ### **2026-05-10** — `_app.tsx beforeLoad` 路由鉴权门禁 + 访客模式 + 退出登录改首页 + Home CTA 鉴权（未提交）
 

@@ -26,28 +26,30 @@
 
 > 一句话，要具体到能验证。
 
-排队 1（路由鉴权门禁）已完成。**进入业务接入期**——剩下 3 条排队任务等用户挑一条开新会话，每条都小到能在一次会话内完成。
+排队 1（路由鉴权门禁）+ 排队 3（DATA_MODEL.md 起草）已完成。排队 2（AI provider 抽象）暂缓——用户系统还没完整跑通，先不开 AI。剩下：SQL 落地 + 排队 4（5 功能页接 Supabase）。
 
 ### 需要做（排队，按优先级）
 
 > 一次开一条。开始前用户先指定要做哪条。
 
-- [ ] **🔴 高 · 排队 2** — AI provider 抽象 + streaming 协议骨架（约 1–2 小时）
+- [ ] **🔴 高 · 排队 3a · 紧接 3** — DATA_MODEL.md 5 处决策点确认 + SQL migration 落地（约 30–60 分钟）
+  - 用户读 `docs/DATA_MODEL.md` § 1 决策点（D5–D9 + D1 升级），同意默认或翻案
+  - 同意后 → 走 SQL Editor 验证一遍 + 生成 `supabase/migrations/<ts>_init_schema.sql`
+  - 完成标准：6 张表（profiles / course / plan / rule / rule_conflict / chat_message / rag_source）在 Supabase 项目里建好 + RLS policies 全开 + handle_new_user trigger 跑通（新注册账号自动建 profiles 行）
+
+- [ ] **🟡 中 · 排队 4** — 5 功能页之一接 Supabase（约半天）
+  - 推荐从 `Upload (/import)` 开始（文件上传天然贴 Supabase Storage + `rag_source` 表）
+  - 把页面顶部写死的 `dataRecords` const 替换为 `useQuery` 风格的 fetch（不引 react-query，先用纯 `useEffect + useState`）
+  - 依赖：排队 3a 完成（schema 落地后才能接）
+  - 完成标准：登录用户上传文件 → 显示在已导入列表 → 刷新页仍在
+
+- [ ] **🔴 高 · 排队 2（暂缓）** — AI provider 抽象 + streaming 协议骨架（约 1–2 小时）
+  - 用户系统验证完整通过后再做（先确认登录 / 注册 / 路由门禁 / 数据写入都稳了，再叠 AI 抽象层）
   - 新建 `src/ai/{providers,prompts,stream,schema,index}.ts`
   - 先定 `chat()` 签名：`({ messages, signal }) => AsyncIterable<Token>`
   - 写一个 `mock` provider 让 `/ai-advisor` 跑通流式渲染（不接真实 LLM）
   - zod schema 先定 `Recommendation` / `ChatMessage` / `RagAnswer`
   - 完成标准：`/ai-advisor` 输入框发消息 → mock provider 模拟 token-by-token 流式返回 → 页面流畅渲染
-
-- [ ] **🟡 中 · 排队 3** — `docs/DATA_MODEL.md` 起草（约 1 小时）
-  - 先文档再 SQL，5 张表字段：`profiles / course / plan / rule / chat_message`（+ 可选 `rag_source`）
-  - 每张表写：字段名 / 类型 / 是否必填 / RLS 策略草稿 / 索引建议
-  - 完成标准：用户读完能直接在 Supabase Dashboard 建表
-
-- [ ] **🟡 中 · 排队 4** — 5 功能页之一接 Supabase（约半天）
-  - 推荐从 `Upload (/import)` 开始（文件上传天然贴 Supabase Storage + `imported_files` 表）
-  - 把页面顶部写死的 `dataRecords` const 替换为 `useQuery` 风格的 fetch（不引 react-query，先用纯 `useEffect + useState`）
-  - 完成标准：登录用户上传文件 → 显示在已导入列表 → 刷新页仍在
 
 ### 不要修改
 
@@ -84,6 +86,19 @@
 ## 完成归档
 
 > 保留最近 5–10 条；权威记录在 `git log`，这里只留人话摘要。
+
+- **2026-05-10** — `docs/DATA_MODEL.md` 起草 + 工程审计 + 决策确认（排队 3 完成）：
+  - 6 张表设计：`profiles` / `course` / `plan` / `rule` / `rule_conflict` / `chat_message` + 可选 `rag_source`（5 表预算 + 冲突拆出来 + RAG 文件清单加挂）。
+  - 每表给：字段表（name / type / required / 默认 / 注释）+ RLS policies + 索引建议；末附 § 9 SQL DDL 速查（未审定，下一轮 SQL Editor 走一遍再落 migration）。
+  - **6 处决策点用户确认**（§ 1 表格全部标 ✅）：D1=b 建 profiles / D5=a 用户私有修课记录 / D6=a JSONB 整存 ReactFlow graph / D7=a rule 用户私有 / D8=b 冲突独立表 `rule_conflict` / D9=a chat_message 不开 parent table。
+  - **工程审计修了 4 处问题**：
+    1. § 9 SQL DDL 顺序错（`rule.rag_source_id` FK 引用了下方才建的 `rag_source`）→ 加了"建表顺序 ≠ 编号顺序"说明
+    2. `rule_conflict` UNIQUE 不对称（A↔B 与 B↔A 可重复）→ 加 `CHECK (rule_a_id < rule_b_id)` 强规范化
+    3. `rule_conflict` 用户一致性无校验（理论上可拼凑别人 rule_id）→ 加 `check_rule_conflict_owner` trigger
+    4. `rag_source.storage_path` 格式含混（是否含 bucket 前缀）→ 明确 = `<auth_uid>/<rag_source_id>.<ext>`，bucket 名由代码常量持有
+  - **审计还覆盖**：course / plan / rule 索引完整、JSONB 字段不建 GIN 故意为之、SECURITY DEFINER + search_path = public 是标准 Supabase 模式、ON DELETE CASCADE 全链路一致、timestamps 全 timestamptz UTC、profiles.id 复用 auth.users.id 不另起 UUID。
+  - **加了 § 5b**：service_role 在 Worker 端 bypass RLS 的注意事项（不进 client bundle / 手动校验 user_id），与排队 2 配合时再展开。
+  - **未做**：学校字典 `schools` 表、学期字典、`school_rules` public 共享表、`rag_chunk` + pgvector embedding、审计日志、partial / BRIN / 物化视图——明确推迟到具体功能页接入时按需补。
 
 - **2026-05-10** — 路由鉴权门禁 + 访客模式 + 退出登录改首页 + Home CTA 鉴权（排队 1 完成 + 用户追加 3 项）：
   - **`_app.tsx`** 加 `beforeLoad`：SSR 守卫（`typeof window === 'undefined'` 直接 return，避免 server 端把已登录用户也踢出，因为 D3=浏览器 auth，token 只在 localStorage）+ `isSupabaseConfigured` 守卫（fail-soft，缺 env 不拦路）+ **访客模式守卫**（`isGuestMode()` 为真即放行）+ `await supabase.auth.getSession()` 读 localStorage 缓存（无网络 IO）+ 无 session → `throw redirect({ to: '/login', search: { redirect: location.href } })`。
