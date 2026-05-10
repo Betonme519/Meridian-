@@ -3,8 +3,8 @@
 > **新 AI 会话 / 新 agent 接手时直接贴这一份。** 等于是给新对话灌入"项目长期记忆"。
 > 重大里程碑后更新；不是每次都改。CURRENT_TASK.md 是每会话的；这份是跨会话的。
 
-> Last snapshot: **2026-05-09**
-> Latest commit: `ded270d` (前端完成准备审计) ＋ 未提交：Transparency hub-and-spoke / TiltedCard / Feedback 5 卡扇形 + 滚动星 / Control 缓动 hover / UserMenu 共享 / 5 功能页 breadcrumb HoverCard
+> Last snapshot: **2026-05-10**
+> Latest commit: `6983787` (完成接后端前准备) ＋ 未提交：`_app.tsx beforeLoad` 路由鉴权门禁 / 访客模式（guest mode）/ 退出登录跳首页 / Home CTA 鉴权门禁 / Login 暂时跳过按钮
 > Active branch: `main`
 
 ---
@@ -34,13 +34,64 @@
 | CourseAnalyzer 页 | 🟡 5%（骨架，无 route） |
 | 后端 Worker | ❌ 0%（未建项目；BFF vs Supabase 方向未定） |
 | AI provider 抽象 | ❌ 0%（`src/api/aiApi.ts` 全空 stub，streaming 协议未定） |
-| 鉴权 / 用户系统 | 🟡 30%（**Mock 实现**，localStorage-backed；详见下文 2026-05-08 条目） |
+| 鉴权 / 用户系统 | 🟡 75%（Supabase 接入 + 注册联通 + `_app` beforeLoad 门禁 + 访客模式；待办：邮件确认 / 忘记密码 / OAuth / `profiles` 表 / 服务端鉴权） |
 | 学校手册 RAG pipeline | ❌ 0% |
 | 真实数据接入 | ❌ 0% |
 
 ---
 
 ## 2. 已完成（按 commit 倒序）
+
+### **2026-05-10** — `_app.tsx beforeLoad` 路由鉴权门禁 + 访客模式 + 退出登录改首页 + Home CTA 鉴权（未提交）
+
+接 Supabase auth 已联通后的第一项业务接入：把 5 个功能页（dashboard / ai-advisor / course-planner / import / schedule）真正闭门，未登录或访客需走登录态或主动选「暂时跳过」。
+
+**`src/routes/_app.tsx` — beforeLoad 4 道守卫（依次短路 return）：**
+1. **SSR 守卫** `typeof window === "undefined"` → return。D3 = 浏览器 auth，token 在 localStorage，server 端 `getSession()` 必为 null；若不守卫，SSR 会把已登录用户也 redirect 到 `/login`，client hydration 后再跑一次拿到真实 session 又会回弹，体验差且控制台报警告。直接放行让客户端处理是 D3 模型下唯一干净的写法。
+2. **`isSupabaseConfigured` 守卫** → return。`fail-soft`，与 `lib/supabase.ts` 风格保持一致：本地缺 `.env.local` 时不能让整站不可访问。
+3. **访客模式守卫** `isGuestMode()` → return。读 localStorage 标志，下文。
+4. **真实校验** `await supabase.auth.getSession()`：读 localStorage 缓存（无网络 IO，<10ms），无 session → `throw redirect({ to: "/login", search: { redirect: location.href } })`。
+
+**`src/routes/login.tsx` / `register.tsx` — `validateSearch`：**
+接受 `?redirect=<string>`，类型化到 `useSearch({ from: "/login" })` / `useSearch({ from: "/register" })`。Login ↔ Register 的 `<Link>` 互链都透传 `search={{ redirect: search.redirect }}`，用户在两页之间切换不丢失 redirect。
+
+**`src/pages/Login/index.tsx` / `Register/index.tsx` — 登录/注册成功后回原页：**
+- 引入 `safeRedirect()` 工具（同文件内）：仅放行同源相对路径（`/` 开头且不以 `//` 开头），否则 fallback `/dashboard`。防 open redirect。
+- 成功后 `exitGuestMode()` 清访客标志 + `navigate({ to: target, replace: true })`。replace 避免后退按钮回到登录页。
+
+**新建 `src/lib/guestMode.ts` — 访客模式 localStorage 薄壳：**
+- 键名 `meridian_guest_mode === "1"` 即为访客
+- 3 个函数：`isGuestMode()` / `enterGuestMode()` / `exitGuestMode()`，都 `typeof window` 守卫 + `try/catch` 包 storage 调用（防 Safari 隐私模式 / quota 异常）
+- **没有放进 `AuthContext`**：CLAUDE.md 把 `AuthContext.tsx` 标"不要修改 — 公共 API 已稳定"，访客标志走独立 lib 不破坏 `useAuth` 签名 / `AuthUser` shape。
+- 生命周期：进入 = Login「暂时跳过」按钮；离开 = 登录成功 / 注册成功 / 退出登录（三处都调 exitGuestMode 防残留）
+
+**`src/pages/Login/index.tsx` 加「暂时跳过 · 以访客身份浏览」按钮：**
+登录按钮下方，小号 underline 文字链接（与「忘记密码？」同视觉重量），点击 `enterGuestMode()` + `navigate(redirect ?? '/dashboard')`，让用户无需注册登录即可浏览功能页（功能页本就是写死 const，访客态天然有内容）。
+
+**`src/components/layout/UserMenu.tsx` — 退出登录跳首页 + 清访客：**
+`handleLogout` 从 `navigate({ to: "/login" })` 改成 `navigate({ to: "/" })`（用户体感：退出 = 回到 marketing 落地页，不是再次面对登录表单）；并 `exitGuestMode()`，防止用户先点暂时跳过、再注册登录、再退出登录这串操作后访客标志残留导致下次访问 `/dashboard` 绕过门禁。
+
+**`src/pages/Home/Hero.tsx` / `FinalCTA.tsx` — Home CTA 鉴权门禁：**
+原本是 `<a href="/dashboard">` 直接到功能页（落地页 marketing 心态：先让用户看产品）。改成 `<button onClick>`，已登录或访客直进 `/dashboard`，未登录 → `/login?redirect=/dashboard`。这条改动属于「不要修改」清单（落地页 + Home/*）的显式授权例外，理由是用户明确要求统一鉴权入口，不再让 CTA 绕过门禁。
+
+**手测验证矩阵：**
+| 状态 | 访问 `/dashboard` | 首页 CTA | 退出登录落地 |
+|---|---|---|---|
+| 未登录 + 非访客 | → `/login?redirect=/dashboard` | → `/login?redirect=/dashboard` | — |
+| 已登录 | 直进 | 直进 | `/`（清 guest） |
+| 访客 | 直进 | 直进 | — |
+| 登录成功 | — | — | guest 已清 |
+
+**未做（明确推迟）：**
+- router context 注入 — 当前 `getSession()` 方案够稳，未来要做服务端鉴权（D3=b）才需要
+- 服务端鉴权（保持 D3=a 浏览器 auth 模型）
+- 功能页空状态视觉打磨 — 当前页面已是 const 假数据，访客模式下天然有内容显示，不阻塞
+- "您正以访客身份浏览"全局 banner — 暂不做，Navbar 仍显示「登录/注册」即视觉提示
+
+**踩坑记录：**
+- TanStack Router 的 `useSearch({ from: "/login" })` 需要 `validateSearch` 在 route 文件中定义，否则 search 类型为 `{}` 而不是 `{ redirect?: string }`，访问 `search.redirect` 会被推断为 `unknown`。
+- `routeTree.gen.ts` 顶有 `// @ts-nocheck`，类型流不依赖它，从 route 文件的 `createFileRoute(...)` 泛型直接推导。所以本轮没必要手动重新生成 `routeTree.gen.ts`。
+- TanStack `<Link>` 的 `search` prop 在父级 search 类型为 `{}` 时会拒绝任意键；用 `validateSearch` 声明后，`<Link to="/login" search={{ redirect: ... }}>` 类型校验通过。
 
 ### **2026-05-09** — Supabase auth 接入（mock 退役）
 

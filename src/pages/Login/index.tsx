@@ -1,6 +1,16 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { enterGuestMode, exitGuestMode } from "@/lib/guestMode";
+
+/**
+ * 仅放行 同源相对路径（必须 / 开头且不以 // 开头），防 open redirect。
+ */
+function safeRedirect(raw: string | undefined): string {
+  if (!raw) return "/dashboard";
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/dashboard";
+  return raw;
+}
 
 /**
  * Login page — standalone auth surface, not wrapped by DashboardLayout.
@@ -19,6 +29,7 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const search = useSearch({ from: "/login" });
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -27,12 +38,20 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(email, password);
-      navigate({ to: "/dashboard" });
+      exitGuestMode();
+      const target = safeRedirect(search.redirect);
+      navigate({ to: target, replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "登录失败，请稍后再试");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSkip = () => {
+    enterGuestMode();
+    const target = safeRedirect(search.redirect);
+    navigate({ to: target, replace: true });
   };
 
   return (
@@ -112,12 +131,26 @@ export default function LoginPage() {
         </form>
 
         <p
+          className="animate-fade-in-up-soft text-center mt-1 mb-3"
+          style={{ animationDelay: "400ms" }}
+        >
+          <button
+            type="button"
+            onClick={handleSkip}
+            className="text-xs font-medium text-gray-500 underline underline-offset-2 hover:text-gray-900 transition-colors cursor-pointer"
+          >
+            暂时跳过 · 以访客身份浏览
+          </button>
+        </p>
+
+        <p
           className="animate-fade-in-up-soft text-sm text-gray-500 m-0"
           style={{ animationDelay: "460ms" }}
         >
           没有账户？
           <Link
             to="/register"
+            search={{ redirect: search.redirect }}
             className="ml-1 font-medium text-gray-900 underline underline-offset-2 decoration-gray-900 hover:text-gray-700 transition-colors"
           >
             注册

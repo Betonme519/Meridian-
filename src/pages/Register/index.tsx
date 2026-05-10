@@ -1,6 +1,16 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { exitGuestMode } from "@/lib/guestMode";
+
+/**
+ * 仅放行 同源相对路径（必须 / 开头且不以 // 开头），防 open redirect。
+ */
+function safeRedirect(raw: string | undefined): string {
+  if (!raw) return "/dashboard";
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/dashboard";
+  return raw;
+}
 
 /**
  * Register page — visual sibling of Login. Same typography rules per
@@ -21,6 +31,7 @@ export default function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
+  const search = useSearch({ from: "/register" });
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -37,7 +48,9 @@ export default function RegisterPage() {
     setSubmitting(true);
     try {
       await register(email, password, name);
-      navigate({ to: "/dashboard" });
+      exitGuestMode();
+      const target = safeRedirect(search.redirect);
+      navigate({ to: target, replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "注册失败，请稍后再试");
     } finally {
@@ -164,6 +177,7 @@ export default function RegisterPage() {
           已经有账户？
           <Link
             to="/login"
+            search={{ redirect: search.redirect }}
             className="ml-1 font-medium text-gray-900 underline underline-offset-2 decoration-gray-900 hover:text-gray-700 transition-colors"
           >
             登录

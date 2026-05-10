@@ -18,7 +18,7 @@
 
 ---
 
-## 当前任务（Last updated: 2026-05-09）
+## 当前任务（Last updated: 2026-05-10）
 
 > 新任务覆盖此区，旧的挪到「完成归档」。
 
@@ -26,13 +26,28 @@
 
 > 一句话，要具体到能验证。
 
-Supabase auth 已接入（mock 退役），架构审计 + 死文件清扫已完成。**当前无主动任务**——等用户拍板下一步：(1) `_app.tsx beforeLoad` 鉴权门禁，(2) AI provider 抽象 + streaming 协议，(3) 5 功能页接真实数据，或 (4) 起草 `docs/DATA_MODEL.md` 为 Supabase 业务表做准备。
+排队 1（路由鉴权门禁）已完成。**进入业务接入期**——剩下 3 条排队任务等用户挑一条开新会话，每条都小到能在一次会话内完成。
 
-### 需要做
+### 需要做（排队，按优先级）
 
-> 等用户授权后再开任务。
+> 一次开一条。开始前用户先指定要做哪条。
 
-- [ ] _等待用户指令_
+- [ ] **🔴 高 · 排队 2** — AI provider 抽象 + streaming 协议骨架（约 1–2 小时）
+  - 新建 `src/ai/{providers,prompts,stream,schema,index}.ts`
+  - 先定 `chat()` 签名：`({ messages, signal }) => AsyncIterable<Token>`
+  - 写一个 `mock` provider 让 `/ai-advisor` 跑通流式渲染（不接真实 LLM）
+  - zod schema 先定 `Recommendation` / `ChatMessage` / `RagAnswer`
+  - 完成标准：`/ai-advisor` 输入框发消息 → mock provider 模拟 token-by-token 流式返回 → 页面流畅渲染
+
+- [ ] **🟡 中 · 排队 3** — `docs/DATA_MODEL.md` 起草（约 1 小时）
+  - 先文档再 SQL，5 张表字段：`profiles / course / plan / rule / chat_message`（+ 可选 `rag_source`）
+  - 每张表写：字段名 / 类型 / 是否必填 / RLS 策略草稿 / 索引建议
+  - 完成标准：用户读完能直接在 Supabase Dashboard 建表
+
+- [ ] **🟡 中 · 排队 4** — 5 功能页之一接 Supabase（约半天）
+  - 推荐从 `Upload (/import)` 开始（文件上传天然贴 Supabase Storage + `imported_files` 表）
+  - 把页面顶部写死的 `dataRecords` const 替换为 `useQuery` 风格的 fetch（不引 react-query，先用纯 `useEffect + useState`）
+  - 完成标准：登录用户上传文件 → 显示在已导入列表 → 刷新页仍在
 
 ### 不要修改
 
@@ -69,6 +84,24 @@ Supabase auth 已接入（mock 退役），架构审计 + 死文件清扫已完�
 ## 完成归档
 
 > 保留最近 5–10 条；权威记录在 `git log`，这里只留人话摘要。
+
+- **2026-05-10** — 路由鉴权门禁 + 访客模式 + 退出登录改首页 + Home CTA 鉴权（排队 1 完成 + 用户追加 3 项）：
+  - **`_app.tsx`** 加 `beforeLoad`：SSR 守卫（`typeof window === 'undefined'` 直接 return，避免 server 端把已登录用户也踢出，因为 D3=浏览器 auth，token 只在 localStorage）+ `isSupabaseConfigured` 守卫（fail-soft，缺 env 不拦路）+ **访客模式守卫**（`isGuestMode()` 为真即放行）+ `await supabase.auth.getSession()` 读 localStorage 缓存（无网络 IO）+ 无 session → `throw redirect({ to: '/login', search: { redirect: location.href } })`。
+  - **`login.tsx` / `register.tsx`** 加 `validateSearch`：接受 `?redirect=` string 参数，类型化到 search。
+  - **`Login/index.tsx` / `Register/index.tsx`**：`useSearch` 读 `redirect`，登录/注册成功后 `exitGuestMode()` + `navigate({ to: target, replace: true })`。`safeRedirect` 工具函数防 open redirect（仅放行 `/` 开头且不以 `//` 开头的同源相对路径，否则 fallback `/dashboard`）。Login↔Register 切换链接 `<Link search={{ redirect: ... }}>` 透传 redirect 参数。
+  - **新建 `src/lib/guestMode.ts`**：localStorage 薄壳（`isGuestMode` / `enterGuestMode` / `exitGuestMode`），SSR 守卫 + try/catch 防隐私模式 quota 异常。键名 `meridian_guest_mode === "1"`。
+  - **Login 页加「暂时跳过 · 以访客身份浏览」按钮**：点击 → `enterGuestMode()` + `navigate(redirect ?? '/dashboard')`，让用户无需注册登录即可浏览功能页（功能页对未登录态自行做空状态）。位置：登录按钮下方小号 underline 链接。
+  - **`UserMenu.tsx` 退出登录改跳首页**：`handleLogout` 从 `navigate({ to: '/login' })` 改成 `navigate({ to: '/' })`，且调用 `exitGuestMode()`（防止退出后访客标志残留导致下次访问功能页绕过门禁）。
+  - **`Hero.tsx` / `FinalCTA.tsx` CTA 鉴权门禁**：「开始分析」/「立即开始」按钮 `<a href="/dashboard">` → `<button onClick>`，已登录或访客 → `/dashboard`，未登录 → `/login?redirect=/dashboard`。
+  - **手测验证项**（用户跑 `npm run dev` 后自验）：未登录访问 `/dashboard`/`/ai-advisor`/`/course-planner`/`/import`/`/schedule` → 跳 `/login?redirect=<原路径>`，登录后回原页；首页两个 CTA 同样行为；点「暂时跳过」 → 进 dashboard 不需登录；退出登录 → 落到首页 `/`；登录或注册成功 → 访客标志被清除。
+  - **未做（明确推迟）**：router context 注入；服务端鉴权（保持 D3=a 浏览器 auth）；功能页空状态视觉打磨（当前页面已是 const 假数据，访客模式下天然有内容显示）。
+
+- **2026-05-10** — Supabase auth 联通验证：
+  - 用户在 Supabase 建项目，拿到 URL + 新格式 publishable key（`sb_publishable_*`，2024 末新发的，等价旧 anon key）。
+  - `.env.local` 第一版 URL 误带 `/rest/v1/` 后缀（SDK 自己拼，重复 → 404 "Invalid path"），删掉后正常。
+  - 注册流程跑通；遗留 3 条小验证任务交给用户：登出、重登、多 tab 同步（验证 `onAuthChange`）。
+  - **关键坑提醒**：Vite 只在启动时读 `.env.local`，改完必须 `Ctrl+C` + `npm run dev` 重启，再浏览器 `Ctrl+Shift+R` 硬刷新。
+  - **Supabase Dashboard 配置确认**：Authentication → Email 启用 + "Confirm email" 关闭（D2 = a）+ Site URL 加 `http://localhost:8080`（lovable vite preset 默认 8080，不是 5173）。
 
 - **2026-05-09** — Supabase auth 接入（mock 退役）+ 架构审计 + 死文件清扫：
   - **架构审计** `docs/ARCHITECTURE_AUDIT.md` 全文刷新（2026-05-07 → 2026-05-09），按炸药当量列出 12 处死文件 / 幽灵抽象 + 4 项决策点。

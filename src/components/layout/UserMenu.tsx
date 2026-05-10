@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/useAuth";
+import { exitGuestMode } from "@/lib/guestMode";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +34,8 @@ export function UserMenu({ trigger }: { trigger: ReactNode }) {
 
   const handleLogout = async () => {
     await logout();
-    navigate({ to: "/login" });
+    exitGuestMode();
+    navigate({ to: "/" });
   };
 
   // 暂时所有非登出项都跳转到 /dashboard——项目还没有对应路由，

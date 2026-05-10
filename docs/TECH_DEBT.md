@@ -41,6 +41,12 @@
 
 ## 已解决
 
+### 2026-05-10 — Supabase auth 联通验证
+
+- [x] **真实 Supabase 项目接入** —— 用户配置 `.env.local`（修了 URL 误带 `/rest/v1/` 后缀的问题）+ Supabase Dashboard 关闭 "Confirm email" + Site URL 加 `http://localhost:8080`。
+- [x] **注册流程跑通** —— 真用户首次成功注册并跳转 `/dashboard`。
+- [x] **publishable key 兼容确认** —— Supabase 2024 末新格式 key（`sb_publishable_*`）与 `@supabase/supabase-js ^2.45.0` 工作正常。
+
 ### 2026-05-09 — Supabase auth 接入（mock 退役）
 
 > 决策：D1 = (a) 暂不建 profiles 表 / D2 = (a) 关邮件确认 / D3 = (a) 纯浏览器 auth / D4 = (a) 保 AuthUser shape 解耦后端

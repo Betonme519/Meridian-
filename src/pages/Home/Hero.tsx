@@ -1,6 +1,9 @@
 import { ArrowRight } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import GridMotion from "@/components/effects/GridMotion";
 import SplitText from "@/components/effects/SplitText";
+import { useAuth } from "@/hooks/useAuth";
+import { isGuestMode } from "@/lib/guestMode";
 
 const _imgs = [
   "/首页 (1).jpg",
@@ -24,6 +27,18 @@ const heroGridItems = [
  * background. Rendered inside the laptop screen by HeroLaptopShowcase.
  */
 export default function Hero() {
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  // 已登录或访客 → 直进 /dashboard；未登录 → 去 /login 带 redirect
+  const handleStart = () => {
+    if (isAuthenticated || isGuestMode()) {
+      navigate({ to: "/dashboard" });
+    } else {
+      navigate({ to: "/login", search: { redirect: "/dashboard" } });
+    }
+  };
+
   return (
     <section className="relative min-h-screen overflow-hidden">
       <div className="absolute inset-0 z-0">
@@ -77,13 +92,14 @@ export default function Hero() {
             className="flex flex-col items-center gap-3 animate-fade-in-up"
             style={{ opacity: 0, animationDelay: "0.4s" }}
           >
-            <a
-              href="/dashboard"
-              className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-full text-base font-medium border border-white bg-transparent text-white hover:bg-white/95 hover:text-black hover:border-white/95 transition-colors duration-300"
+            <button
+              type="button"
+              onClick={handleStart}
+              className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-full text-base font-medium border border-white bg-transparent text-white hover:bg-white/95 hover:text-black hover:border-white/95 transition-colors duration-300 cursor-pointer"
             >
               开始分析
               <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
-            </a>
+            </button>
             <p className="text-xs text-white/40">免费 · 无需注册 · 支持导出</p>
           </div>
         </div>
