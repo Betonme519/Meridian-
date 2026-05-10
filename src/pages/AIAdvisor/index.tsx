@@ -12,9 +12,11 @@ import {
   Wand2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useProfile } from "@/hooks/useProfile";
+import type { GoalMode } from "@/api/profileApi";
 
 type Mode = {
-  title: string;
+  title: GoalMode;
   desc: string;
   icon: LucideIcon;
   logic: string;
@@ -95,7 +97,10 @@ function recommendMode(text: string) {
 }
 
 export default function AIAdvisorPage() {
-  const [selectedMode, setSelectedMode] = useState("高 GPA");
+  const { profile, updateProfile } = useProfile();
+  // selectedMode 从 profile.goal_mode 派生；guest / loading 时 fallback 高 GPA
+  const selectedMode: GoalMode = profile?.goal_mode ?? "高 GPA";
+
   const [profileText, setProfileText] = useState(
     "我想保持 GPA，但这学期还要实习，每周最多只能学习 20 小时。",
   );
@@ -106,8 +111,15 @@ export default function AIAdvisorPage() {
     [selectedMode],
   );
 
+  // 切换模式 = 写回 profile（乐观更新立刻反映；失败由 ProfileContext.error 暴露）
+  const setSelectedMode = (mode: GoalMode) => {
+    void updateProfile({ goal_mode: mode }).catch((e) =>
+      console.warn("[AIAdvisor] 保存目标模式失败:", e),
+    );
+  };
+
   function handleParse() {
-    const nextMode = recommendMode(profileText);
+    const nextMode = recommendMode(profileText) as GoalMode;
     setSelectedMode(nextMode);
     setParsedNote(`AI 已根据你的描述推荐：${nextMode}`);
   }

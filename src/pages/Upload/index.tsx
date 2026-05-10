@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Cloud,
   Database,
@@ -15,6 +15,7 @@ import {
   Upload as UploadIcon,
   type LucideIcon,
 } from "lucide-react";
+import { useProfile } from "@/hooks/useProfile";
 
 /* ───────────────────────── Section 2 · File import slots ───────────────────────── */
 
@@ -98,10 +99,52 @@ const statusCls: Record<DataRecord["status"], string> = {
 /* ───────────────────────── Page ───────────────────────── */
 
 export default function UploadPage() {
+  const { profile, updateProfile } = useProfile();
+
+  // 本地草稿态——profile 加载后由 useEffect 覆盖默认值；guest 态下保持默认
   const [school, setSchool] = useState(schoolOptions[0]);
-  const [grade, setGrade] = useState("2024");
-  const [major, setMajor] = useState("计算机科学与技术");
+  const [grade, setGrade] = useState("");
+  const [major, setMajor] = useState("");
   const [dragHover, setDragHover] = useState<number | null>(null);
+
+  // profile 加载/变化时同步到本地草稿（包括首次加载和多 tab 同步场景）
+  useEffect(() => {
+    if (!profile) return;
+    setSchool(profile.school ?? schoolOptions[0]);
+    setGrade(profile.grade != null ? String(profile.grade) : "");
+    setMajor(profile.major ?? "");
+  }, [profile?.school, profile?.grade, profile?.major]);
+
+  // school 是 select，change 即 commit
+  const handleSchoolChange = (v: string) => {
+    setSchool(v);
+    void updateProfile({ school: v === schoolOptions[0] ? null : v }).catch(
+      (e) => console.warn("[Upload] 保存学校失败:", e),
+    );
+  };
+
+  // 文本输入 onBlur 才 commit，避免每键一次写
+  const handleGradeBlur = () => {
+    const trimmed = grade.trim();
+    if (trimmed === "") {
+      void updateProfile({ grade: null }).catch((e) =>
+        console.warn("[Upload] 保存入学年份失败:", e),
+      );
+      return;
+    }
+    const n = Number(trimmed);
+    if (!Number.isFinite(n) || !Number.isInteger(n)) return; // 无效值不写
+    void updateProfile({ grade: n }).catch((e) =>
+      console.warn("[Upload] 保存入学年份失败:", e),
+    );
+  };
+
+  const handleMajorBlur = () => {
+    const trimmed = major.trim();
+    void updateProfile({ major: trimmed === "" ? null : trimmed }).catch((e) =>
+      console.warn("[Upload] 保存专业失败:", e),
+    );
+  };
 
   const connected = school !== schoolOptions[0];
 
@@ -173,7 +216,7 @@ export default function UploadPage() {
               </span>
               <select
                 value={school}
-                onChange={(e) => setSchool(e.target.value)}
+                onChange={(e) => handleSchoolChange(e.target.value)}
                 className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 transition-colors hover:border-slate-400 focus:border-slate-950 focus:outline-none"
               >
                 {schoolOptions.map((s) => (
@@ -224,6 +267,7 @@ export default function UploadPage() {
               <input
                 value={grade}
                 onChange={(e) => setGrade(e.target.value)}
+                onBlur={handleGradeBlur}
                 className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm transition-colors hover:border-slate-400 focus:border-slate-950 focus:outline-none"
               />
             </Field>
@@ -231,6 +275,7 @@ export default function UploadPage() {
               <input
                 value={major}
                 onChange={(e) => setMajor(e.target.value)}
+                onBlur={handleMajorBlur}
                 className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm transition-colors hover:border-slate-400 focus:border-slate-950 focus:outline-none"
               />
             </Field>

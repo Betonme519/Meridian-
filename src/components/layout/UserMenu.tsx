@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { exitGuestMode } from "@/lib/guestMode";
 import {
   DropdownMenu,
@@ -30,7 +31,12 @@ import {
  */
 export function UserMenu({ trigger }: { trigger: ReactNode }) {
   const { user, logout } = useAuth();
+  const { profile } = useProfile();
   const navigate = useNavigate();
+
+  // 显示名优先级：profile.name > auth.user.name (来自注册时 metadata) > email
+  // profile 加载完成前后无缝切换，无需 loading state
+  const displayName = profile?.name ?? user?.name ?? user?.email ?? "";
 
   const handleLogout = async () => {
     await logout();
@@ -68,7 +74,7 @@ export function UserMenu({ trigger }: { trigger: ReactNode }) {
       >
         <DropdownMenuLabel className="flex flex-col gap-0.5 px-3 py-2.5">
           <span className="text-sm font-medium text-slate-900 truncate">
-            {user?.name}
+            {displayName}
           </span>
           <span className="text-xs font-normal text-slate-500 truncate">
             {user?.email}

@@ -2,6 +2,7 @@ import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/r
 
 import appCss from "../styles/globals.css?url";
 import { AuthProvider } from "@/context/AuthContext";
+import { ProfileProvider } from "@/context/ProfileContext";
 
 function NotFoundComponent() {
   return (
@@ -73,7 +74,8 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 /**
  * 全局 Provider 壳。挂点列表：
- *   - AuthProvider        ✅ 已挂（mock 实现，见 src/api/authApi.ts）
+ *   - AuthProvider        ✅ 已挂（Supabase 实现，见 src/api/authApi.ts）
+ *   - ProfileProvider     ✅ 已挂（嵌在 AuthProvider 内，依赖 useAuth）
  *   - QueryClientProvider 未挂（@tanstack/react-query 依赖已于 2026-05-09 移除；
  *                          真有 server-state 缓存需求时再装回 + 在此挂）
  *   - ThemeProvider       (light/dark 切换)
@@ -83,7 +85,11 @@ function RootShell({ children }: { children: React.ReactNode }) {
  * 接入新 Provider 时统一在这里包，避免 root 持续膨胀且保持层级清晰。
  */
 function Providers({ children }: { children: React.ReactNode }) {
-  return <AuthProvider>{children}</AuthProvider>;
+  return (
+    <AuthProvider>
+      <ProfileProvider>{children}</ProfileProvider>
+    </AuthProvider>
+  );
 }
 
 function RootComponent() {

@@ -26,22 +26,49 @@
 
 > 一句话，要具体到能验证。
 
-排队 1（路由鉴权门禁）+ 排队 3（DATA_MODEL.md 起草）已完成。排队 2（AI provider 抽象）暂缓——用户系统还没完整跑通，先不开 AI。剩下：SQL 落地 + 排队 4（5 功能页接 Supabase）。
+排队 1 / 3 / 3a 完成 + profiles 表已在前端接通（Upload / AIAdvisor / Dashboard / UserMenu 全部用上 profile 字段）。排队 2 暂缓。下一步进排队 4 的剩余功能页（按 rag_source / course / plan / rule / chat_message 各表分别接）。
 
 ### 需要做（排队，按优先级）
 
 > 一次开一条。开始前用户先指定要做哪条。
 
-- [ ] **🔴 高 · 排队 3a · 紧接 3** — DATA_MODEL.md 5 处决策点确认 + SQL migration 落地（约 30–60 分钟）
-  - 用户读 `docs/DATA_MODEL.md` § 1 决策点（D5–D9 + D1 升级），同意默认或翻案
-  - 同意后 → 走 SQL Editor 验证一遍 + 生成 `supabase/migrations/<ts>_init_schema.sql`
-  - 完成标准：6 张表（profiles / course / plan / rule / rule_conflict / chat_message / rag_source）在 Supabase 项目里建好 + RLS policies 全开 + handle_new_user trigger 跑通（新注册账号自动建 profiles 行）
+- [ ] **🟡 中 · 排队 4a** — `/import` 接 `rag_source` + Supabase Storage（约半天）
+  - 文件上传走 `supabase.storage.from("rag_sources").upload(...)`，路径 `<auth_uid>/<rag_source_id>.<ext>`
+  - 同步写一行 `rag_source` 表（kind / mime / size_bytes / storage_path / parsed_status='pending'）
+  - 已导入列表（`dataRecords` 写死 const）改成 `SELECT * FROM rag_source WHERE user_id = auth.uid()`
+  - 依赖：profiles 接入已完成（本轮）；schema 已落地
+  - 完成标准：登录用户上传文件 → 列表显示 → 刷新页仍在
 
-- [ ] **🟡 中 · 排队 4** — 5 功能页之一接 Supabase（约半天）
-  - 推荐从 `Upload (/import)` 开始（文件上传天然贴 Supabase Storage + `rag_source` 表）
-  - 把页面顶部写死的 `dataRecords` const 替换为 `useQuery` 风格的 fetch（不引 react-query，先用纯 `useEffect + useState`）
-  - 依赖：排队 3a 完成（schema 落地后才能接）
-  - 完成标准：登录用户上传文件 → 显示在已导入列表 → 刷新页仍在
+- [ ] **🟡 中 · 排队 4b** — `/course-planner` 接 `plan` 表（约半天）
+  - 把 ReactFlow 当前的写死 nodes/edges 改成读 `plan` 表，自动保存
+  - "新建 plan" 按钮 → `INSERT INTO plan (...)` → 跳到该 plan
+  - 依赖：profiles 接入已完成
+
+- [ ] **🟡 中 · 排队 4c** — `/schedule` 接 `rule` + `rule_conflict`（约半天）
+  - 规则树按 branch 分组拉取，trust 三档着色保留
+  - 冲突独立加载
+
+- [ ] **🔴 高 · 排队 2（暂缓）** — AI provider 抽象 + streaming 协议骨架（约 1–2 小时）
+  - 排队 4a/b/c 跑通后再做（业务表写入流程稳了再叠 AI 抽象层）
+  - 完成标准：`/ai-advisor` 输入框发消息 → mock provider 模拟 token-by-token 流式返回 → 写 `chat_message` 表
+
+### profile 接入 · 未解决问题（本轮记录）
+
+> 不阻塞当前实现，但下一轮要意识到。
+
+- **Navbar 头像首字母仍取 `auth.user.name`**：`src/components/layout/Navbar.tsx:25` 的 `initial` 派生没切到 profile.name。理由：CLAUDE.md 标 "Navbar 不要修改"。profile.name 与 user.name 大多数情况一致（注册时同一字符串），只有用户改名后会短暂不一致。要改的话改 `Navbar.tsx` 一行 + 用 `useProfile()`。
+- **`src/data/userProfile.ts` 是 0 引用 dead code**：保留未删（CLAUDE.md "不要 refactor unrelated"）。下一轮清死代码时一并清掉。
+- **访客模式无 profile**：Login「暂时跳过」进入访客态时 `useProfile()` 返回 `{ profile: null, ... }`，所有读 profile 的页面 fallback 到默认值（"高 GPA" / 空 school 等）。`updateProfile` 早 return 不抛错。访客切换写不进 DB——目前无明确产品反馈机制（不是 bug 是设计选择）。
+- **error 状态无 UI 暴露**：`useProfile().error` 已实现，但所有页面只 `console.warn` 不显示给用户。理由：requirement 4 "不修改现有 UI 样式"，新增错误条/toast 会引入新 UI 元素。如要暴露，建议在 `__root.tsx` 挂 `<Toaster />`（sonner 已装）+ ProfileContext useEffect 监听 error 弹 toast。
+- **`profile.target_gpa` 暂无消费方**：requirement 列了 6 个字段（name/school/major/grade/target_gpa/goal_mode），但当前 5 个功能页里只有 `target_gpa` 没有对应 UI 输入位（schema 已留位）。下一轮加 Settings 页或在 Upload 个人设置区追加输入框时再用。
+- **`profile.goal_weights` 同上**：仅 `goal_mode === '个性化定制'` 时有意义，UI 暂未做权重输入面板。
+- **`AIAdvisor` 切换模式无 loading 反馈**：optimistic update 立刻反映，绝大多数情况无感知；网络断时 revert 后无视觉提示（同上 error 不暴露问题）。
+- **多 tab 同步**：profile 不订阅 Supabase realtime；A tab 改了 goal_mode，B tab 看到的还是旧值直到刷新。如要同步：`supabase.channel('profiles').on('postgres_changes', ...)` 走 realtime。本轮不做。
+- **profile fetch 与 Supabase auth getSession 串行**：`AuthContext.useEffect` 拉 user，`ProfileProvider.useEffect` 监听 user 变化再拉 profile，两次 IO 串行。首屏可见 profile 字段会有 ~100–300ms 延迟。可接受。
+- **`updateProfile` 并发写 stale revert（审计追加）**：连点 AIAdvisor 模式 3 次，3 次写并发，服务器按到达顺序处理；客户端按响应顺序 setProfile，旧响应可能覆盖新乐观值，UI 闪一下旧值。任一中途 fail，revert 到的是"前一次乐观值"而非真正服务器值。修法：updateProfile 内部加 requestId 计数器（同 loadProfile 模式），只让 latest 响应应用。严重度中（spam-click 才显现）。
+- **logout 期间 pending updateProfile race（审计追加）**：登出时 useEffect 清空 profile，但已发出的 updateProfile 仍可能 catch → `setProfile(prev)` 把旧 profile 写回去，造成 UI 短暂复原。修法：updateProfile 入口读 requestIdRef，logout 时 ++ref 让所有 pending 失效。严重度低（边角 race）。
+- **TS 类型手动维护 vs Supabase 自动生成（审计追加）**：所有 `as Profile` cast 绕开运行时校验，schema drift 时编译过运行时挂。下一轮跑一次 `supabase gen types typescript --project-id <id> > src/types/database.ts`，profileApi 切到 typed client。本轮不动。
+- **grade 无效输入无 UI 反馈（审计追加）**：用户敲 "abc" → onBlur Number(NaN) 校验失败，本地 state 保留 "abc"，profile 同步前看起来"已保存"。修法：onBlur 时把无效值 reset 回 `String(profile?.grade ?? "")` 并显示 helper text，或加 zod 校验。本轮不修。
 
 - [ ] **🔴 高 · 排队 2（暂缓）** — AI provider 抽象 + streaming 协议骨架（约 1–2 小时）
   - 用户系统验证完整通过后再做（先确认登录 / 注册 / 路由门禁 / 数据写入都稳了，再叠 AI 抽象层）
@@ -86,6 +113,17 @@
 ## 完成归档
 
 > 保留最近 5–10 条；权威记录在 `git log`，这里只留人话摘要。
+
+- **2026-05-10** — profiles 表前端接通（第一阶段业务接入，紧接 SQL migration）：
+  - **新建 3 文件**：`src/api/profileApi.ts`（getProfile / upsertProfile / updateProfile + GoalMode 枚举 + Profile / ProfilePatch 类型）；`src/context/ProfileContext.tsx`（Provider 跟 useAuth 同步，404 兜底 upsert，乐观更新 + race 防护用 requestId 计数器）；`src/hooks/useProfile.ts`（re-export）。
+  - **`__root.tsx`** 在 `<AuthProvider>` 内嵌 `<ProfileProvider>`（依赖 useAuth）。
+  - **Upload `/import`**：school / grade / major 从 profile 读取并写回。select onChange 即时写；text input onBlur 才写（避免每键一次 IO）。grade 转 number 校验 + 空字符串写 null。
+  - **AIAdvisor `/ai-advisor`**：`selectedMode` 由 `profile?.goal_mode ?? '高 GPA'` 派生（不再用 useState 本地）；点击模式 → `updateProfile({ goal_mode })`；`Mode.title` 类型从 `string` 收紧为 `GoalMode` union。
+  - **Dashboard `/dashboard`**：`importShortcuts[4].status` 与 `decisionCards[0].body` 不再写死 "高 GPA"，改为渲染时动态派生 `currentGoalMode = profile?.goal_mode ?? '高 GPA'`；`isReady` 检查从字面值匹配 `s.status === '高 GPA'` 改成"非占位状态"判断（`status && status !== '未连接' && status !== '未导入'`）。
+  - **UserMenu**：显示名优先级 `profile.name > user.name > email`，避免改名后菜单标签滞后。
+  - **不动**：`AuthContext` / `authApi.ts` / `supabase.ts`（CLAUDE.md "不要修改 公共 API"）；`Navbar.tsx`（CLAUDE.md "全局 Nav 不要修改"，已记入未解决问题）；`src/data/userProfile.ts`（dead code 0 引用，留给未来 refactor）。
+  - **`tsc --noEmit` 干净**（仅遗留 CardSwap.tsx 旧错，与本任务无关）。
+  - **未解决问题已记入 § 当前任务 → profile 接入 · 未解决问题**（8 项，含 Navbar、target_gpa 无 UI、多 tab 实时同步、error 不暴露 UI 等）。
 
 - **2026-05-10** — `docs/DATA_MODEL.md` 起草 + 工程审计 + 决策确认（排队 3 完成）：
   - 6 张表设计：`profiles` / `course` / `plan` / `rule` / `rule_conflict` / `chat_message` + 可选 `rag_source`（5 表预算 + 冲突拆出来 + RAG 文件清单加挂）。

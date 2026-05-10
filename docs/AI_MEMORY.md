@@ -4,7 +4,7 @@
 > 重大里程碑后更新；不是每次都改。CURRENT_TASK.md 是每会话的；这份是跨会话的。
 
 > Last snapshot: **2026-05-10**
-> Latest commit: `6983787` (完成接后端前准备) ＋ 未提交：`_app.tsx beforeLoad` 路由鉴权门禁 / 访客模式（guest mode）/ 退出登录跳首页 / Home CTA 鉴权门禁 / Login 暂时跳过按钮 / **`docs/DATA_MODEL.md` 起草 + 审计 + 决策确认**
+> Latest commit: `535b49c` (完成 Supabase 后端基础架构初始化) ＋ 未提交：**profiles 表前端接通**（Upload / AIAdvisor / Dashboard / UserMenu 全部由 profile 字段驱动 + 新建 ProfileContext / profileApi / useProfile）
 > Active branch: `main`
 
 ---
@@ -27,8 +27,10 @@
 | TiltedCard 3D tilt 组件 | ✅ 100%（React Bits TS port，无 `motion` 依赖） |
 | 共享 UserMenu | ✅ 100%（`components/layout/UserMenu.tsx`，Navbar + DashboardLayout 两处共用） |
 | 文档体系 | ✅ 100%（CURRENT_TASK / AI_MEMORY / OVERVIEW / ARCHITECTURE / DESIGN_SYSTEM / TECH_DEBT / ARCHITECTURE_AUDIT / **DATA_MODEL**） |
-| 数据库 schema 设计 | ✅ 100%（`docs/DATA_MODEL.md`，6 张表 + 决策已确认 + 审计过；待落 SQL migration） |
-| 数据库 schema 落地 | ❌ 0%（Supabase 项目里还只有 `auth.users`，业务表全空） |
+| 数据库 schema 设计 | ✅ 100%（`docs/DATA_MODEL.md`，6 张表 + 决策已确认 + 审计过） |
+| 数据库 schema 落地 | ✅ 100%（`supabase/migrations/0001_init_schema.sql` 已在 Dashboard 跑通 + Storage `rag_sources` bucket + RLS 已建） |
+| profiles 表前端接通 | ✅ 100%（`src/api/profileApi.ts` + `src/context/ProfileContext.tsx`，Upload / AIAdvisor / Dashboard / UserMenu 4 处接入） |
+| course / plan / rule / chat_message / rag_source 接通 | ❌ 0%（仍是写死 const，依赖排队 4a/b/c） |
 | 路由架构 | ✅ pathless `_app` layout，5 个功能页统一套 DashboardLayout |
 | 全局菜单单一真理 | ✅ `src/config/menu.ts`（label/desc + **新增** title/intro 给 breadcrumb hover 用） |
 | Providers 壳 | ✅ `__root.tsx` 已挂 `<AuthProvider>`（其余 TODO 挂点） |
@@ -36,13 +38,88 @@
 | CourseAnalyzer 页 | 🟡 5%（骨架，无 route） |
 | 后端 Worker | ❌ 0%（未建项目；BFF vs Supabase 方向未定） |
 | AI provider 抽象 | ❌ 0%（`src/api/aiApi.ts` 全空 stub，streaming 协议未定） |
-| 鉴权 / 用户系统 | 🟡 75%（Supabase 接入 + 注册联通 + `_app` beforeLoad 门禁 + 访客模式；待办：邮件确认 / 忘记密码 / OAuth / `profiles` 表 / 服务端鉴权） |
+| 鉴权 / 用户系统 | 🟡 85%（Supabase 接入 + 注册联通 + `_app` beforeLoad 门禁 + 访客模式 + **profiles 表前端接通（ProfileContext + 4 页面接通）**；待办：邮件确认 / 忘记密码 / OAuth / 服务端鉴权 / `profiles` realtime 多 tab 同步） |
 | 学校手册 RAG pipeline | ❌ 0% |
 | 真实数据接入 | ❌ 0% |
 
 ---
 
 ## 2. 已完成（按 commit 倒序）
+
+### **2026-05-10** — profiles 表前端接通（业务接入第一阶段，未提交）
+
+紧接 `0001_init_schema.sql` 在 Supabase 跑通后的第一项业务接入工作。schema 已 ready 但前端 5 功能页还是写死 const；这一轮把 `profiles` 表的 6 个字段（name / school / major / grade / target_gpa / goal_mode）接到现有 4 处消费方。其他 5 张业务表（course / plan / rule / rule_conflict / chat_message / rag_source）等下一轮排队 4a/b/c 接。
+
+**新建 3 文件 — 数据接入三层：**
+
+- **`src/api/profileApi.ts`** —— Supabase CRUD 薄壳。
+  - 三个公开函数：`getProfile(uid)` / `upsertProfile(uid, patch?)` / `updateProfile(uid, patch)`。
+  - `getProfile` 用 `.maybeSingle()`，行不存在返回 null（不抛错），由调用方决定走 upsert 兜底。
+  - `upsertProfile` 显式 `onConflict: "id"`；INSERT side 仅写 patch 字段，UPDATE side 仅更 patch 字段——不会清掉其他字段。
+  - `updateProfile` 用 `.eq().select().maybeSingle()`，返回 null 则行不存在（与 upsert 区别就是不创建）。
+  - 类型层：`Profile` 1:1 对齐 schema；`ProfilePatch = Partial<Omit<Profile, "id"|"created_at"|"updated_at">>`；`GoalMode` union 与 DB CHECK 完全一致；`GOAL_MODES` 数组导出方便 UI 遍历。
+  - **未做（明确推迟）**：跑 `supabase gen types typescript` 自动生成 TS 类型；目前手写 `as Profile` cast 绕开运行时校验，schema drift 时编译过运行时挂——下一轮 schema 调整前必须先做。
+
+- **`src/context/ProfileContext.tsx`** —— Provider 层。
+  - 监听 `useAuth` 的 user.id 变化：登入 → loadProfile（getProfile + 404 兜底 upsertProfile）；登出 → clear（profile = null, error = null）。
+  - `requestIdRef` 计数器防 race：用户快速切换账号时旧 fetch 完成不会覆盖新结果。
+  - `updateProfile(patch)` 乐观更新：先 `setProfile(next)` 立刻 UI 反映，再 `await` Supabase；失败 catch 内 revert 到 prev + setError。
+  - **审计发现的 race（已记入 CURRENT_TASK 未解决）**：updateProfile 自身没接 requestIdRef，并发写时旧响应可能覆盖新乐观值；logout 期间 pending 失败 revert 把 profile 写回去。
+  - `refresh()` 公开导出；多 tab 实时同步未做（不订阅 Supabase realtime）。
+  - 公共 API 五件套：`{ profile, loading, error, updateProfile, refresh }`，与 `useAuth` 风格对齐。
+
+- **`src/hooks/useProfile.ts`** —— 一行 re-export，匹配 `useAuth` 模式让消费方无需知道 context 细节。
+
+**`__root.tsx` Provider 嵌套：**
+`<AuthProvider><ProfileProvider>{children}</ProfileProvider></AuthProvider>`。顺序关键——ProfileProvider 内部 `useAuth()` 必须在 AuthProvider 之内。
+
+**4 处页面接入：**
+
+- **`/import` (Upload page)** —— school / grade / major 三字段。
+  - **本地草稿态 + profile 同步**：useState 存 UI 草稿值，useEffect 监听 profile 字段变化把 profile 值写回草稿（覆盖默认 `schoolOptions[0]` / `""` / `""`）。这套模式在 profile 加载完前显示默认值，加载完无缝切换。
+  - **写回时机**：select onChange 即时写（单击 commit 自然），text input onBlur 才写（避免每键一次 IO）；grade 转 number 校验 + `Number.isFinite + Number.isInteger`，无效值不写 DB（但本地草稿保留——审计列为问题，下一轮加 helper text 或 reset）；空字符串写 null。
+  - 学校 select 占位 `"请选择学校"` 也存 null（不存占位字符串）。
+
+- **`/ai-advisor` (AIAdvisor page)** —— goal_mode 字段。
+  - **selectedMode 直接派生** `profile?.goal_mode ?? "高 GPA"`，不再用 useState 本地。
+  - 点击模式 → `updateProfile({ goal_mode: mode })` 乐观更新 → 下次渲染 selectedMode 反映新值。
+  - `Mode.title` 类型从 `string` 收紧为 `GoalMode` union——modes 数组 8 项与 GoalMode 8 值精确对齐，DB CHECK + TS union 双保险。
+  - `recommendMode` 返回类型 TS 推断为 GoalMode 子集（除 "个性化定制" 外的 7 个），`as GoalMode` cast 安全。
+
+- **`/dashboard` (Dashboard page)** —— goal_mode 反映在 2 处：
+  - `importShortcuts[4]` "输入目标" 入口的 status 字段 `"高 GPA"` → 渲染时动态 `s.title === "输入目标" ? currentGoalMode : s.status`。
+  - `decisionCards[0]` "当前目标" 卡片 body `"高 GPA 模式 · 保研路线"` → `${currentGoalMode} 模式`（去掉了 "· 保研路线" 子标签——profile schema 没有这层概念）。
+  - **`isReady` 语义微调**：从字面值 `s.status === "已上传" || s.status === "高 GPA"` 改为 `!!status && status !== "未连接" && status !== "未导入"`——任意 goal_mode 都算 ready，更通用。
+
+- **`UserMenu`** —— 显示名字段。
+  - `displayName = profile?.name ?? user?.name ?? user?.email ?? ""` 三级 fallback。
+  - 用户改 profile.name 后菜单标签立刻反映；profile 未加载时回退到 auth.user.name（注册时 metadata，不会空）。
+
+**不动（CLAUDE.md 约束）：**
+- `AuthContext` / `authApi.ts` / `supabase.ts`：标 "公共 API 已稳定"，profile 走独立 Context 不破坏其签名。
+- `Navbar.tsx`：标 "全局 Nav 不要修改"。其 `initial` 头像首字母仍取 `auth.user.name`，profile.name 改名后不立刻反映——已记入未解决问题，下一轮如果碰 Navbar 顺手修。
+- `src/data/userProfile.ts`：dead code 0 引用，留待 refactor 阶段一起清。
+- 5 页面的 className / 布局结构 / 样式：完全不动，只换数据源。
+
+**`tsc --noEmit` 干净**（仅遗留 CardSwap.tsx 旧错，与本任务无关）。
+
+**审计后追加的 4 条未解决问题（已记入 CURRENT_TASK §profile 接入 · 未解决问题）：**
+1. updateProfile 并发写 stale revert（未接 requestIdRef）
+2. logout 期间 pending updateProfile race
+3. 手动 TS 类型 vs Supabase 自动生成的 schema drift 风险
+4. grade 无效输入无 UI 反馈
+
+**未做（明确推迟）：**
+- 多 tab 实时同步（Supabase realtime channel）
+- error 状态 UI 暴露（依赖挂 `<Toaster />` + 监听 ProfileContext.error 弹 toast）
+- target_gpa / goal_weights UI 输入位（schema 已留位，等加 Settings 页或在 Upload 个人设置区追加输入框）
+- Navbar 头像 initial 切到 profile.name
+- AIAdvisor 切换模式的 loading 反馈
+
+**下一步（排队 4a/b/c）：**
+- `/import` 接 `rag_source` + Supabase Storage（推荐起点）
+- `/course-planner` 接 `plan` 表
+- `/schedule` 接 `rule` + `rule_conflict`
 
 ### **2026-05-10** — `docs/DATA_MODEL.md` 起草 + 工程审计 + 6 处决策确认（未提交）
 

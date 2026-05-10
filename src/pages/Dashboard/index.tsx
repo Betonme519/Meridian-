@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { useProfile } from "@/hooks/useProfile";
 import {
   ArrowRight,
   ArrowRightLeft,
@@ -182,6 +183,10 @@ const metricIcons: LucideIcon[] = [TrendingUp, GraduationCap, Timer, TriangleAle
 /* ───────────────────────── Page ───────────────────────── */
 
 export default function DashboardPage() {
+  const { profile } = useProfile();
+  // 派生当前目标模式：profile 加载完成后用 profile.goal_mode；guest / loading 时 fallback
+  const currentGoalMode = profile?.goal_mode ?? "高 GPA";
+
   const [selectedAction, setSelectedAction] = useState(actions[1].type);
   const activeAction = useMemo(
     () => actions.find((action) => action.type === selectedAction) ?? actions[1],
@@ -202,7 +207,12 @@ export default function DashboardPage() {
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {importShortcuts.map((s, i) => {
             const Icon = s.icon;
-            const isReady = s.status === "已上传" || s.status === "高 GPA";
+            // 「输入目标」入口的状态实时反映 profile.goal_mode；其他保持原 status
+            const status =
+              s.title === "输入目标" ? currentGoalMode : s.status;
+            // ready = 已上传 / 任一 goal_mode（已设过目标）；未连接/未导入 不算
+            const isReady =
+              !!status && status !== "未连接" && status !== "未导入";
             return (
               <Link
                 key={s.title}
@@ -214,7 +224,7 @@ export default function DashboardPage() {
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 transition-colors group-hover:bg-slate-900 group-hover:text-white">
                     <Icon className="h-5 w-5" strokeWidth={1.7} />
                   </div>
-                  {s.status && (
+                  {status && (
                     <span
                       className={`ml-auto inline-flex h-5 items-center rounded-full px-2 text-[11px] font-semibold ${
                         isReady
@@ -222,7 +232,7 @@ export default function DashboardPage() {
                           : "bg-slate-100 text-slate-500"
                       }`}
                     >
-                      {s.status}
+                      {status}
                     </span>
                   )}
                 </div>
@@ -248,7 +258,11 @@ export default function DashboardPage() {
           </span>
         </div>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {decisionCards.map((c, i) => (
+          {decisionCards.map((c, i) => {
+            // 「当前目标」卡片的 body 实时反映 profile.goal_mode
+            const body =
+              c.title === "当前目标" ? `${currentGoalMode} 模式` : c.body;
+            return (
             <article
               key={c.title}
               className={`animate-fade-in-up-soft rounded-2xl border p-5 ${toneClass[c.tone]}`}
@@ -263,7 +277,7 @@ export default function DashboardPage() {
                   <TriangleAlert className="h-4 w-4 text-amber-700" />
                 )}
               </div>
-              <p className="mt-3 text-sm leading-6 text-slate-800">{c.body}</p>
+              <p className="mt-3 text-sm leading-6 text-slate-800">{body}</p>
               <p className={`mt-2 text-[11px] ${toneText[c.tone]}`}>{c.meta}</p>
               {c.cta && (
                 <Link
@@ -275,7 +289,8 @@ export default function DashboardPage() {
                 </Link>
               )}
             </article>
-          ))}
+            );
+          })}
         </div>
       </div>
 
