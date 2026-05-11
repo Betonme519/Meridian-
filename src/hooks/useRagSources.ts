@@ -36,11 +36,16 @@ interface UseRagSourcesValue {
 export function useRagSources(): UseRagSourcesValue {
   const { user, loading: authLoading } = useAuth();
   const [sources, setSources] = useState<RagSource[]>([]);
-  const [loading, setLoading] = useState(false);
+  // loading 初值 true：避免首次渲染时空列表 + "0 条记录" 闪一下，待 useEffect
+  // 决定到底要不要拉、是否登录态后再切回 false。
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(0);
 
   const requestIdRef = useRef(0);
+  // 已加载过哪个 user.id 的列表；防 AuthContext re-emit（token refresh / 元数据
+  // 更新）触发的同 id 重拉。登出时 reset 为 null。
+  const loadedUserIdRef = useRef<string | null>(null);
 
   const load = useCallback(async (userId: string) => {
     const reqId = ++requestIdRef.current;
@@ -60,16 +65,20 @@ export function useRagSources(): UseRagSourcesValue {
     }
   }, []);
 
-  // 登入 → 拉列表；登出 → 清空
+  // 登入 → 拉列表；登出 → 清空。
+  // user 对象引用变化但 id 未变（token refresh 等）不会重拉。
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
       requestIdRef.current++;
+      loadedUserIdRef.current = null;
       setSources([]);
       setLoading(false);
       setError(null);
       return;
     }
+    if (loadedUserIdRef.current === user.id) return;
+    loadedUserIdRef.current = user.id;
     void load(user.id);
   }, [user, authLoading, load]);
 

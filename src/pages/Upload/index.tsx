@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Cloud,
   Database,
@@ -134,9 +134,6 @@ export default function UploadPage() {
   const [major, setMajor] = useState("");
   const [dragHover, setDragHover] = useState<number | null>(null);
 
-  // 每个 slot 一个隐藏 <input type=file>，点击卡片或拖入文件统一走 handleFiles
-  const fileInputsRef = useRef<Array<HTMLInputElement | null>>([]);
-
   // profile 加载/变化时同步到本地草稿（包括首次加载和多 tab 同步场景）
   useEffect(() => {
     if (!profile) return;
@@ -229,11 +226,11 @@ export default function UploadPage() {
           {fileSlots.map((s, i) => {
             const Icon = s.icon;
             const isHover = dragHover === i;
+            // 用 <label> 包 <input>：点击 label 自动触发 input 文件选择，
+            // 无需 ref + stopPropagation；符合 HTML 规范、a11y 友好。
             return (
-              <button
+              <label
                 key={s.title}
-                type="button"
-                onClick={() => fileInputsRef.current[i]?.click()}
                 onDragOver={(e) => {
                   e.preventDefault();
                   setDragHover(i);
@@ -244,27 +241,14 @@ export default function UploadPage() {
                   setDragHover(null);
                   void handleFiles(i, e.dataTransfer.files);
                 }}
-                className={`animate-fade-in-up-soft flex flex-col items-start rounded-2xl border-2 border-dashed p-5 text-left transition-colors ${
+                className={`animate-fade-in-up-soft flex cursor-pointer flex-col items-start rounded-2xl border-2 border-dashed p-5 text-left transition-colors ${
                   isHover
                     ? "border-slate-950 bg-slate-50"
                     : "border-slate-300 bg-white hover:border-slate-500"
                 }`}
                 style={{ animationDelay: `${60 + i * 60}ms` }}
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100">
-                  <Icon className="h-5 w-5 text-slate-700" strokeWidth={1.7} />
-                </div>
-                <p className="mt-3 text-sm font-semibold text-slate-900">{s.title}</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">{s.desc}</p>
-                <p className="mt-3 text-[11px] text-slate-400">{s.formats}</p>
-                <span className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-slate-700">
-                  拖拽文件到此 / 点击上传
-                </span>
-                {/* 隐藏 input：onClick 触发 click()，onChange 走同一个 handleFiles */}
                 <input
-                  ref={(el) => {
-                    fileInputsRef.current[i] = el;
-                  }}
                   type="file"
                   multiple
                   accept={s.accept}
@@ -274,9 +258,17 @@ export default function UploadPage() {
                     // 重置 value：下次再选同一个文件名也能触发 onChange
                     e.target.value = "";
                   }}
-                  onClick={(e) => e.stopPropagation()}
                 />
-              </button>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100">
+                  <Icon className="h-5 w-5 text-slate-700" strokeWidth={1.7} />
+                </div>
+                <p className="mt-3 text-sm font-semibold text-slate-900">{s.title}</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">{s.desc}</p>
+                <p className="mt-3 text-[11px] text-slate-400">{s.formats}</p>
+                <span className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-slate-700">
+                  拖拽文件到此 / 点击上传
+                </span>
+              </label>
             );
           })}
         </div>

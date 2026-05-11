@@ -1,640 +1,232 @@
-# AI Memory — 长期项目状态存档
+# AI Memory — Meridian 长期项目记忆
 
-> **新 AI 会话 / 新 agent 接手时直接贴这一份。** 等于是给新对话灌入"项目长期记忆"。
-> 重大里程碑后更新；不是每次都改。CURRENT_TASK.md 是每会话的；这份是跨会话的。
+> 新 AI 5 分钟读完即可上手。每个里程碑 5–15 行摘要，不是开发日志。
+> 短期 sprint 看 `CURRENT_TASK.md`；技术债 backlog 看 `TECH_DEBT.md`。
 
-> Last snapshot: **2026-05-10**
-> Latest commit: `535b49c` (完成 Supabase 后端基础架构初始化) ＋ 未提交：**profiles 表前端接通**（Upload / AIAdvisor / Dashboard / UserMenu 全部由 profile 字段驱动 + 新建 ProfileContext / profileApi / useProfile）
-> Active branch: `main`
+> Last snapshot: **2026-05-11**  ·  Branch: `main`
 
 ---
 
-## 1. 当前项目状态（一图速览）
+## 1. 项目定位
 
-```
-阶段        →  前端 demo 全部完成（落地页 + 5 功能页），进入业务接入期
-近期重点    →  Transparency 视觉重做、Feedback / Control 交互打磨、共享 UserMenu、功能页顶栏 breadcrumb HoverCard
-下一里程碑  →  决定 BFF vs Supabase / AI provider 抽象 / 5 功能页接真实数据
-风险点      →  bun.lockb 与 node_modules 可能不同步；中国高校本地化未做；功能页全是写死 const
-```
+**Meridian** — 中国高校选课决策引擎。
 
-**完成度估计：**
+帮学生看见 培养方案 / 成绩 / 课表 / 学校规则 之间的关系网，按目标（高 GPA / 保研 / 留学 / 实习…）推荐选课与路径，并模拟决策代价。
 
-| 模块 | 状态 |
+**目标用户**：在校大学生（首批中国高校，5 所典型院校试点）
+**核心价值**：不是推荐"好课"，是在你的目标下计算代价最低的路径，并把规则之间的影响关系展开
+
+---
+
+## 2. 当前阶段
+
+| 维度 | 状态 |
 |---|---|
-| 落地页（Home） | ✅ 98%（Hero / Flow / Explain / GpaMath / **Transparency**（替代 Honesty） / Control / Feedback / FAQ / FinalCTA / Footer 全部接好；文案需本地化为中国高校） |
-| 笔记本 3D 展示 | ✅ 100%（CSS 伪 3D，含厚度 / 键盘 / hover lift） |
-| TiltedCard 3D tilt 组件 | ✅ 100%（React Bits TS port，无 `motion` 依赖） |
-| 共享 UserMenu | ✅ 100%（`components/layout/UserMenu.tsx`，Navbar + DashboardLayout 两处共用） |
-| 文档体系 | ✅ 100%（CURRENT_TASK / AI_MEMORY / OVERVIEW / ARCHITECTURE / DESIGN_SYSTEM / TECH_DEBT / ARCHITECTURE_AUDIT / **DATA_MODEL**） |
-| 数据库 schema 设计 | ✅ 100%（`docs/DATA_MODEL.md`，6 张表 + 决策已确认 + 审计过） |
-| 数据库 schema 落地 | ✅ 100%（`supabase/migrations/0001_init_schema.sql` 已在 Dashboard 跑通 + Storage `rag_sources` bucket + RLS 已建） |
-| profiles 表前端接通 | ✅ 100%（`src/api/profileApi.ts` + `src/context/ProfileContext.tsx`，Upload / AIAdvisor / Dashboard / UserMenu 4 处接入） |
-| course / plan / rule / chat_message / rag_source 接通 | ❌ 0%（仍是写死 const，依赖排队 4a/b/c） |
-| 路由架构 | ✅ pathless `_app` layout，5 个功能页统一套 DashboardLayout |
-| 全局菜单单一真理 | ✅ `src/config/menu.ts`（label/desc + **新增** title/intro 给 breadcrumb hover 用） |
-| Providers 壳 | ✅ `__root.tsx` 已挂 `<AuthProvider>`（其余 TODO 挂点） |
-| 5 功能页（Dashboard / Planner / AIAdvisor / Schedule / Upload） | 🟡 demo 完成（feature/dashboard 合并），全是写死 const，等真实数据 |
-| CourseAnalyzer 页 | 🟡 5%（骨架，无 route） |
-| 后端 Worker | ❌ 0%（未建项目；BFF vs Supabase 方向未定） |
-| AI provider 抽象 | ❌ 0%（`src/api/aiApi.ts` 全空 stub，streaming 协议未定） |
-| 鉴权 / 用户系统 | 🟡 85%（Supabase 接入 + 注册联通 + `_app` beforeLoad 门禁 + 访客模式 + **profiles 表前端接通（ProfileContext + 4 页面接通）**；待办：邮件确认 / 忘记密码 / OAuth / 服务端鉴权 / `profiles` realtime 多 tab 同步） |
-| 学校手册 RAG pipeline | ❌ 0% |
-| 真实数据接入 | ❌ 0% |
+| 阶段 | 前端 demo 完成（落地页 + 5 功能页），业务接入期 |
+| 已接通业务表 | `profiles` ✅ · `rag_source` ✅ |
+| 待接通业务表 | `plan` · `rule` · `rule_conflict` · `chat_message` |
+| 下一里程碑 | 排队 4b（`/course-planner` 接 `plan`）/ 4c（`/schedule` 接 `rule`）/ 2（AI provider 抽象） |
+| 主要风险 | bun.lockb 与 node_modules 可能不同步；中国高校本地化文案未做；解析 pipeline 未建 |
 
 ---
 
-## 2. 已完成（按 commit 倒序）
-
-### **2026-05-10** — profiles 表前端接通（业务接入第一阶段，未提交）
-
-紧接 `0001_init_schema.sql` 在 Supabase 跑通后的第一项业务接入工作。schema 已 ready 但前端 5 功能页还是写死 const；这一轮把 `profiles` 表的 6 个字段（name / school / major / grade / target_gpa / goal_mode）接到现有 4 处消费方。其他 5 张业务表（course / plan / rule / rule_conflict / chat_message / rag_source）等下一轮排队 4a/b/c 接。
-
-**新建 3 文件 — 数据接入三层：**
-
-- **`src/api/profileApi.ts`** —— Supabase CRUD 薄壳。
-  - 三个公开函数：`getProfile(uid)` / `upsertProfile(uid, patch?)` / `updateProfile(uid, patch)`。
-  - `getProfile` 用 `.maybeSingle()`，行不存在返回 null（不抛错），由调用方决定走 upsert 兜底。
-  - `upsertProfile` 显式 `onConflict: "id"`；INSERT side 仅写 patch 字段，UPDATE side 仅更 patch 字段——不会清掉其他字段。
-  - `updateProfile` 用 `.eq().select().maybeSingle()`，返回 null 则行不存在（与 upsert 区别就是不创建）。
-  - 类型层：`Profile` 1:1 对齐 schema；`ProfilePatch = Partial<Omit<Profile, "id"|"created_at"|"updated_at">>`；`GoalMode` union 与 DB CHECK 完全一致；`GOAL_MODES` 数组导出方便 UI 遍历。
-  - **未做（明确推迟）**：跑 `supabase gen types typescript` 自动生成 TS 类型；目前手写 `as Profile` cast 绕开运行时校验，schema drift 时编译过运行时挂——下一轮 schema 调整前必须先做。
-
-- **`src/context/ProfileContext.tsx`** —— Provider 层。
-  - 监听 `useAuth` 的 user.id 变化：登入 → loadProfile（getProfile + 404 兜底 upsertProfile）；登出 → clear（profile = null, error = null）。
-  - `requestIdRef` 计数器防 race：用户快速切换账号时旧 fetch 完成不会覆盖新结果。
-  - `updateProfile(patch)` 乐观更新：先 `setProfile(next)` 立刻 UI 反映，再 `await` Supabase；失败 catch 内 revert 到 prev + setError。
-  - **审计发现的 race（已记入 CURRENT_TASK 未解决）**：updateProfile 自身没接 requestIdRef，并发写时旧响应可能覆盖新乐观值；logout 期间 pending 失败 revert 把 profile 写回去。
-  - `refresh()` 公开导出；多 tab 实时同步未做（不订阅 Supabase realtime）。
-  - 公共 API 五件套：`{ profile, loading, error, updateProfile, refresh }`，与 `useAuth` 风格对齐。
-
-- **`src/hooks/useProfile.ts`** —— 一行 re-export，匹配 `useAuth` 模式让消费方无需知道 context 细节。
-
-**`__root.tsx` Provider 嵌套：**
-`<AuthProvider><ProfileProvider>{children}</ProfileProvider></AuthProvider>`。顺序关键——ProfileProvider 内部 `useAuth()` 必须在 AuthProvider 之内。
-
-**4 处页面接入：**
-
-- **`/import` (Upload page)** —— school / grade / major 三字段。
-  - **本地草稿态 + profile 同步**：useState 存 UI 草稿值，useEffect 监听 profile 字段变化把 profile 值写回草稿（覆盖默认 `schoolOptions[0]` / `""` / `""`）。这套模式在 profile 加载完前显示默认值，加载完无缝切换。
-  - **写回时机**：select onChange 即时写（单击 commit 自然），text input onBlur 才写（避免每键一次 IO）；grade 转 number 校验 + `Number.isFinite + Number.isInteger`，无效值不写 DB（但本地草稿保留——审计列为问题，下一轮加 helper text 或 reset）；空字符串写 null。
-  - 学校 select 占位 `"请选择学校"` 也存 null（不存占位字符串）。
-
-- **`/ai-advisor` (AIAdvisor page)** —— goal_mode 字段。
-  - **selectedMode 直接派生** `profile?.goal_mode ?? "高 GPA"`，不再用 useState 本地。
-  - 点击模式 → `updateProfile({ goal_mode: mode })` 乐观更新 → 下次渲染 selectedMode 反映新值。
-  - `Mode.title` 类型从 `string` 收紧为 `GoalMode` union——modes 数组 8 项与 GoalMode 8 值精确对齐，DB CHECK + TS union 双保险。
-  - `recommendMode` 返回类型 TS 推断为 GoalMode 子集（除 "个性化定制" 外的 7 个），`as GoalMode` cast 安全。
-
-- **`/dashboard` (Dashboard page)** —— goal_mode 反映在 2 处：
-  - `importShortcuts[4]` "输入目标" 入口的 status 字段 `"高 GPA"` → 渲染时动态 `s.title === "输入目标" ? currentGoalMode : s.status`。
-  - `decisionCards[0]` "当前目标" 卡片 body `"高 GPA 模式 · 保研路线"` → `${currentGoalMode} 模式`（去掉了 "· 保研路线" 子标签——profile schema 没有这层概念）。
-  - **`isReady` 语义微调**：从字面值 `s.status === "已上传" || s.status === "高 GPA"` 改为 `!!status && status !== "未连接" && status !== "未导入"`——任意 goal_mode 都算 ready，更通用。
-
-- **`UserMenu`** —— 显示名字段。
-  - `displayName = profile?.name ?? user?.name ?? user?.email ?? ""` 三级 fallback。
-  - 用户改 profile.name 后菜单标签立刻反映；profile 未加载时回退到 auth.user.name（注册时 metadata，不会空）。
-
-**不动（CLAUDE.md 约束）：**
-- `AuthContext` / `authApi.ts` / `supabase.ts`：标 "公共 API 已稳定"，profile 走独立 Context 不破坏其签名。
-- `Navbar.tsx`：标 "全局 Nav 不要修改"。其 `initial` 头像首字母仍取 `auth.user.name`，profile.name 改名后不立刻反映——已记入未解决问题，下一轮如果碰 Navbar 顺手修。
-- `src/data/userProfile.ts`：dead code 0 引用，留待 refactor 阶段一起清。
-- 5 页面的 className / 布局结构 / 样式：完全不动，只换数据源。
-
-**`tsc --noEmit` 干净**（仅遗留 CardSwap.tsx 旧错，与本任务无关）。
-
-**审计后追加的 4 条未解决问题（已记入 CURRENT_TASK §profile 接入 · 未解决问题）：**
-1. updateProfile 并发写 stale revert（未接 requestIdRef）
-2. logout 期间 pending updateProfile race
-3. 手动 TS 类型 vs Supabase 自动生成的 schema drift 风险
-4. grade 无效输入无 UI 反馈
-
-**未做（明确推迟）：**
-- 多 tab 实时同步（Supabase realtime channel）
-- error 状态 UI 暴露（依赖挂 `<Toaster />` + 监听 ProfileContext.error 弹 toast）
-- target_gpa / goal_weights UI 输入位（schema 已留位，等加 Settings 页或在 Upload 个人设置区追加输入框）
-- Navbar 头像 initial 切到 profile.name
-- AIAdvisor 切换模式的 loading 反馈
-
-**下一步（排队 4a/b/c）：**
-- `/import` 接 `rag_source` + Supabase Storage（推荐起点）
-- `/course-planner` 接 `plan` 表
-- `/schedule` 接 `rule` + `rule_conflict`
-
-### **2026-05-10** — `docs/DATA_MODEL.md` 起草 + 工程审计 + 6 处决策确认（未提交）
-
-排队 3 任务。给 Supabase Postgres 设计了完整的 schema 文档，6 张主表 + 1 张可选表，配 RLS / 索引 / trigger / DDL 速查。
-
-**6 张表 + 1 可选：**
-- `profiles` — 1:1 扩展 auth.users，存 school / major / grade / target_gpa / goal_mode（中文 enum 与 `AIAdvisor/index.tsx` 字面量对齐）/ goal_weights JSONB（个性化模式权重）
-- `course` — 用户私有修课记录（不是学校 catalog；catalog 走 RAG 解析），code / name / credits / category / semester / status (planned/enrolled/completed/dropped/failed) / grade_letter / grade_point / counts_in_gpa
-- `plan` — ReactFlow 决策图整存 JSONB（nodes / edges / viewport），不拆 plan_node / plan_edge
-- `rule` — 用户私有规则知识库，trust 三级 (high/med/low) + source 自由文本 + 可选 FK 到 `rag_source`
-- `rule_conflict` — 规则冲突独立表（不嵌进 rule.conflicts_with[]），含 judgement / confidence / resolved_by
-- `chat_message` — AI 对话历史，conversation_id 字段分组（不开 parent `chat_conversation` 表），不可改不可 UPDATE
-- `rag_source`（可选但推荐建）— 上传文件清单 + 解析状态，bytes 在 Supabase Storage（bucket `rag_sources`），表里只存 `<auth_uid>/<rag_source_id>.<ext>` 相对路径 + parsed_text 文本兜底
-
-**6 处决策点用户确认：**
-- **D1=b** 建 profiles（升级原 D1=a 的"塞 metadata"决定，因为 school/major/grade 等已超出 metadata 用法）
-- **D5=a** course 用户私有修课记录（不是学校 catalog）
-- **D6=a** plan JSONB 整存（不拆 plan_node / plan_edge）
-- **D7=a** rule 用户私有（不做同校共享，未来加 `school_rules` public 表升级）
-- **D8=b** 冲突独立 `rule_conflict` 表（不嵌进 `rule.conflicts_with[]`）
-- **D9=a** chat_message 不开 parent table，conversation_id 字段直接挂 message 上
-
-**工程审计修了 4 处真问题：**
-1. § 9 SQL DDL 顺序错（`rule.rag_source_id` FK 引用了下方 9.7 才建的 `rag_source`）→ 加"建表顺序 ≠ 编号顺序"说明，正确序：`profiles → rag_source → course → plan → rule → rule_conflict → chat_message`
-2. `rule_conflict` UNIQUE 不对称（A↔B 与 B↔A 可重复）→ 加 `CHECK (rule_a_id < rule_b_id)` 字典序规范化（前端插入前必须先 swap min/max）
-3. `rule_conflict` 用户一致性无 DB 校验（理论上拼凑别人 rule_id 不会泄漏数据但污染表）→ 加 `check_rule_conflict_owner` BEFORE INSERT/UPDATE trigger
-4. `rag_source.storage_path` 格式含混（含不含 bucket 前缀）→ 明确 = `<auth_uid>/<rag_source_id>.<ext>` 相对路径，bucket 名 `rag_sources` 由代码常量持有不入库
-
-**审计还覆盖（无问题，记录设计意图）：**
-- `course` 无 `UNIQUE (user_id, code, semester)`：故意，允许撤选重选 / 导入纠错，业务层去重
-- `chat_message.conversation_id default gen_random_uuid()`：故意，"未指定 = 单消息独立会话"的保守默认
-- `goal_mode` 用中文 enum：与 `AIAdvisor/index.tsx` 字面量对齐，i18n 时再换 ASCII
-- JSONB 字段不建 GIN 索引：当前查询用不到，建了浪费写入
-- `SECURITY DEFINER` + `search_path = public`：handle_new_user trigger 的标准 Supabase 写法
-- `ON DELETE CASCADE` 全链路：删账号即清干净
-- timestamps 全 `timestamptz`：UTC 存，时区无关
-
-**设计纪律确立：**
-- 表名单数（`course` 而非 `courses`）—— Supabase 客户端 `.from("course")` 读起来像句子
-- `text + CHECK IN (...)` 替代 Postgres ENUM 类型 —— 改起来不要 ALTER TYPE 反复折腾
-- JSONB 只给"图状/树状/用户自定义形状"字段（plan.nodes / edges / chat_message.metadata）—— 要查的字段必拆列
-- 字段命名：snake_case，时间戳 `*_at` 后缀，布尔 `is_*` / `has_*` 前缀（例外 `counts_in_gpa`），FK `<other_table>_id`
-- 主键 `uuid default gen_random_uuid()`（Postgres 13+ 内置 `pgcrypto`-free，不要 `uuid-ossp`）
-- 软删不做：删就是真删
-
-**新加 § 5b — service_role bypass RLS 注意：**
-Cloudflare Worker 端跑 AI 抽数据 / RAG 解析时会用 `SUPABASE_SERVICE_ROLE_KEY` 直连，绕过所有 RLS。原则：service_role 只在 server-side 用，绝不进 client bundle（Vite `VITE_*` 会被字面量替换 → 直接泄漏）；写入业务表时手动校验 `user_id`（RLS 帮不了你）。与排队 2（AI provider 抽象）一起设计。
-
-**未做（明确推迟）：**
-- 学校字典 `schools` 表：profiles.school 暂用自由文本
-- 学期字典 `semesters` 表：course.semester 暂用 `'2025-fall'` 字符串
-- `school_rules` public 共享表（D7=b 升级路径）
-- `rag_chunk` + pgvector embedding：等单文档超 1MB 再做
-- 审计 / 操作日志 `audit_log` 表
-- `course.grade_score numeric(5,2)`（百分比原始分）：当前只 4.0 制点，原始百分比塞 `notes`
-- `authApi.mapUser` 改读 `profiles.name` 而非 `auth.users.user_metadata.name`：schema 落地后再改
-
-**下一步（排队 3a）：**
-SQL Editor 走一遍 DDL 验证 → 生成 `supabase/migrations/<timestamp>_init_schema.sql` → 旧账号补一句 `INSERT INTO profiles (id) SELECT id FROM auth.users ON CONFLICT DO NOTHING;` backfill。
-
-### **2026-05-10** — `_app.tsx beforeLoad` 路由鉴权门禁 + 访客模式 + 退出登录改首页 + Home CTA 鉴权（未提交）
-
-接 Supabase auth 已联通后的第一项业务接入：把 5 个功能页（dashboard / ai-advisor / course-planner / import / schedule）真正闭门，未登录或访客需走登录态或主动选「暂时跳过」。
-
-**`src/routes/_app.tsx` — beforeLoad 4 道守卫（依次短路 return）：**
-1. **SSR 守卫** `typeof window === "undefined"` → return。D3 = 浏览器 auth，token 在 localStorage，server 端 `getSession()` 必为 null；若不守卫，SSR 会把已登录用户也 redirect 到 `/login`，client hydration 后再跑一次拿到真实 session 又会回弹，体验差且控制台报警告。直接放行让客户端处理是 D3 模型下唯一干净的写法。
-2. **`isSupabaseConfigured` 守卫** → return。`fail-soft`，与 `lib/supabase.ts` 风格保持一致：本地缺 `.env.local` 时不能让整站不可访问。
-3. **访客模式守卫** `isGuestMode()` → return。读 localStorage 标志，下文。
-4. **真实校验** `await supabase.auth.getSession()`：读 localStorage 缓存（无网络 IO，<10ms），无 session → `throw redirect({ to: "/login", search: { redirect: location.href } })`。
-
-**`src/routes/login.tsx` / `register.tsx` — `validateSearch`：**
-接受 `?redirect=<string>`，类型化到 `useSearch({ from: "/login" })` / `useSearch({ from: "/register" })`。Login ↔ Register 的 `<Link>` 互链都透传 `search={{ redirect: search.redirect }}`，用户在两页之间切换不丢失 redirect。
-
-**`src/pages/Login/index.tsx` / `Register/index.tsx` — 登录/注册成功后回原页：**
-- 引入 `safeRedirect()` 工具（同文件内）：仅放行同源相对路径（`/` 开头且不以 `//` 开头），否则 fallback `/dashboard`。防 open redirect。
-- 成功后 `exitGuestMode()` 清访客标志 + `navigate({ to: target, replace: true })`。replace 避免后退按钮回到登录页。
-
-**新建 `src/lib/guestMode.ts` — 访客模式 localStorage 薄壳：**
-- 键名 `meridian_guest_mode === "1"` 即为访客
-- 3 个函数：`isGuestMode()` / `enterGuestMode()` / `exitGuestMode()`，都 `typeof window` 守卫 + `try/catch` 包 storage 调用（防 Safari 隐私模式 / quota 异常）
-- **没有放进 `AuthContext`**：CLAUDE.md 把 `AuthContext.tsx` 标"不要修改 — 公共 API 已稳定"，访客标志走独立 lib 不破坏 `useAuth` 签名 / `AuthUser` shape。
-- 生命周期：进入 = Login「暂时跳过」按钮；离开 = 登录成功 / 注册成功 / 退出登录（三处都调 exitGuestMode 防残留）
-
-**`src/pages/Login/index.tsx` 加「暂时跳过 · 以访客身份浏览」按钮：**
-登录按钮下方，小号 underline 文字链接（与「忘记密码？」同视觉重量），点击 `enterGuestMode()` + `navigate(redirect ?? '/dashboard')`，让用户无需注册登录即可浏览功能页（功能页本就是写死 const，访客态天然有内容）。
-
-**`src/components/layout/UserMenu.tsx` — 退出登录跳首页 + 清访客：**
-`handleLogout` 从 `navigate({ to: "/login" })` 改成 `navigate({ to: "/" })`（用户体感：退出 = 回到 marketing 落地页，不是再次面对登录表单）；并 `exitGuestMode()`，防止用户先点暂时跳过、再注册登录、再退出登录这串操作后访客标志残留导致下次访问 `/dashboard` 绕过门禁。
-
-**`src/pages/Home/Hero.tsx` / `FinalCTA.tsx` — Home CTA 鉴权门禁：**
-原本是 `<a href="/dashboard">` 直接到功能页（落地页 marketing 心态：先让用户看产品）。改成 `<button onClick>`，已登录或访客直进 `/dashboard`，未登录 → `/login?redirect=/dashboard`。这条改动属于「不要修改」清单（落地页 + Home/*）的显式授权例外，理由是用户明确要求统一鉴权入口，不再让 CTA 绕过门禁。
-
-**手测验证矩阵：**
-| 状态 | 访问 `/dashboard` | 首页 CTA | 退出登录落地 |
-|---|---|---|---|
-| 未登录 + 非访客 | → `/login?redirect=/dashboard` | → `/login?redirect=/dashboard` | — |
-| 已登录 | 直进 | 直进 | `/`（清 guest） |
-| 访客 | 直进 | 直进 | — |
-| 登录成功 | — | — | guest 已清 |
-
-**未做（明确推迟）：**
-- router context 注入 — 当前 `getSession()` 方案够稳，未来要做服务端鉴权（D3=b）才需要
-- 服务端鉴权（保持 D3=a 浏览器 auth 模型）
-- 功能页空状态视觉打磨 — 当前页面已是 const 假数据，访客模式下天然有内容显示，不阻塞
-- "您正以访客身份浏览"全局 banner — 暂不做，Navbar 仍显示「登录/注册」即视觉提示
-
-**踩坑记录：**
-- TanStack Router 的 `useSearch({ from: "/login" })` 需要 `validateSearch` 在 route 文件中定义，否则 search 类型为 `{}` 而不是 `{ redirect?: string }`，访问 `search.redirect` 会被推断为 `unknown`。
-- `routeTree.gen.ts` 顶有 `// @ts-nocheck`，类型流不依赖它，从 route 文件的 `createFileRoute(...)` 泛型直接推导。所以本轮没必要手动重新生成 `routeTree.gen.ts`。
-- TanStack `<Link>` 的 `search` prop 在父级 search 类型为 `{}` 时会拒绝任意键；用 `validateSearch` 声明后，`<Link to="/login" search={{ redirect: ... }}>` 类型校验通过。
-
-### **2026-05-09** — Supabase auth 接入（mock 退役）
-
-**决策（D1–D4 全部走默认建议路径）：**
-- **D1 = (a)** 暂不建 `profiles` 表；profile 字段（name 等）暂存 `auth.users.user_metadata`
-- **D2 = (a)** 关闭邮件确认（Supabase Dashboard → Authentication → Email → "Confirm email" 关）
-- **D3 = (a)** 纯浏览器 `@supabase/supabase-js`（不上 `@supabase/ssr`）；`_app.tsx beforeLoad` 鉴权门禁推迟
-- **D4 = (a)** 保留本地 `AuthUser` shape，在 `authApi.ts` 内做 Supabase User → AuthUser 映射（解耦）
-
-**改动（最小化）：**
-- 新建 `src/lib/supabase.ts`：客户端单例 + SSR 守卫（`typeof window !== "undefined"`），缺 env 时启动报错
-- 新建 `.env.example`：`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` 模板
-- `.gitignore`：补 `.env` 显式规则（`.env.local` 已被 `*.local` 覆盖）
-- `package.json`：+ `@supabase/supabase-js: ^2.45.0`
-- `src/api/authApi.ts`：4 个函数体替换为 `supabase.auth.*` 调用，新增 `onAuthChange(cb): unsubscribe` 包 `onAuthStateChange`，删除所有 localStorage / mock 助手；`MockSession` → `AuthSession`（去 `token` 字段，AuthContext 不消费）；`AuthUser` shape 不变（id / email / name / createdAt）
-- `src/context/AuthContext.tsx`：`useEffect` 内首次 `getCurrentUser` 后再订阅 `onAuthChange(setUser)`，cleanup 时 unsubscribe；公共 API（login / register / logout / user / isAuthenticated / loading）**完全不变**——Login / Register 页 0 修改
-
-**校验：**
-- `npm run build` 通过（client + Cloudflare Worker SSR 双端均无 type 错）
-- `lib/supabase.ts` 的 env 缺失校验只在**运行时**触发（dev / SSR 第一次请求），build 不爆——dev 前必须先建 `.env.local`
-
-**未做（明确推迟到下一轮）：**
-- `_app.tsx beforeLoad` 鉴权门禁（CLAUDE.md 标"不要修改"，且 D3 浏览器侧 auth 需先解决路由 context 注入或升级 SSR）
-- `profiles` 表 + RLS（D1 = a，等 UI 真要写业务字段再建 + 先起草 `docs/DATA_MODEL.md`）
-- 邮件确认 / 忘记密码 / OAuth / `/auth/callback` 路由（D2 = a）
-- AI provider 抽象 / RAG（明确不在本轮）
-
-**部署 env 策略（重要）：**
-Vite 的 `import.meta.env.VITE_*` 是 **构建时静态替换**，不是 Worker 运行时变量。所以 `wrangler.jsonc` 里加 `vars` 块**没用**——Worker 拿到的 bundle 里值已经被字面量替换。正确流程：
-- **本地开发**：`.env.local`（gitignore 已盖）
-- **CI / 本地部署**：在 `npm run build` 之前导出环境变量，例如：
-  ```bash
-  export VITE_SUPABASE_URL=https://xxx.supabase.co
-  export VITE_SUPABASE_ANON_KEY=eyJ...
-  npm run build
-  wrangler deploy
-  ```
-- **GitHub Actions**：在 build step 用 `env:` 注入 secrets
-- **anon key 公开安全**：可以提交到 git（如想"零配置"的话），但本项目目前选择不提交，按 CI/CD 注入
-
-**已踩过的坑 — env 缺失导致整站打不开（2026-05-09 当天修复）：**
-最早 `lib/supabase.ts` 在 env 缺失时硬抛错，导致 `__root.tsx Providers` 链崩溃 → SSR 启动失败 → 整站包括 Home 都加载不了。修复：fail-soft——env 缺失只 `console.warn`，`isSupabaseConfigured` 标志在 `authApi.ts` 里检查，未配置时 `getCurrentUser` 返回 null、`logout` no-op、`onAuthChange` 返回空 unsubscribe，只有 `login` / `register` 抛清晰错（用户点登录按钮才看到）。
-
-### **2026-05-09** — Transparency / TiltedCard / Feedback 扇形 + 滚动星 / Control 缓动 / 共享 UserMenu / 5 功能页 breadcrumb HoverCard（未提交）
-
-**`Transparency.tsx`（替代旧 `Honesty.tsx`，已删除）** — 落地页"透明性"区，hub-and-spoke 布局：
-- 3×3 grid（lg+）：Row 1 [P0 / 标题 / P1] / Row 2 [· / 卡 / ·] / Row 3 [P2 / · / P3]
-- 4 个 pillar 在四角，标题 + 推荐示例卡在中央列；移动端单列堆叠（`order-` 重排），SVG 隐藏
-- 卡片视觉下移 40px：5 个包装层 `lg:translate-y-10`（transform 不改 layout box，下方 Control 不被推下）；SVG 加 `overflow-visible` 让线端不被 hub 边界裁掉
-- **SVG bezier dashed marching-ants 连线**：用 `getBoundingClientRect()` + `ResizeObserver` 实时测算 pillar 内边中点和卡的左右边中点，写到 SVG 的真实像素 viewBox；卡只有 2 个连接点（左中 / 右中），TL+BL 汇聚于左中，TR+BR 汇聚于右中（Y 字形）；marching-ants 用 `transparency-ants` 关键帧（`Home.css`），1.4s 线性循环 `stroke-dashoffset 0 → -12` 与 `stroke-dasharray="6 6"` 同步
-- **Hover 联动**：进入 pillar → 该 pillar 描边深 + 阴影、对应 chip 浮起 + 描边变彩、对应连线变彩 + 加粗、端点小圆变大变彩；4 处同步反应强调"同一条信息流"
-- **Pillar 缓缓亮起**：内联 layered transitions（transform 0.85s / border 0.85s+0.06s 延迟 / shadow 1s+0.1s 延迟 / icon 方框 bg 0.95s+0.18s / icon color 0.95s+0.22s），全 `cubic-bezier(0.16,1,0.3,1)` —— 修了"一下子跳起来变黑"的 bug（之前 `<Pillar>` 定义在 `Transparency` 函数体内，每次父级 re-render 函数引用变了 → React 卸载重挂 → CSS transition 完全没机会跑）。改成 `renderPillar()` 函数调用（返回 JSX 而不是组件），就在原 DOM 节点上 update style，transitions 正常生效
-- **中央卡用 `<TiltedCard>`** rotateAmplitude=6 / scaleOnHover=1.015 / perspective=1200
-- 入场 IntersectionObserver 触发，stagger：headline 0s → 卡 0.15s → chip 0.45s+0.08·i → pillar 0.7s+0.1·i → 连线 0.7s+0.12·i → 端点小圆 0.9s+0.12·i
-
-**新组件 `TiltedCard.{tsx,css}`（`components/effects/`）** — React Bits 的 TS port：
-- **零依赖**：原版用 `motion`（30KB+ 弹簧库）；本项目已有 React Bits TS port 先例（`CardSwap`、`SplitText`），保持惯例不引 motion，spring 物理感用 CSS `cubic-bezier(0.22,0.61,0.36,1)` 600ms 长缓动近似
-- 鼠标 tracking 期 90ms 微缓动（消抖不延迟），离场 600ms 长缓动（模拟 spring 回弹无 overshoot）
-- shine overlay：`mix-blend-mode: soft-light` + `radial-gradient(400px circle at var(--shine-x) var(--shine-y), rgba(255,255,255,0.55), transparent 45%)`，仅 `:hover` 时不透明
-- 接 `children` 而非 `imageSrc`（原版只支持图片），方便包任意 JSX
-- `prefers-reduced-motion: reduce` 自动停用所有 transform 与 shine
-
-**`Feedback.tsx` 全面重做** — 5 张 testimonial 卡（增 Tao 大三数学 / Sara 国际学生）：
-- 评分调整：Lin 5⭐ / Tao 4⭐ / Marcus **3→4⭐** / Aisha **4→5⭐** / Sara 5⭐
-- **xl 单行扇形布局**：`xl:grid-cols-5`，rotate `-3.5° / -1.5° / 0 / +1.5° / +3.5°`，外两张 scale 0.95 + translate-x ±12px + z-0；中心卡 z-20、内侧卡 z-10；hover 任一张 → rotate 归零 + translate 归零 + scale 1 + z-30 抽出，700ms `cubic-bezier(0.16,1,0.3,1)`；容器 `max-w-[1700px]` 让 5 卡有舒展空间
-- **滚动驱动星星 cascade**：12 颗 lit 星（5+4+4+5+5 → 实际 23 总星）每颗有阈值 `(globalIdx + 0.5) / TOTAL_LIT`，进度公式 `(vh - sectionTop) / (vh/2 + sectionHeight/2)` clamp 0-1（section 顶进入视口底 → 0；section 中心到达视口中心 → 1，之后保持 1）。rAF 节流 scroll 监听。filled `#fbbf24`（amber-400）/ unfilled `#e2e8f0`（slate-200）→ 后改 `#f59e0b`（amber-500）/ `#e5e7eb`（gray-200）按 design system 对齐。无 scale-pop（避免抽搐）
-- **`FeedbackCard` 模块顶层定义**：父级每帧 scroll re-render，组件函数引用稳定，本地 hover state 持久化，CSS transitions 正常运行
-- **设计系统对齐**：tone 色从 blue/slate 改回 emerald/amber/gray；highlight 卡从 `border-amber-200/70 ring-1` 改成 `border-amber-300 ring-2 ring-amber-100`；section bg 从渐变改成 `bg-gray-50`；hover 从 scale + shadow 改成只 translateY(-3px) + 边框深；eyebrow 标准化 `text-xs tracking-widest mb-4`；标题 `text-3xl md:text-5xl mb-4`；头像渐变改 `bg-gray-100` 单色
-
-**`Control.tsx` 缓动 hover** — 3 张编号卡：
-- 之前 Tailwind `hover:` arbitrary value `hover:-translate-y-0.5 transition-[border-color,transform,box-shadow] ease-[cubic-bezier(0.16,1,0.3,1)]` "卡卡的"——原因：Tailwind arbitrary values 在某些情况下没解析全 + 2px translate 太微小读不出动感
-- 改成 `ControlCard` 模块顶层组件 + `useState` hover + 内联分层过渡：transform 0.85s / border 0.85s+0.06s / shadow 1s+0.1s / 数字圆 scale(1.08) 0.85s+0.1s，全部 `cubic-bezier(0.16, 1, 0.3, 1)` expo-out（前快后慢）
-- Section padding `py-24 → pt-12 pb-48`：移上去贴近 Transparency + 整体加高
-- Transparency 与 Control 之间的横线删了（`border-y → border-t`）
-
-**`FinalCTA.tsx` 按钮反向** — 实心黑底 → 黑色描边 + 黑字；hover 反相为黑底白字 + 箭头 `group-hover:translate-x-1`；200ms `transition-colors` + `transition-transform ease-out`
-
-**`Footer.tsx`** — 3 列改 2 列，删掉中间 Workspace/Rules/Simulation 块，保留左品牌 + 右"Built for students."
-
-**共享 `UserMenu.tsx`（新增 `components/layout/`）** — Navbar + DashboardLayout 两处头像下拉单一组件：
-- **`modal={false}`**（关键 bug 修复）：默认 Radix DropdownMenu `modal={true}` 打开时锁 body scroll + 注入 `padding-right` 抵消滚动条消失，**导致 fixed 定位的首页 Navbar 整条向右跳 ~15px** 同时入场动画在首帧 reflow 中被吃掉。`modal={false}` 直接绕过 body lock，两个 bug 一起消失
-- 菜单项（用户头像点击）：用户名 + 邮箱 → 个人资料 / 个性化 / **Upgrade plan**（amber 渐变高亮）/ 设置 / 帮助 / 退出登录（red）。后两次迭代删掉了「个性化」并按用户要求重排为 个人资料 / Upgrade plan / 设置 / 帮助 / 退出登录
-- 入场 220ms `cubic-bezier(0.22,0.61,0.36,1)` from `origin-top-right`（从头像位置展开），shadcn 默认 fade + zoom-95 + slide-from-top-2 复合
-- Hover 交互：底色 + 文字 + 图标颜色平滑过渡，**图标不做 transform**（之前 0.5px sub-pixel translate 看起来是抽搐 bug），upgrade 项 amber 渐变加深，logout 项红底 + 红字
-- Trigger 按钮在调用方各自定义（Navbar 适应 dark/light hero / DashboardLayout 实心 slate-950），通过 `trigger` prop 传入
-
-**5 功能页 breadcrumb HoverCard**（Dashboard / AIAdvisor / Planner / Schedule / Upload）：
-- 删掉每页顶部 `<header>` 块（eyebrow + h1 + intro 段落）
-- 内容搬到 `MENU_ITEMS` 的新 `title` + `intro` 字段（`src/config/menu.ts`），单一真理源
-- `DashboardLayout` 顶栏的 `[CurrentIcon] {currentItem.label}` breadcrumb 外包 shadcn `HoverCard`，hover 弹出圆角白卡（`rounded-2xl border-slate-200/70 bg-white/95 backdrop-blur-xl shadow-[0_18px_44px_...]`）显示 `currentItem.title` + `currentItem.intro`，sideOffset 12，`openDelay/closeDelay` 各 120ms
-- 中间短命的 `PageIntro.tsx` 已删除
-
-### **2026-05-09**（早些）— **feature/dashboard 分支合并**（commit `d4c10c5`）：5 个功能页从骨架推进到可演示状态
-
-每页仍是写死 `const`（无 fetch），但视觉与 state 交互完整：
-
-- **`pages/Dashboard/index.tsx`**（384 行，路由 `/dashboard`）：4 区——信息导入快捷入口（5 入口 + 状态徽章）+ 决策卡（3 张可点切换 tone）+ 场景动作选择（`useState` selectedAction，活跃态切换 metric 文案）+ 指标卡（4 项 GPA / 学位进度 / 学习时长 / 风险）。`metricIcons` 数组 + tone class 映射。
-- **`pages/Planner/index.tsx`**（676 行，路由 `/course-planner`，菜单 label "Workspace"）：基于 `@xyflow/react` 的 ReactFlow 决策图谱。多种节点类型 `course / requirement / gpa / risk / goal / workload / abroad / internship / second-class / volunteer / alternative`，lane 分层（L0 培养目标 / L1 课程 / L2 GPA / L3 风险 等），自定义 `MeridianFlowNode`，背景 `BackgroundVariant.Dots` + `MiniMap` + `Controls`，节点 `MarkerType.ArrowClosed`，可拖拽缩放。
-- **`pages/AIAdvisor/index.tsx`**（256 行，路由 `/ai-advisor`，菜单 label "Goal Mode"）：左侧 4 个固定 Mode 卡（GPA 优先 / 学习兴趣 / 留学准备 / 实习就业，各带 logic 逻辑说明）+ 右侧自然语言输入框，输入框上方状态指示器「中文 · 自然语言」+ pulse halo 效果（`animate-pulse-halo`）。
-- **`pages/Schedule/index.tsx`**（332 行，路由 `/schedule`，菜单 label "Rule Graph"）：左侧规则树（按培养方案分组的可折叠 RuleLeaf + ConflictRule + ExternalLink）+ 右侧冲突详情卡（A 方文案 + B 方文案 + AI 判断 + 来源链接），冲突卡黑底白字（`bg-slate-950`）。
-- **`pages/Upload/index.tsx`**（355 行，路由 `/import`，菜单 label "Import"）：学校选择器 + 当前连接状态（教务 / 个人 / 社区数据源）+ 文件上传槽（5 种类型 + 格式提示）+ 已导入文件表格（带导入日期、类型、状态）。
-
-合并产生的路由文件：`routes/_app/{ai-advisor,course-planner,dashboard,import,schedule}.tsx`，全部走 pathless `_app` layout 套 `DashboardLayout`。
-
-### **2026-05-08** — 落地页 Explain / GpaMath / FAQ / Footer 改版（未提交）
-
-落地页 4 个 section 的视觉与交互重做，新增 1 个通用组件 CardSwap。
-
-**Explain.tsx — 「认知落差」（替代旧的"每个推荐都有理由"）：**
-- 黑底 + 磨砂玻璃卡（`bg-gradient-to-br from-white/[0.10] via-white/[0.05] to-white/[0.02] + backdrop-blur-2xl + border-white/15 + inset 高光 shadow`）
-- 两栏并置同一组 6 件事，左栏 emerald check 圆 + 文字由 `#9ca3af → #f8fafc`，右栏白色描边问号圆 + 文字由 `#e5e7eb → #9ca3af` + overlay 横线 `scaleX 0→1` 划过
-- 滚动驱动：GSAP scrub 1，cardRef trigger，`start: "top 90%" end: "center 62%"`，6 项 stagger 0.6 间隔 → 卡片中心碰到视口中心稍前完成全部勾掉/划掉
-- 鼠标 tilt：`perspective 1200 + transformStyle preserve-3d`，quickTo `rotationY ±2.5° / rotationX ±1.75°` (Y 反向)，duration 0.55s power2.out
-- 大标题用 `<SplitText>` 与 Hero 同源参数（splitType chars / delay 40 / duration 0.9 / from y:50）
-- 文案：「为什么大家会焦虑」「在同一个学校中」（无句号）+ 桥接「很多人直到毕业前，才第一次看清这些规则之间的关系」
-
-**GpaMath.tsx — 「Meridian 不只是推荐好课」（替代旧的"绩点不是玄学，是公式"）：**
-- 左栏文字：kicker 「产品价值」+ h2 大字（Meridian / 不只是推荐好课，强制换行）+ 副文 `text-lg md:text-2xl text-gray-700`（而是在你的目标下 / 计算代价最低的路径）+ 三个 bullet 点 `space-y-3 text-gray-600`（目标变化推荐逻辑实时变化 / 规则之间的影响关系被重新展开 / 每一次选择都会被提前推演）
-- 右栏视频堆叠：CardSwap 三张卡（width 720 / height 480 / cardDistance 84 / verticalDistance 96 / delay 3000ms / easing linear），列高 500/580/640px，container `position: absolute top:50% right:0 translate(0,-50%)` 垂直居中锚点
-- 入场顺序：kicker → h2 SplitText → 副文 0.55s → bullets stagger 0.12s → 视频 0.35s 同链 ScrollTrigger `top 80%`
-- `id="value"` 给 Navbar 用（备用，当前未引用）
-
-**新组件 `src/components/effects/CardSwap.{tsx,css}` — React Bits port，TS 化：**
-- 自动循环：`setInterval(swap, delay)`，前卡 y+=500 掉下，余卡 promote，原前卡返回末位
-- 点击跳转：`goToFrontRef` 按 click 把对应 idx 旋到 order[0]，0.55s power2.out 全卡同步重定位，结束后重启 interval（kill 当前 timeline 防冲突）
-- 视口暂停：IntersectionObserver `threshold: 0` 观察 container，离屏 → `tlRef.pause() + clearInterval`，回屏 → `play() + startInterval`，避免滚过去之后卡片继续滑动到下一 section
-- 卡片样式：`linear-gradient(140deg, #1d1d22, #131318)` + `border-white/16` + `box-shadow 0 18px 50px`（不是纯黑），`cursor: pointer`
-- props：`width / height / cardDistance / verticalDistance / delay / pauseOnHover / onCardClick / skewAmount / easing(linear|elastic) / children`
-
-**Faq.tsx — 新 section（在 Feedback 与 FinalCTA 之间）：**
-- 4 条 Q&A，编号 `01-04 text-xl md:text-2xl tabular-nums`，hover 时颜色由 gray-400 → gray-900
-- 鼠标悬停展开答案：`grid-template-rows 0fr → 1fr` 平滑展开 + 答案 opacity 0→1 delay 100ms + Plus 图标 `rotate-45` 变 × + 行 `bg-gray-50` 浅底 + 题目 `translate-x-0.5`
-- 触屏降级：`[@media(hover:none)]:grid-rows-[1fr] + opacity-100`，无 hover 设备答案常驻
-- 入场：kicker / h2 / 4 项 stagger fade-up（duration 0.5/0.75/0.6 + delay 0/150/400ms）
-- 容器宽 `max-w-6xl`，行 padding `px-4 md:px-8 py-8`，列间距 `gap-8 md:gap-14`
-
-**Footer.tsx — 三栏黑底重写：**
-- `bg-black + border-t border-white/10 + py-14`
-- 左栏：M logo 反色（`bg-white + 黑 M`）+ Meridian + `See the rules earlier.` + 「很多规则，只是从来没人把它们连接起来。」
-- 中栏：`Workspace / Rules / Simulation` 一列三行（`<br />` 分行 + leading-7）
-- 右栏：`Built for students.`
-- 字色阶：white / gray-300 / gray-500 三档，重要 white、次重要 gray-300、辅助 gray-500
-- 底部 `border-t border-white/10` + © 版权小字
-
-**Navbar.tsx：**
-- 4 项导航居中：父 `relative`，nav links 容器 `absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`
-- 文案与锚点：产品理念 → `#trust`（HeroLaptopShowcase 内 sentinel `<div id="trust" top:100vh>`，触发 GSAP scrub progress ≈ 0.45）/ 规则系统 → `#explain` / 决策路径 → `#value` / 用户反馈 → `#feedback`
-- 登录态适配（已有）：`useAuth` 拿 user，登录后右上变 DropdownMenu 头像
-- AIAdvisor 一处文案：「口述你的情况」→「描述你的情况」
-
-### **2026-05-08** — 登录/注册页 + Mock 鉴权（未提交）
-
-把 auth 系统从「全空 stub」推到「能点登录、能跳 dashboard、刷新仍登录」。**全部是 mock，不是真后端**。
-
-**视觉：**
-- 新页 `src/pages/Login/`、`src/pages/Register/`：白卡 + Apple-like 字体规范（Inter / `font-semibold tracking-tight` / `text-3xl` 大标题 / `text-sm` 正文 / `text-xs` 小字）+ rounded-full 输入与按钮
-- 两卡尺寸锁死：`max-w-[440px] min-h-[640px]`，登录↔注册切换零跳动
-- 入场用项目内 `animate-fade-in-up-soft`，子元素阶梯延时 80/140/200/260/460ms（社交按钮额外 520ms，仅登录页）
-- 输入框 `hover:border-gray-400` + `focus:border-gray-900 + ring-gray-900/10`
-- 路由：`src/routes/login.tsx`、`src/routes/register.tsx`（不挂 `_app`，绕开 DashboardLayout）
-
-**鉴权流：**
-- `src/api/authApi.ts` ←  **完整 mock**：login/register/logout/getCurrentUser；session 存 `localStorage["meridian:auth"]`，包含 `{ user: { id, email, name, createdAt }, token: "mock_..." }`；带 300ms 假延迟模拟网络
-  - 校验规则：login 密码 ≥6 位；register 密码 ≥8 位；邮箱必须含 `@`
-  - **不校验唯一性、不存密码、token 是随机字符串**——上线必换
-- `src/context/AuthContext.tsx` ← 改成真 Provider，暴露 `{ user, isAuthenticated, loading, login, register, logout }`；mount 时 `getCurrentUser()` 恢复 session
-- `src/hooks/useAuth.ts` ← 一行 re-export `useAuthContext`
-- `src/routes/__root.tsx` ← `<Providers>` 改成 `<AuthProvider>` 包裹（不再 pass-through）
-
-**入口接通：**
-- 首页 Navbar 「登录/注册」按钮 → `/login`、`/register`；登录态自动切换为头像首字母 + DropdownMenu（与 DashboardLayout 同一组项），颜色随 scrolled 状态自适应（白底深色 / 透明白色）
-- DashboardLayout 右上头像：`isAuthenticated` 时是头像首字母 + shadcn DropdownMenu（用户名 / 邮箱 / 我的面板 / 退出登录）；未登录时显示 "登录" 按钮链到 `/login`
-- Login 提交 → `useAuth().login()` → `navigate({ to: "/dashboard" })`，错误显示在按钮上方
-- Register 提交 → `useAuth().register()` → 同上（即"注册→自动登录→跳 dashboard"）
-- 提交期间按钮 disabled + 文案改为「登录中…」/「创建中…」
-
-**接真后端时改这几处：**
-1. **改 `src/api/authApi.ts`**：四个函数的函数体替换成 `fetch("/api/auth/login", ...)` 真实调用。返回类型保持 `MockSession` / `AuthUser` 形状，或同步修改 `AuthContext` 的 `setUser` 数据结构
-2. **token**：当前 token 是 `mock_xxx` 随机串，无 expiry。换真 JWT 时考虑：
-   - 存储位置：localStorage（XSS 风险）vs httpOnly cookie（推荐）
-   - Refresh token 流程：在 `AuthProvider` 加 axios/fetch 拦截器或 react-query mutation
-   - 401 全局处理：TanStack Router 的 beforeLoad / route guards
-3. **路由守卫**：`/_app/*` 下的 dashboard/ai-advisor 等当前对未登录用户也开放。真上线时在 `routes/_app.tsx` 加 `beforeLoad` 检查 `isAuthenticated`，否则 throw redirect 到 `/login?redirect=...`
-4. **DESIGN_SYSTEM 同步**：登录卡片用了 `shadow-[0_5px_20px_rgba(0,0,0,0.04)]`，违反"落地页几乎不用 box-shadow"——auth 页是浮层卡片，特例。如要彻底纯 border 风，删除 shadow class
-5. **Apple/Google 登录按钮**：UI 已有，未接 OAuth provider。接入时走 `src/services/` 业务层 + `authApi.ts` 新方法
-
-**没做：**
-- 没加 `/forgot-password` 流程（按钮目前是 `<button type="button">` 无 href）
-- 没加路由守卫（dashboard 等页面对未登录用户仍可访问）
-- 没接 OAuth
-
-### **2026-05-07** — 一级结构债收敛（未提交）
-做了架构审计 + 处理 4 件最高优先级结构问题，**严格不动 UI 与业务逻辑**：
-
-- `src/config/menu.ts` 单一真理：6 项功能菜单（label/desc/to/icon）抽出，`Navbar` 与 `DashboardLayout` 共用
-- TanStack Router `_app` pathless layout：新建 `routes/_app.tsx` 包 `<Outlet>` in `DashboardLayout`，6 个功能页 route 移入 `routes/_app/`，**page 不再 import DashboardLayout**
-  - URL 不变（仍 `/dashboard` 等，`_app` 段被 pathless 吃掉）
-  - `routeTree.gen.ts` 由 router-plugin 自动重生成
-- 删除旧 stub：`src/components/Navbar/`、`src/components/Sidebar/`（确认零引用）
-- `__root.tsx` 加 `<Providers>` pass-through 函数：5 个 JSDoc 挂点（QueryClient / Auth / Theme / Toaster / ErrorBoundary）。**未引入任何新依赖、无业务逻辑**
-- 派生文档：`docs/ARCHITECTURE_AUDIT.md`（一次性深度审计，4 章 + 14 节）+ `docs/TECH_DEBT.md`（持续追踪）
-- 验证：`tsc --noEmit` clean
-
-**未做（用户明确要求不做）：** 真接 react-query / Supabase / AI provider；不抽业务组件；不改 api/services/hooks。
-
-### `c826436` — docs: AI handoff documentation
-四份文档：
-- `docs/CURRENT_TASK.md` — 每会话任务约束
-- `docs/PROJECT_OVERVIEW.md` — 项目定位 / 用户 / 商业 / 技术栈
-- `docs/ARCHITECTURE.md` — 文件结构 / 数据流 / 协作约定
-- `docs/DESIGN_SYSTEM.md` — token / 字体 / 按钮 / 动画 / 文案规范
-
-### `1c26d5f` — restructure project + 自适应 Nav + SplitText
-- 拆 `src/pages/Home/index.tsx` 730 行 → 一 section 一文件
-- Nav/Footer 抽到 `src/components/layout/`
-- CourseAnalyzer / Dashboard 骨架页
-- Nav 在 dark Hero 上透明白字、滚 30vh 后切换白底深字
-- Hero 三行大字用 `gsap/SplitText` 字符级 fade-up
-- assets/logo → assets/logos
-- styles/global.css → globals.css + animations.css 拆分
-
-### `db63087` — 笔记本厚度 + hover lift
-- 修了 `embedded-laptop-base-3d` 缺 `transform-style: preserve-3d` 的 bug（导致 base-front 子元素 rotateX(-90) 被压回 2D）
-- 底座前缘加可见厚度立面
-- 键盘从渐变贴图改成 5×14 真实 div 键，每键独立厚度 box-shadow
-- 整机加多层 ambient drop shadow
-- 鼠标 hover 笔记本上抬 -2vh，scroll progress > 0.7 启用
-
-### `72a8a3b` — CSS 笔记本展示初版
-- Hero 内嵌入 `<EmbeddedLaptop>`
-- ScrollTrigger pin/scrub：scale 1→0.32, xPercent 26, rotateY -14, rotateX -4
-- 起始 offset 0.05 + duration 1.2 + ease "power2.out"（fast start, slow tail）
-- GridMotion 从鼠标驱动改自动循环（marquee 风格，items 复制双倍 + xPercent 0→-50% 无限循环）
-- Trust 文案嵌在第二页左侧
-
-### `7da4447` — 初始项目
-- TanStack Start + React 19 + Vite 7 + Tailwind 4
-- shadcn/ui 50+ 组件
-- GSAP 已装
+## 3. 技术栈
+
+- **Runtime**：React 19 + TS 5.8 + Vite 7 + TanStack Start（SSR / 文件式 routes）+ Bun + Cloudflare Workers
+- **UI**：Tailwind 4（@theme inline + oklch tokens）+ shadcn/ui（46 个 Radix primitive）+ lucide-react
+- **动画**：GSAP 3.15 + ScrollTrigger + SplitText；自定义 CSS keyframes
+- **后端**：Supabase（Postgres + Auth + Storage + 未来 Edge Functions）；Cloudflare Worker 跑 TanStack Start SSR
+- **状态**：React Context（Auth + Profile），不上 Zustand / Redux
+- **数据接入层**：`src/api/*` 薄壳调 Supabase，`src/context/*` 管 Provider，`src/hooks/*` re-export
 
 ---
 
-## 3. 关键技术决策（带原因）
+## 4. 核心架构
 
-### 笔记本展示：CSS 伪 3D 而不是 Three.js / R3F
-**为什么：** 试过 R3F 路线（commit 已 reset）。装了 `@react-three/fiber + @react-three/drei` 后渲染失败 + 视觉粗糙，回退到 CSS。
-**当前：** 全 CSS + `transform-style: preserve-3d` + translateZ + rotateX/Y。
-**坑：** 嵌套 3D 必须 **每层** 父级加 `preserve-3d`，否则子元素 3D 退化为 2D。
-**未来要不要换 3D 模型：** 不要轻易动。CSS 已能做合盖动画（旋转 lid 即可）。要换得重写整个展示。
+```
+src/
+├─ routes/             TanStack Router 文件式
+│  ├─ __root.tsx           根布局 + <AuthProvider><ProfileProvider>
+│  ├─ _app.tsx             pathless layout：DashboardLayout + beforeLoad 鉴权
+│  ├─ _app/                5 功能页 routes（dashboard / ai-advisor / course-planner / import / schedule）
+│  ├─ login.tsx · register.tsx
+│  └─ index.tsx            → Home
+├─ pages/              业务页面，一页一目录
+├─ components/
+│  ├─ layout/              Navbar · Footer · DashboardLayout · UserMenu（Navbar+DashboardLayout 共用）
+│  ├─ effects/             EmbeddedLaptop · GridMotion · SplitText · TiltedCard · CardSwap
+│  └─ ui/                  shadcn primitives，不要重写
+├─ lib/                supabase 客户端单例 · guestMode · utils
+├─ api/                profileApi · ragSourceApi · authApi（薄壳）
+├─ context/            AuthContext · ProfileContext
+├─ hooks/              useAuth · useProfile · useRagSources
+├─ config/             menu.ts（单一真理源，Navbar + DashboardLayout 共用）
+└─ styles/             globals.css · variables.css · animations.css
+```
 
-### 动画引擎：GSAP + ScrollTrigger + SplitText
-**为什么：** Tailwind / Framer Motion 表达力不够（pin、scrub、字符级动画都需要 GSAP）。
-**注意：** GSAP 3.13+ 把 SplitText 改为免费，本项目装的 3.15.0 可用。
-**坑：** `gsap.registerPlugin(useGSAP)` 这行在 SSR 期间不会爆，因为 Vite 只 transform 不 execute。但要注意各 plugin 的 register 函数有 `window.innerWidth` 引用，万一变成模块顶层执行就会炸。
-
-### 状态管理：React Context（不上 Zustand / Redux）
-**为什么：** 项目规模不大，跨页面共享状态有限（用户 + 鉴权）。
-**何时升级：** Context 触发的 re-render 出现性能问题时。
-**当前：** `src/context/{Auth,User}Context.tsx` 仅占位，未实装。
-
-### 后端：Cloudflare Workers
-**为什么：** 项目已配 `wrangler.jsonc` + `@cloudflare/vite-plugin`。前后端同一栈部署，简化运维。
-**当前：** Worker 项目骨架未建，`src/api/*` 都是空 stub。
-**TBD：** 数据库选 D1（SQLite）还是 KV，向量库用 Cloudflare Vectorize 还是外部。
-
-### Nav 自适应：scroll listener + setState
-**为什么：** IntersectionObserver 需要监测节点对齐 nav，复杂；scrollY 比较够用。
-**阈值：** 30vh（笔记本展示已缩小到右下，主视野是白色 sticky 舞台）。
-**坑：** 直接 setState 在快速滚动时频繁触发；当前用了 `passive: true` listener 没明显问题。如果以后卡，改成 RAF 节流。
-
-### 路由分组：TanStack Router pathless `_app` layout
-**为什么：** 6 个功能页都需要 `DashboardLayout`（左侧 rail + drawer）。原本每个 page 各自 `import DashboardLayout` 后手动包裹——layout 决策被泄露到 page 里，新增功能页要记得包，新增全局壳要改 6 处。
-**当前：** `routes/_app.tsx` 是 pathless layout（`_` 前缀），内部 `<DashboardLayout><Outlet/></DashboardLayout>`。功能页 route 全在 `routes/_app/` 下，URL 不变（`_app` 段被 pathless 吃掉）。
-**坑：** `routeTree.gen.ts` 由 router-plugin 自动生成；移动 route 文件后 plugin 会自动改写 `createFileRoute` 路径字符串到 `/_app/<name>`，但**别手改 routeTree.gen.ts**，重启 dev 会被覆盖。
-
-### 全局菜单：单一真理 `src/config/menu.ts`
-**为什么：** Navbar（首页 drawer）和 DashboardLayout（功能页左侧 rail + drawer）显示**完全相同**的功能菜单。改一处忘另一处 = UI 不一致。
-**当前：** `src/config/menu.ts` 导出 `MENU_ITEMS: MenuItem[]`，字段统一为 `{ label, desc, to, icon }`。两处 import 同一份。
-**新加菜单项：** 只动 `src/config/menu.ts`，Navbar 和 DashboardLayout 自动同步。
-
-### 项目结构：一 section 一文件
-**为什么：** 多 agent 用 git 分支并行开发同一项目。Home/index.tsx 730 行的单文件会冲突。
-**协作模式：** `feature/home-flow`、`feature/home-feedback` 各自分支互不冲突。
-**协调点：** `Home/index.tsx`（加新 section 时改）、`Navbar.tsx`、`globals.css`、`package.json`、`__root.tsx`——这些是约定 owner，不是各自动手。
-
-### 文档体系：4 份分层
-- `CURRENT_TASK.md` 每会话变 — 边界
-- `AI_MEMORY.md` 每里程碑变 — 状态
-- 其它三份稳定 — 项目本身
+**数据接入三层模式**：`api/<table>Api.ts` → `context/<Table>Context.tsx`（全局） 或 `hooks/use<Table>.ts`（页面级） → page 消费。切后端只动 api 层。
 
 ---
 
-## 4. 注意事项（已踩过的坑）
+## 5. 关键技术决策
 
-### CSS 3D
-- **每层 preserve-3d**：父元素只要有 `transform` 但没 `transform-style: preserve-3d`，所有子的 3D 旋转都被压回 2D（看起来"消失"或变成扁条）。Bug 排查模板：先把可疑元素加 4vw 红色背景看渲染位置。
-- **transform-origin 选择**：旋转轴决定子元素飞向哪里。`top` / `bottom` / `center` 不一样，要根据物理含义选。
-- **rotateX 方向**：CSS Y-down 坐标。rotateX(+90) 让元素的"底"转向远离镜头方向，rotateX(-90) 转向镜头。容易记反。
+| 决策 | 选择 | 原因 |
+|---|---|---|
+| 后端 | Supabase（Postgres + Auth + Storage） | 单家 SaaS，RLS 把权限收到 DB 层；Worker BFF 之后再加 |
+| 鉴权 | D3=a 纯浏览器 `@supabase/supabase-js` | session 由 supabase-js 自管 localStorage；服务端鉴权（D3=b）推迟 |
+| 邮箱确认 | 关闭（D2=a） | 摩擦最小化，注册即用 |
+| TS 类型 | 手维护对齐 schema（待自动生成） | 当前 `as Profile` cast，TD-3 待跑 `supabase gen types` |
+| 状态管理 | React Context | 跨页共享有限；性能问题再升 Zustand |
+| 笔记本 3D | 全 CSS preserve-3d（不用 R3F） | 试过 R3F 已 reset；CSS 已能做合盖动画 |
+| 动画 | GSAP + ScrollTrigger + SplitText | Tailwind / Framer 表达力不够（pin / scrub / 字符级） |
+| 路由分组 | TanStack pathless `_app` layout | 5 功能页共享 DashboardLayout 不泄露到 page |
+| 全局菜单 | `src/config/menu.ts` 单一真理 | Navbar + DashboardLayout 共用，避免改一处忘另一处 |
+| Plan 存储 | JSONB 整存 ReactFlow graph（D6=a） | 不拆 plan_node / plan_edge，图状结构天然 JSONB 友好 |
+| 冲突表 | 独立 `rule_conflict`（D8=b） | 不嵌进 `rule.conflicts_with[]`，便于 AI 判断和审计 |
+| chat_message | 不开 parent table（D9=a） | conversation_id 字段挂消息上，未来加 conversation 表升级路径 |
 
-### React 19
-- **Ref callback 不能 return 元素**：`ref={el => rowRefs.current[i] = el}` 在 React 19 会报 TS 错误。要写成 `ref={el => { rowRefs.current[i] = el; }}`（显式 void return）。
-- **JSX namespace 不存在**：React 19 把 `JSX.IntrinsicElements` 移除了，组件里写 `Tag as keyof JSX.IntrinsicElements` 报错。用 `createElement(tag, ...)` 绕开。
+---
 
-### TanStack Start SSR
-- 路由组件被 SSR 渲染。组件 init 期间引用 `window.innerWidth` 之类会炸（GridMotion 现在的写法工作是因为 dev mode 当前没 SSR 这页 / 客户端补全）。后期接入 Worker 后要补 client-only 守卫或 useEffect。
-- Vite transform ≠ execute。模块顶层的 `gsap.registerPlugin(...)` 不会在 transform 时跑——但浏览器 import 时跑。
+## 6. 已完成的大模块
 
-### Drei `<Html transform>` 局限（当前未使用）
-- Hero 嵌入 `<Html transform>` 渲染时，内部 React 子树用了 `min-h-screen` 会炸尺寸（参考 viewport 而不是 Html 容器）。要么改 Hero 用 `h-full`，要么放弃。
+### 落地页（Home）— `~90%`
+Hero / Flow / Explain / GpaMath / Transparency / Control / Feedback / FAQ / FinalCTA / Footer 全接好。文案需本地化中国高校。
+特色：EmbeddedLaptop（CSS 伪 3D）· GridMotion 图墙 · TiltedCard 3D tilt · Feedback 5 卡扇形 + 滚动星 · Transparency hub-and-spoke SVG 连线。
 
-### `useEffect` cleanup + GSAP context
-- `gsap.context()` 必须 return cleanup 函数 `() => ctx.revert()`，否则 dev hot reload 时会有重复 trigger 残留。
+### 5 功能页 demo — `100%`（visual）
+`/dashboard` · `/ai-advisor` · `/course-planner`（ReactFlow）· `/schedule` · `/import`，已套 DashboardLayout，pathless `_app` 分组，breadcrumb HoverCard。仍部分写死 const（plan / rule / chat_message 未接）。
+
+### 数据库 — `100%`
+`docs/DATA_MODEL.md` 6 张主表 + 1 RAG 表 + RLS + index + trigger，已落 `supabase/migrations/0001_init_schema.sql` 跑通；Storage `rag_sources` bucket + 4 条 path-based RLS 已建。
+
+### 用户系统 — `~95%`
+Supabase auth 接入 + 注册 / 登录 / 登出 / 多 tab 同步；`_app.tsx` beforeLoad 鉴权门禁；访客模式（localStorage flag）；Login 「暂时跳过」按钮；Home CTA 鉴权门禁；`profiles` 表前端接通（4 处消费方）。
+待办：邮件确认 / 忘记密码 / OAuth / 服务端鉴权 / profile realtime。
+
+### `rag_source` 接入 — `100%`
+`/import` 真上传到 Supabase Storage + 写 `rag_source` 表 + 列表读 DB + 删除。文件路径 `<auth_uid>/<rag_source_id>.<ext>`。upload 兜底清孤儿 storage。当前 `parsed_status` 永远 pending（解析流程依赖 AI provider，TD-2）。
+
+### 文档体系 — `100%`
+`CURRENT_TASK.md`（sprint）· `AI_MEMORY.md`（本文，长期）· `TECH_DEBT.md`（backlog）· `PROJECT_OVERVIEW.md` · `ARCHITECTURE.md` · `DESIGN_SYSTEM.md` · `DATA_MODEL.md` · `ARCHITECTURE_AUDIT.md`（一次性深度审计）。
+
+---
+
+## 7. 已踩过的重要坑
+
+### Supabase env 缺失导致整站打不开
+最早 `lib/supabase.ts` env 缺失硬抛错 → Providers 链崩溃 → SSR 失败 → 整站包括 Home 加载不了。
+**修法**：fail-soft，env 缺失只 `console.warn`，`isSupabaseConfigured` 标志在 authApi 检查；只有 login / register 抛清晰错。
+
+### Vite `VITE_*` 是构建时静态替换不是运行时变量
+`wrangler.jsonc` 加 `vars` 块没用——Worker 拿到的 bundle 里值已字面量替换。
+**修法**：CI build 前导出环境变量；GitHub Actions 用 `env:` 注入 secrets。
+
+### Supabase URL 误带 `/rest/v1/` 后缀
+SDK 自己拼路径，重复 → 404 "Invalid path"。
+**修法**：`.env.local` 写裸 URL `https://xxx.supabase.co`，不加任何后缀。Vite 改 env 必须重启 dev server。
+
+### CSS 3D 必须每层 `preserve-3d`
+父元素只要有 transform 但没 `transform-style: preserve-3d`，所有子的 3D 旋转都被压回 2D。
+**Bug 排查模板**：先把可疑元素加红色背景看渲染位置。
+
+### React 19 ref callback 不能 return
+`ref={el => arr[i] = el}` 在 React 19 会报 TS 错；写成 `ref={el => { arr[i] = el; }}` 显式 void。
+
+### Radix DropdownMenu 默认 `modal={true}` 锁 body scroll
+打开时注入 padding-right 抵消滚动条 → fixed Navbar 整条向右跳 ~15px。
+**修法**：UserMenu 用 `modal={false}`。
+
+### `<button>` 不能内嵌 `<input type=file>`
+HTML5 规范禁止 button 内含 interactive content。React 不报错但 a11y / Firefox / Safari 行为不一致。
+**修法**：用 `<label>` 包 `<input>`，label 自动触发内嵌 input click，免 ref + stopPropagation。
+
+### Plan ReactFlow 节点定义在父组件函数内会丢动画
+父级 re-render 时组件函数引用变 → React 卸载重挂 → CSS transition 没机会跑。
+**修法**：组件定义在模块顶层，或改成函数调用返回 JSX（不当组件用）。
+
+### 子页面菜单单一真理
+原 Navbar 和 DashboardLayout 各写一份菜单，改一处忘另一处 = UI 不一致。已抽到 `src/config/menu.ts`，加菜单项只动这一处。
 
 ### bun + npm 混用
-- 本项目装过 npm（`npm install --no-package-lock` 装 R3F，后来 reset），但 `bun.lockb` 没重新生成。新 agent 拉分支跑 `bun install` 可能拉到旧依赖。
-- **建议：** main 分支跑一次 `bun install` 重生 lockb 后再让 agent 各自拉分支。
-
-### 落地页文案与目标用户错位
-- Hero / Explain section 用 `CS 101 / MATH 220 / RateMyProf` 这些**美式选课系统词汇**。
-- 但 `PROJECT_OVERVIEW.md` 已确认目标用户是**中国高校**学生。
-- 这是有意保留的占位文案，本地化任务**还没做**。
+本项目装过 npm（R3F 已 reset），`bun.lockb` 没重新生成。新 agent 拉分支跑 `bun install` 可能拉到旧依赖。
+**建议**：main 跑 `bun install` 重生 lockb 后再让 agent 各自拉分支。
 
 ---
 
-## 5. 未解决问题 / TBD
+## 8. 下一阶段方向
 
-### 业务侧
-- ❓ 中国高校的实际选课规则差异有多大？需要调研典型几所学校的培养方案
-- ❓ 第一批种子学校选谁（推荐试点 5 所典型院校：985 / 211 / 双非 / 民办 / 高职）
-- ❓ "学校手册"具体格式：PDF 主流？教务系统直接抓？需要调研
+### 短期（当前 sprint）
+- **排队 4b** — `/course-planner` 接 `plan` 表（ReactFlow nodes/edges → JSONB 自动保存）
+- **排队 4c** — `/schedule` 接 `rule` + `rule_conflict`
+- **排队 2** — AI provider 抽象 + streaming 协议骨架（mock provider 跑通 `/ai-advisor` 流式渲染）
 
-### 技术侧
-- ❓ 学校手册 OCR + 解析 pipeline（用 Cloudflare AI / OpenAI / 自建？）
-- ~~Worker 项目结构~~ → Supabase 路线下不再需要独立 Worker BFF；TanStack Start SSR 仍跑 Cloudflare Worker
-- ~~D1 还是 KV~~ → 走 Supabase Postgres；向量库（pgvector / Vectorize）等 RAG 阶段再定
-- ~~鉴权方式~~ → 已选 Supabase 浏览器 auth（D3 = a）；session 由 supabase-js 自管 localStorage
+### 中期
+- `chat_message` 表接 `/ai-advisor` 历史
+- `rag_source.parsed_status` 解析 pipeline（worker 推进 pending → parsed/failed，TD-2）
+- `<Toaster />` 全局错误通道（TD-4）
+- `supabase gen types` 切 typed client（TD-3）
+- 多 tab realtime 订阅（TD-6）
 
-### 历史包袱（不影响功能但乱）
-- ~~`src/components/{Navbar,Sidebar}/`~~ 已删除（2026-05-07）
-- `src/components/{CourseCard,GPAChart,UploadBox,ChatPanel}/` 仍是空 `<div />` stub，留待业务接入时实做或删
-- `src/components/effects/LaptopFrame.tsx + .css` 旧版 CSS 笔记本（已不用，保留作 fallback）
-- `src/components/effects/LiquidEther.css` 孤儿 CSS（无对应 .tsx，可删）
-- `src/layouts/MainLayout.tsx` 旧版页面壳（与 `components/layout/PageShell` 重复且都无人用）
-- `src/components/layout/PageShell.tsx` 写完无人引用（Home 直接拼 Navbar+Footer）
-- `src/pages/{Courses,Upload,AIAdvisor,Profile,CourseAnalyzer}/` 中无 route 的 4 个：早期占位（AIAdvisor 已通过 `/ai-advisor` route 接入）
-- `components.json` tailwind css 入口指 `src/styles.css`，实际是 `src/styles/globals.css`——`shadcn add` 会出错
-
-**清理时机：** 等业务方向定下来（BFF vs Supabase + AI provider）后统一清理。详见 `docs/TECH_DEBT.md`。
+### 长期
+- 中国高校文案本地化（Hero / Explain 仍是美式选课词汇）
+- 学校字典 `schools` 表 + 学期字典
+- `rag_chunk` + pgvector embedding（等单文档超 1MB）
+- 第二课堂 / 国际生路径 / 留学申请路径专项
+- 学校手册 OCR + 解析 pipeline
+- 移动端 / PWA
 
 ---
 
-## 6. 命令速查
+## 9. 项目时间线（按 commit 倒序，5-15 行/里程碑）
 
-```bash
-# 开发
-bun dev                    # 默认 8080 端口
-./node_modules/.bin/tsc --noEmit   # 类型检查（bun 不在 PATH 时直接跑）
+### 2026-05-11 · `/import` 接通 Storage + `rag_source` 表（排队 4a）
+- 新建 `ragSourceApi.ts`（list / upload / delete + RagSourceKind / ParsedStatus 类型 + 兜底清孤儿 storage）+ `useRagSources.ts`（本地 hook，登入即拉，乐观更新，race 防护）
+- 改 `/import`：3 个 ImportSlot 用 `<label>` 包 `<input>` 接通拖拽 + 选文件 + 多文件串行上传；列表读 DB；状态 pill 映射 `parsed_status` → 中文 + low-saturation 配色；空态 + uploading 计数 spinner + inline rose error banner
+- 审计修了 3 条中度问题：button → label、useEffect dep 加 user.id 守卫防 token-refresh 重拉、loading 初值 true 防空态闪烁
+- 不动：AuthContext / supabase.ts / __root.tsx / Navbar / profileApi。tsc 干净（仅 CardSwap 历史遗留错）。
 
-# 构建
-bun run build
-bun run preview
+### 2026-05-10 · `profiles` 表前端接通
+- 新建 `profileApi.ts`（getProfile / upsertProfile / updateProfile + GoalMode 枚举）+ `ProfileContext.tsx`（Provider，登入即拉，404 兜底 upsert，乐观更新 + requestId race 防护）+ `useProfile.ts` re-export
+- `__root.tsx` 嵌套 `<AuthProvider><ProfileProvider>` 顺序关键
+- 4 处页面接入：`/import`（school/grade/major）· `/ai-advisor`（goal_mode 派生 + 点击 updateProfile）· `/dashboard`（importShortcuts + decisionCards 动态派生 currentGoalMode）· UserMenu（profile.name → user.name → email 三级 fallback）
+- 不动 AuthContext / authApi / supabase.ts / Navbar / 页面 className 与布局
 
-# git
-git log --oneline -10
-git reset --hard <hash>    # 回退
-git status --short
+### 2026-05-10 · `docs/DATA_MODEL.md` 起草 + SQL migration 落地
+- 6 张主表（profiles / course / plan / rule / rule_conflict / chat_message）+ 1 RAG 表（rag_source）设计 + RLS + index + trigger
+- 6 处决策：D1=b 建 profiles · D5=a course 用户私有 · D6=a plan JSONB 整存 · D7=a rule 用户私有 · D8=b 冲突独立表 · D9=a chat_message 不开 parent
+- 工程审计修 4 处：SQL DDL 顺序、rule_conflict UNIQUE 对称、rule_conflict 用户一致性 trigger、rag_source.storage_path 格式
+- `supabase/migrations/0001_init_schema.sql` 在 Dashboard 跑通；Storage `rag_sources` bucket + 4 条 path-based RLS 已建
 
-# 部署（待）
-bunx wrangler deploy       # Cloudflare 部署，等 Worker 项目建好后启用
-```
+### 2026-05-10 · 路由鉴权门禁 + 访客模式 + 退出回首页 + Home CTA 鉴权
+- `_app.tsx` beforeLoad 4 道守卫：SSR / `isSupabaseConfigured` / 访客 / `await getSession()` → 无 session redirect `/login?redirect=`
+- 新建 `src/lib/guestMode.ts` localStorage 薄壳（SSR + 隐私模式 try/catch 守卫）
+- Login 加「暂时跳过」按钮 + `safeRedirect()` 防 open redirect；Login↔Register 透传 redirect
+- UserMenu 退出登录跳 `/`（不再回登录页）+ `exitGuestMode()` 防残留
+- Home `Hero.tsx` / `FinalCTA.tsx` CTA 改 `<button onClick>` 已登录或访客直进 dashboard，未登录 → `/login?redirect=/dashboard`
 
----
+### 2026-05-09 · Supabase auth 接入（mock 退役） + 死文件清扫 + 架构审计
+- 决策 D1–D4 全走默认 (a)：profiles 推迟 / 关邮件确认 / 纯浏览器 auth / 保 AuthUser shape 解耦
+- 新建 `src/lib/supabase.ts` 单例（SSR 守卫 + fail-soft env 缺失 + `isSupabaseConfigured`）；`authApi.ts` 4 函数 mock → Supabase + 新增 `onAuthChange`；`AuthContext` 加订阅，公共 API 不变
+- 死文件清扫：21 文件 + 8 目录全部 0 引用确认后删（MainLayout / PageShell / common/ / ChatPanel 等 stub）
+- react-query 移除（全项目 0 useQuery）；架构审计 `ARCHITECTURE_AUDIT.md` 全文刷新
+- 部署坑：Vite `VITE_*` 构建时替换，`wrangler.jsonc vars` 没用，CI build 前导环境变量
 
-## 7. 给新 AI 的开场白模板
+### 2026-05-09 · 落地页 Transparency 区 + Feedback 重做 + 共享 UserMenu
+- 新 section `Transparency.tsx` 替代 `Honesty.tsx`：hub-and-spoke + SVG bezier 连线 + marching-ants 关键帧 + 中央 TiltedCard 3D tilt
+- 新组件 `TiltedCard`（React Bits TS port，零依赖）+ `CardSwap`（视频堆叠自动循环）
+- Feedback 5 卡扇形 + 滚动星 cascade；Control 缓动 hover（layered transitions）
+- 共享 `UserMenu.tsx` 抽出 Navbar + DashboardLayout 两处复用；`modal={false}` 修首页点头像导致 Navbar 整条向右跳的 bug
+- 5 功能页 breadcrumb HoverCard：删每页顶部 eyebrow + h1 + intro，搬到 `menu.ts` title/intro 字段
 
-> 拷贝下面这段贴到新对话，AI 就能一键 onboarding：
+### 2026-05-08 · 登录系统 mock + 落地页 4 个 section 改版
+- mock 鉴权 + Login / Register 页（白卡 Apple-like，两卡尺寸锁死 max-w-440 min-h-640 零跳动）
+- Explain「认知落差」+ GpaMath「Meridian 不只是推荐好课」+ Faq.tsx 新建 + Footer 黑底三栏 + Navbar 4 项居中
 
-```
-我在做 Meridian — 中国高校选课决策引擎。读 docs/AI_MEMORY.md
-拿到当前状态。然后读 docs/CURRENT_TASK.md 知道今天要做什么。
-重要参考：docs/{PROJECT_OVERVIEW,ARCHITECTURE,DESIGN_SYSTEM}.md。
+### 2026-05-07 · 一级结构债收敛
+- `src/config/menu.ts` 单一真理；TanStack pathless `_app` layout（6 功能页统一壳）
+- 删旧 Navbar / Sidebar stub；`__root.tsx` `<Providers>` pass-through 壳
 
-技术栈：React 19 + TS + Vite + TanStack Start + Tailwind 4 + shadcn/ui +
-GSAP + Cloudflare Workers（待建）。包管理 bun。
-
-不要改不该改的（CURRENT_TASK 里有"不要修改"清单）。完成后停下报告。
-```
-
----
-
-## 8. 文档维护节奏
-
-| 文档 | 更新频率 | 谁改 |
-|---|---|---|
-| `CURRENT_TASK.md` | 每次开会话前 | 用户 |
-| `AI_MEMORY.md` | 每个里程碑（commit 几个之后） | 让 AI 总结然后审 |
-| `PROJECT_OVERVIEW.md` | 商业 / 用户定位变了 | 用户 |
-| `ARCHITECTURE.md` | 加新文件夹 / 改数据流 | AI 改完后用户审 |
-| `DESIGN_SYSTEM.md` | 加新 token / 新 pattern | AI 改完后用户审 |
-
-**更新 AI_MEMORY 的指令：**
-
-```
-让 AI 跑：
-
-「根据最近 commit 和当前代码状态更新 docs/AI_MEMORY.md。
-保留章节结构。重点更新：当前状态、已完成、未解决问题。」
-```
+### 2026-05-06 · 项目结构 + 笔记本 3D 初版
+- 拆 `Home/index.tsx` 730 行 → 一 section 一文件
+- EmbeddedLaptop CSS 伪 3D + GridMotion 自动循环图墙 + Hero SplitText 字符级 fade-up
+- TanStack Start + React 19 + Vite 7 + Tailwind 4 + shadcn 50+ + GSAP 装备完成
