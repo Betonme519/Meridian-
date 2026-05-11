@@ -98,6 +98,7 @@ export interface CardSwapProps {
   delay?: number;
   pauseOnHover?: boolean;
   onCardClick?: (idx: number) => void;
+  onFrontChange?: (idx: number) => void;
   skewAmount?: number;
   easing?: "linear" | "elastic";
   children: ReactNode;
@@ -111,6 +112,7 @@ const CardSwap = ({
   delay = 5000,
   pauseOnHover = false,
   onCardClick,
+  onFrontChange,
   skewAmount = 6,
   easing = "elastic",
   children,
@@ -155,6 +157,13 @@ const CardSwap = ({
   // we don't have to re-bind on every child render.
   const goToFrontRef = useRef<((targetIdx: number) => void) | null>(null);
 
+  // Keep latest onFrontChange in a ref so the swap effect (which doesn't
+  // list it in deps) always fires the current closure.
+  const onFrontChangeRef = useRef(onFrontChange);
+  useEffect(() => {
+    onFrontChangeRef.current = onFrontChange;
+  });
+
   useEffect(() => {
     const total = refs.length;
     refs.forEach((r, i) =>
@@ -169,6 +178,9 @@ const CardSwap = ({
       if (order.current.length < 2) return;
 
       const [front, ...rest] = order.current;
+      // Notify parent which card becomes the new visual front, before the
+      // drop animation starts (so playback can switch immediately).
+      onFrontChangeRef.current?.(rest[0]);
       const elFront = refs[front].current;
       const tl = gsap.timeline();
       tlRef.current = tl;
@@ -256,6 +268,7 @@ const CardSwap = ({
         ...order.current.slice(pos),
         ...order.current.slice(0, pos),
       ];
+      onFrontChangeRef.current?.(newOrder[0]);
 
       tlRef.current?.kill();
       if (intervalRef.current !== undefined) clearInterval(intervalRef.current);

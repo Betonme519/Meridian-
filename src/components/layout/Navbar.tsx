@@ -3,6 +3,8 @@ import { Link } from "@tanstack/react-router";
 import { MENU_ITEMS } from "@/config/menu";
 import { useAuth } from "@/hooks/useAuth";
 import { UserMenu } from "@/components/layout/UserMenu";
+import logoBlack from "@/assets/logos/logo黑.png";
+import logoWhite from "@/assets/logos/logo白.png";
 
 /**
  * Adaptive top navigation bar.
@@ -123,25 +125,31 @@ export default function Navbar() {
               </span>
             </button>
 
-            {/* Logo */}
-            <div className="flex items-center gap-2">
-              <div
-                className="w-7 h-7 rounded-md flex items-center justify-center"
-                style={{
-                  background: navOpaque ? "#000" : "#fff",
-                  transition: "background 0.3s ease",
-                }}
-              >
-                <span
-                  className="text-xs font-bold"
+            {/* Logo — crossfade between black (on white nav) and white (on dark hero) */}
+            <Link to="/" className="flex items-center gap-2" aria-label="Meridian 首页">
+              <span className="relative inline-block w-7 h-7">
+                <img
+                  src={logoBlack}
+                  alt=""
+                  aria-hidden="true"
+                  draggable={false}
+                  className="absolute inset-0 w-full h-full object-contain"
                   style={{
-                    color: navOpaque ? "#fff" : "#000",
-                    transition: "color 0.3s ease",
+                    opacity: navOpaque ? 1 : 0,
+                    transition: "opacity 0.3s ease",
                   }}
-                >
-                  M
-                </span>
-              </div>
+                />
+                <img
+                  src={logoWhite}
+                  alt="Meridian"
+                  draggable={false}
+                  className="absolute inset-0 w-full h-full object-contain"
+                  style={{
+                    opacity: navOpaque ? 0 : 1,
+                    transition: "opacity 0.3s ease",
+                  }}
+                />
+              </span>
               <span
                 className="text-base font-semibold tracking-tight"
                 style={{
@@ -151,7 +159,7 @@ export default function Navbar() {
               >
                 Meridian
               </span>
-            </div>
+            </Link>
           </div>
 
           <div

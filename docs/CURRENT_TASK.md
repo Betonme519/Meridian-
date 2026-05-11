@@ -18,7 +18,7 @@
 
 ---
 
-## 当前任务（Last updated: 2026-05-10）
+## 当前任务（Last updated: 2026-05-11）
 
 > 新任务覆盖此区，旧的挪到「完成归档」。
 
@@ -26,18 +26,13 @@
 
 > 一句话，要具体到能验证。
 
-排队 1 / 3 / 3a 完成 + profiles 表已在前端接通（Upload / AIAdvisor / Dashboard / UserMenu 全部用上 profile 字段）。排队 2 暂缓。下一步进排队 4 的剩余功能页（按 rag_source / course / plan / rule / chat_message 各表分别接）。
+排队 1 / 3 / 3a / 4a 完成 + profiles + rag_source 已在前端接通（`/import` 真上传到 Supabase Storage + 写表 + 列表读 DB + 删除）。排队 2 暂缓。下一步进排队 4b（`/course-planner` 接 `plan` 表）或 4c（`/schedule` 接 `rule` + `rule_conflict`）。
+
+> ⚠️ **用户操作必需**：4a 已写完前端但 Supabase Dashboard 上**还需要手动建 Storage bucket**才能跑通——见下方「rag_source 接入 · 未解决问题」第一条。
 
 ### 需要做（排队，按优先级）
 
 > 一次开一条。开始前用户先指定要做哪条。
-
-- [ ] **🟡 中 · 排队 4a** — `/import` 接 `rag_source` + Supabase Storage（约半天）
-  - 文件上传走 `supabase.storage.from("rag_sources").upload(...)`，路径 `<auth_uid>/<rag_source_id>.<ext>`
-  - 同步写一行 `rag_source` 表（kind / mime / size_bytes / storage_path / parsed_status='pending'）
-  - 已导入列表（`dataRecords` 写死 const）改成 `SELECT * FROM rag_source WHERE user_id = auth.uid()`
-  - 依赖：profiles 接入已完成（本轮）；schema 已落地
-  - 完成标准：登录用户上传文件 → 列表显示 → 刷新页仍在
 
 - [ ] **🟡 中 · 排队 4b** — `/course-planner` 接 `plan` 表（约半天）
   - 把 ReactFlow 当前的写死 nodes/edges 改成读 `plan` 表，自动保存
@@ -69,6 +64,24 @@
 - **logout 期间 pending updateProfile race（审计追加）**：登出时 useEffect 清空 profile，但已发出的 updateProfile 仍可能 catch → `setProfile(prev)` 把旧 profile 写回去，造成 UI 短暂复原。修法：updateProfile 入口读 requestIdRef，logout 时 ++ref 让所有 pending 失效。严重度低（边角 race）。
 - **TS 类型手动维护 vs Supabase 自动生成（审计追加）**：所有 `as Profile` cast 绕开运行时校验，schema drift 时编译过运行时挂。下一轮跑一次 `supabase gen types typescript --project-id <id> > src/types/database.ts`，profileApi 切到 typed client。本轮不动。
 - **grade 无效输入无 UI 反馈（审计追加）**：用户敲 "abc" → onBlur Number(NaN) 校验失败，本地 state 保留 "abc"，profile 同步前看起来"已保存"。修法：onBlur 时把无效值 reset 回 `String(profile?.grade ?? "")` 并显示 helper text，或加 zod 校验。本轮不修。
+
+### rag_source 接入 · 未解决问题（本轮记录）
+
+> 不阻塞当前实现，但下一轮要意识到。
+
+- **⚠️ Storage bucket 需手动建（用户操作）**：schema § 10 默认注释，本轮也未跑那段 SQL。用户必须在 Supabase Dashboard → Storage → New bucket，名 `rag_sources`、Private；再加 4 条 RLS（SELECT/INSERT/UPDATE/DELETE），USING / WITH CHECK 同填 `bucket_id = 'rag_sources' AND auth.uid()::text = (storage.foldername(name))[1]`。不建直接试上传会拿 403（"new row violates row-level security policy"）。完整 SQL 在 `supabase/migrations/0001_init_schema.sql` § 10。
+- **解析状态永远卡在 pending**：`parsed_status='pending'` 是 insert 默认，没有 worker / AI provider 把它推进到 parsed/failed。要等排队 2（AI provider 抽象）后再写解析任务调度。
+- **error 暴露比 profile 进了一步但仍无全局 toast**：`/import` 文件导入区上方已有 inline rose banner 暴露 `sourcesError`；profile 那边仍是 `console.warn`。两边不一致是因为 upload 是用户主动操作，无反馈很慌。下一轮挂 `<Toaster />` 统一。
+- **重复文件无去重 / 无文件 hash**：同名同内容传两次会建两行两份 storage 对象。要去重需要 hash 字段（如 `sha256`）+ 上传前预校验。本轮不做。
+- **客户端无文件大小预检查**：Supabase Storage 免费版单文件 50MB，超限服务端才报错。下一轮加 `if (file.size > MAX) return setError(...)` 预拦截。
+- **upload 并发无 race 防护**：listRagSources 有 requestIdRef 防 race；upload 没做，连点多文件时 setSources 顺序按 await 返回顺序（与 created_at desc 略有偏差，刷新即正）。严重度低。
+- **deleteRagSource 部分成功不可恢复**：Storage 删成功 + 表删失败 → 列表还在但文件丢了；反向情况则是孤儿 storage 对象（已记入 `console.warn`）。下一轮加重试机制或后台 GC。
+- **`displayName` API 已开但 UI 未暴露**：`uploadRagSource` 入参支持 `displayName`，但 `/import` 没让用户改名（直接用 `file.name`）。要做改名 UI 时直接连接。
+- **`<input accept>` 只是浏览器过滤建议**：可绕过；后端无 mime 白名单校验。本轮不做白名单（schema kind 是用户选的，不卡 mime）。
+- **bucket 名硬编码 `BUCKET = "rag_sources"`**：多环境（dev/prod）分名时改成 env 变量。本轮单环境无影响。
+- **TS 类型仍手维护 `as RagSource`**：与 profile 同问题，等下次 `supabase gen types typescript` 生成 `src/types/database.ts` 后切 typed client。
+- **多 tab 同步无 realtime**：A tab 删了文件，B tab 看到还在直到刷新。如要同步：`supabase.channel('rag_source').on('postgres_changes', ...)`。本轮不做。
+- **"重新导入" 按钮被替换为 "删除"**：原 UI 是 `<RefreshCw />重新导入`，4a 改成 `<Trash2 />删除`，因为重新解析要等 AI provider 抽象。下一轮排队 2 完成后可恢复 "重新解析" 按钮（不动 storage 对象、只重置 parsed_status='pending'）。
 
 - [ ] **🔴 高 · 排队 2（暂缓）** — AI provider 抽象 + streaming 协议骨架（约 1–2 小时）
   - 用户系统验证完整通过后再做（先确认登录 / 注册 / 路由门禁 / 数据写入都稳了，再叠 AI 抽象层）
@@ -113,6 +126,14 @@
 ## 完成归档
 
 > 保留最近 5–10 条；权威记录在 `git log`，这里只留人话摘要。
+
+- **2026-05-11** — `/import` 接通 Supabase Storage + `rag_source` 表（排队 4a 完成）：
+  - **新建 2 文件**：`src/api/ragSourceApi.ts`（listRagSources / uploadRagSource / deleteRagSource + RagSourceKind / ParsedStatus / RagSource 类型 + BUCKET 常量；upload 预生成 uuid → 传 Storage `<uid>/<id>.<ext>` → 写表，行写失败兜底清 Storage；delete 先 Storage 后 表行）；`src/hooks/useRagSources.ts`（本地 hook，未做 Provider；登入 → load，登出 → 清；upload 乐观插表头；remove 乐观删失败 revert；race 防护用 requestIdRef）。
+  - **改 `src/pages/Upload/index.tsx`**：3 个 ImportSlot 加 `kind: RagSourceKind` + `accept` 属性；每 slot 渲染隐藏 `<input type=file multiple>`，点击卡片 / 拖入 / 选文件统一走 `handleFiles(slotIdx, FileList)` → 串行 `await upload(file, kind)`（避免 Storage rate limit）。已导入列表 `dataRecords` 写死数组改成 `useRagSources().sources`，按 `created_at` desc；状态 pill 映射 `parsed_status` → 中文标签 + low-saturation 配色；"重新导入" 按钮换成 "删除"（重新解析待排队 2 完成）；空态显示"还没有导入任何文件 —— 点击上方任一卡片开始"；顶部加 `uploading > 0` 计数 spinner + `sourcesError` inline rose banner。
+  - **不动**：`AuthContext` / `authApi.ts` / `supabase.ts` / `__root.tsx`（未挂 Provider，hook 本地态）/ `Navbar.tsx` / `profileApi.ts` / `ProfileContext.tsx`（CLAUDE.md "公共 API 已稳定"）；Upload 页 connector / mini apps / personal settings 三段未触碰（"不要 refactor unrelated"）。
+  - **⚠️ 用户操作必需**：Supabase Dashboard 建 `rag_sources` bucket（Private）+ 4 条 path-based RLS，否则上传会 403。已记入「rag_source 接入 · 未解决问题」第一条。
+  - **`tsc --noEmit` 干净**（仅遗留 CardSwap.tsx 旧错，与本任务无关）。
+  - **未解决问题已记入 § 当前任务 → rag_source 接入 · 未解决问题**（12 项，含 bucket 手动建、解析永远 pending、无 toast、无去重、无文件大小预检、删除部分成功无 GC 等）。
 
 - **2026-05-10** — profiles 表前端接通（第一阶段业务接入，紧接 SQL migration）：
   - **新建 3 文件**：`src/api/profileApi.ts`（getProfile / upsertProfile / updateProfile + GoalMode 枚举 + Profile / ProfilePatch 类型）；`src/context/ProfileContext.tsx`（Provider 跟 useAuth 同步，404 兜底 upsert，乐观更新 + race 防护用 requestId 计数器）；`src/hooks/useProfile.ts`（re-export）。

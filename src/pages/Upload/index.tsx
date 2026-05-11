@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Cloud,
   Database,
@@ -8,14 +8,17 @@ import {
   FileText,
   Image as ImageIcon,
   Link2,
-  RefreshCw,
+  Loader2,
   Settings2,
   ShieldCheck,
   Smartphone,
+  Trash2,
   Upload as UploadIcon,
   type LucideIcon,
 } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
+import { useRagSources } from "@/hooks/useRagSources";
+import type { ParsedStatus, RagSourceKind } from "@/api/ragSourceApi";
 
 /* ───────────────────────── Section 2 · File import slots ───────────────────────── */
 
@@ -23,6 +26,10 @@ type ImportSlot = {
   title: string;
   desc: string;
   formats: string;
+  /** 写入 rag_source.kind 的枚举值 */
+  kind: RagSourceKind;
+  /** <input accept>；保持宽松，浏览器只是默认过滤，最终 mime 走表字段记录 */
+  accept: string;
   icon: LucideIcon;
 };
 
@@ -31,18 +38,24 @@ const fileSlots: ImportSlot[] = [
     title: "培养方案 / 学生手册",
     desc: "AI 自动解析章节、学分结构、替代规则",
     formats: "PDF · Word · Markdown",
+    kind: "培养方案",
+    accept: ".pdf,.doc,.docx,.md,application/pdf",
     icon: FileText,
   },
   {
     title: "成绩单",
     desc: "教务系统导出，或截图 OCR",
     formats: "PDF · Excel · 图片",
+    kind: "成绩单",
+    accept: ".pdf,.xls,.xlsx,.csv,image/*,application/pdf",
     icon: FileSpreadsheet,
   },
   {
     title: "课表 / 截图",
     desc: "本学期课程 + 时间冲突自动检测",
     formats: "图片 · iCal · CSV",
+    kind: "课表",
+    accept: "image/*,.ics,.csv",
     icon: ImageIcon,
   },
 ];
@@ -77,35 +90,52 @@ const miniApps: MiniApp[] = [
 
 /* ───────────────────────── Section 6 · Imported data list ───────────────────────── */
 
-type DataRecord = {
-  name: string;
-  type: string;
-  date: string;
-  status: "解析完成" | "待解析" | "失败";
+/**
+ * 解析状态 → 中文标签 + 配色。配色保持 low saturation，沿用既有色板。
+ * 解析中暂时与待解析同色（视觉上都属于"未完成"），节省色彩负担。
+ */
+const STATUS_LABEL: Record<ParsedStatus, string> = {
+  pending: "待解析",
+  parsing: "解析中",
+  parsed: "解析完成",
+  failed: "失败",
 };
 
-const dataRecords: DataRecord[] = [
-  { name: "培养方案 v2024.pdf",      type: "培养方案", date: "2026-04-22", status: "解析完成" },
-  { name: "transcript_2025fall.pdf",  type: "成绩单",   date: "2026-04-29", status: "解析完成" },
-  { name: "课表-2026-spring.png",     type: "课表",     date: "2026-04-30", status: "待解析" },
-];
-
-const statusCls: Record<DataRecord["status"], string> = {
-  解析完成: "bg-emerald-50 text-emerald-700",
-  待解析:   "bg-amber-50 text-amber-800",
-  失败:     "bg-rose-50 text-rose-700",
+const STATUS_CLS: Record<ParsedStatus, string> = {
+  pending: "bg-amber-50 text-amber-800",
+  parsing: "bg-amber-50 text-amber-800",
+  parsed: "bg-emerald-50 text-emerald-700",
+  failed: "bg-rose-50 text-rose-700",
 };
+
+/** ISO timestamptz → YYYY-MM-DD，避开 locale 差异 */
+function formatDate(iso: string): string {
+  if (!iso) return "—";
+  // ISO 头 10 位就是日期；schema 写入用 timestamptz，全段以 'YYYY-MM-DD...' 开头
+  return iso.slice(0, 10);
+}
 
 /* ───────────────────────── Page ───────────────────────── */
 
 export default function UploadPage() {
   const { profile, updateProfile } = useProfile();
+  const {
+    sources,
+    loading: sourcesLoading,
+    error: sourcesError,
+    uploading,
+    upload,
+    remove,
+  } = useRagSources();
 
   // 本地草稿态——profile 加载后由 useEffect 覆盖默认值；guest 态下保持默认
   const [school, setSchool] = useState(schoolOptions[0]);
   const [grade, setGrade] = useState("");
   const [major, setMajor] = useState("");
   const [dragHover, setDragHover] = useState<number | null>(null);
+
+  // 每个 slot 一个隐藏 <input type=file>，点击卡片或拖入文件统一走 handleFiles
+  const fileInputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
   // profile 加载/变化时同步到本地草稿（包括首次加载和多 tab 同步场景）
   useEffect(() => {
@@ -148,6 +178,29 @@ export default function UploadPage() {
 
   const connected = school !== schoolOptions[0];
 
+  /**
+   * 拖入或选中文件 → 顺序上传。允许多文件，每个独立调用 API。
+   * upload 内部已有 race / error 处理；这里只负责拆 FileList。
+   */
+  const handleFiles = async (slotIdx: number, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const kind = fileSlots[slotIdx].kind;
+    // 顺序处理：浏览器并行上传多文件容易撞 Storage rate limit，串行更稳
+    for (const file of Array.from(files)) {
+      await upload(file, kind);
+    }
+  };
+
+  const handleRemove = async (id: string) => {
+    const target = sources.find((s) => s.id === id);
+    if (!target) return;
+    try {
+      await remove(target);
+    } catch (e) {
+      console.warn("[Upload] 删除失败:", e);
+    }
+  };
+
   return (
     <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
       {/* Hero */}
@@ -157,8 +210,21 @@ export default function UploadPage() {
         <div className="flex items-center gap-2">
           <UploadIcon className="h-5 w-5 text-slate-500" />
           <h2 className="font-semibold tracking-tight">文件导入</h2>
+          {uploading > 0 && (
+            <span className="ml-3 inline-flex items-center gap-1 text-xs text-slate-500">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              上传中 {uploading}
+            </span>
+          )}
           <span className="ml-auto text-xs text-slate-400">PDF · Excel · 图片</span>
         </div>
+
+        {sourcesError && (
+          <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+            {sourcesError}
+          </p>
+        )}
+
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           {fileSlots.map((s, i) => {
             const Icon = s.icon;
@@ -167,6 +233,7 @@ export default function UploadPage() {
               <button
                 key={s.title}
                 type="button"
+                onClick={() => fileInputsRef.current[i]?.click()}
                 onDragOver={(e) => {
                   e.preventDefault();
                   setDragHover(i);
@@ -175,6 +242,7 @@ export default function UploadPage() {
                 onDrop={(e) => {
                   e.preventDefault();
                   setDragHover(null);
+                  void handleFiles(i, e.dataTransfer.files);
                 }}
                 className={`animate-fade-in-up-soft flex flex-col items-start rounded-2xl border-2 border-dashed p-5 text-left transition-colors ${
                   isHover
@@ -192,6 +260,22 @@ export default function UploadPage() {
                 <span className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-slate-700">
                   拖拽文件到此 / 点击上传
                 </span>
+                {/* 隐藏 input：onClick 触发 click()，onChange 走同一个 handleFiles */}
+                <input
+                  ref={(el) => {
+                    fileInputsRef.current[i] = el;
+                  }}
+                  type="file"
+                  multiple
+                  accept={s.accept}
+                  className="hidden"
+                  onChange={(e) => {
+                    void handleFiles(i, e.target.files);
+                    // 重置 value：下次再选同一个文件名也能触发 onChange
+                    e.target.value = "";
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                />
               </button>
             );
           })}
@@ -341,7 +425,7 @@ export default function UploadPage() {
           <Database className="h-5 w-5 text-slate-500" />
           <h2 className="font-semibold tracking-tight">已导入的数据</h2>
           <span className="ml-auto text-xs text-slate-400 tabular-nums">
-            {dataRecords.length} 条记录
+            {sourcesLoading ? "加载中…" : `${sources.length} 条记录`}
           </span>
         </div>
         <div
@@ -355,30 +439,40 @@ export default function UploadPage() {
             <span>状态</span>
             <span />
           </div>
-          {dataRecords.map((r) => (
+
+          {sources.length === 0 && !sourcesLoading && (
+            <p className="px-5 py-10 text-center text-sm text-slate-500">
+              还没有导入任何文件 —— 点击上方任一卡片开始
+            </p>
+          )}
+
+          {sources.map((r) => (
             <article
-              key={r.name}
+              key={r.id}
               className="grid gap-2 border-b border-slate-100 px-5 py-4 transition-colors last:border-b-0 hover:bg-slate-50/60 md:grid-cols-[1.4fr_120px_140px_120px_120px] md:items-center md:gap-4"
             >
               <div>
                 <p className="text-sm font-medium text-slate-900">{r.name}</p>
                 <p className="text-[11px] text-slate-400 md:hidden">
-                  {r.type} · {r.date}
+                  {r.kind} · {formatDate(r.created_at)}
                 </p>
               </div>
-              <span className="text-xs text-slate-700 max-md:hidden">{r.type}</span>
-              <span className="text-xs tabular-nums text-slate-500 max-md:hidden">{r.date}</span>
+              <span className="text-xs text-slate-700 max-md:hidden">{r.kind}</span>
+              <span className="text-xs tabular-nums text-slate-500 max-md:hidden">
+                {formatDate(r.created_at)}
+              </span>
               <span
-                className={`inline-flex h-5 w-fit items-center rounded-full px-2 text-[11px] font-semibold ${statusCls[r.status]}`}
+                className={`inline-flex h-5 w-fit items-center rounded-full px-2 text-[11px] font-semibold ${STATUS_CLS[r.parsed_status]}`}
               >
-                {r.status}
+                {STATUS_LABEL[r.parsed_status]}
               </span>
               <button
                 type="button"
-                className="inline-flex h-8 w-fit items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-medium text-slate-700 transition-colors hover:border-slate-400 hover:text-slate-950"
+                onClick={() => void handleRemove(r.id)}
+                className="inline-flex h-8 w-fit items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-medium text-slate-700 transition-colors hover:border-rose-300 hover:text-rose-700"
               >
-                <RefreshCw className="h-3 w-3" />
-                重新导入
+                <Trash2 className="h-3 w-3" />
+                删除
               </button>
             </article>
           ))}

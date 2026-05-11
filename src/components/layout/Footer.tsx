@@ -1,3 +1,5 @@
+import logoWhite from "@/assets/logos/logo白.png";
+
 /**
  * Site footer — two-column layout: brand + tagline + lede on the left,
  * audience on the right. Bottom rail keeps the copyright on its own line.
@@ -12,9 +14,12 @@ export default function Footer() {
           {/* LEFT — brand + tagline + lede */}
           <div>
             <div className="flex items-center gap-2 mb-5">
-              <div className="w-7 h-7 rounded-md bg-white flex items-center justify-center">
-                <span className="text-black text-xs font-bold">M</span>
-              </div>
+              <img
+                src={logoWhite}
+                alt="Meridian"
+                draggable={false}
+                className="w-7 h-7 object-contain"
+              />
               <span className="text-base font-semibold text-white">
                 Meridian
               </span>

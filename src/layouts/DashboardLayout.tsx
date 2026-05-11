@@ -3,6 +3,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { MENU_ITEMS } from "@/config/menu";
 import { useAuth } from "@/hooks/useAuth";
 import { UserMenu } from "@/components/layout/UserMenu";
+import logoBlack from "@/assets/logos/logo黑.png";
 import {
   HoverCard,
   HoverCardContent,
@@ -58,9 +59,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <Link
           to="/"
           aria-label="Meridian 首页"
-          className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950 text-sm font-semibold text-white"
+          className="flex h-10 w-10 items-center justify-center rounded-lg"
         >
-          M
+          <img
+            src={logoBlack}
+            alt="Meridian"
+            draggable={false}
+            className="h-7 w-7 object-contain"
+          />
         </Link>
         <nav className="mt-6 flex flex-col gap-1.5">
           {MENU_ITEMS.map((item) => {
@@ -187,8 +193,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
             {/* Mobile-only logo (icon rail is hidden on small screens) */}
             <Link to="/" className="flex items-center gap-2 lg:hidden">
-              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-950 text-xs font-bold text-white">
-                M
+              <span className="flex h-8 w-8 items-center justify-center">
+                <img
+                  src={logoBlack}
+                  alt="Meridian"
+                  draggable={false}
+                  className="h-7 w-7 object-contain"
+                />
               </span>
               <span className="text-sm font-semibold tracking-tight text-slate-900">
                 Meridian

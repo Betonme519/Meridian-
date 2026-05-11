@@ -1,10 +1,14 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { Play } from "lucide-react";
 import SplitText from "@/components/effects/SplitText";
 import CardSwap, { Card } from "@/components/effects/CardSwap";
+import video1 from "@/assets/video/Meridian-01-AI-Understanding.mp4";
+import video2 from "@/assets/video/Meridian-02-Dynamic-Simulation.mp4";
+import video3 from "@/assets/video/Meridian-03-Real-Execution.mp4";
+
+const VIDEOS = [video1, video2, video3];
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -30,6 +34,26 @@ export default function GpaMath() {
   const subRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLDivElement>(null);
   const bulletsRef = useRef<(HTMLLIElement | null)[]>([]);
+
+  // Front-of-stack index (driven by CardSwap's onFrontChange callback) and
+  // currently hovered card (null = no hover). Active card = hovered if any,
+  // otherwise the topmost. Only the active card plays; the rest are paused.
+  const [frontIdx, setFrontIdx] = useState(0);
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const [inView, setInView] = useState(true);
+  const activeIdx = inView ? (hoveredIdx ?? frontIdx) : -1;
+
+  // Pause all videos when the stack scrolls out of view to save resources.
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      ([entry]) => setInView(entry?.isIntersecting ?? false),
+      { threshold: 0 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   useGSAP(
     () => {
@@ -168,16 +192,28 @@ export default function GpaMath() {
               verticalDistance={96}
               delay={3000}
               easing="linear"
+              pauseOnHover
+              onFrontChange={setFrontIdx}
             >
-              <Card>
-                <VideoSlot label="视频 1" />
-              </Card>
-              <Card>
-                <VideoSlot label="视频 2" />
-              </Card>
-              <Card>
-                <VideoSlot label="视频 3" />
-              </Card>
+              {VIDEOS.map((src, i) => (
+                <Card
+                  key={src}
+                  onMouseEnter={() => setHoveredIdx(i)}
+                  onMouseLeave={() => setHoveredIdx(null)}
+                  style={{
+                    background:
+                      "linear-gradient(135deg, rgba(245,247,250,0.78) 0%, rgba(228,233,242,0.55) 100%)",
+                    backdropFilter: "blur(24px) saturate(180%)",
+                    WebkitBackdropFilter: "blur(24px) saturate(180%)",
+                    border: "1px solid rgba(255,255,255,0.7)",
+                    borderRadius: "24px",
+                    boxShadow:
+                      "0 30px 80px -24px rgba(15,23,42,0.22), 0 12px 30px -16px rgba(15,23,42,0.1), inset 0 1px 0 rgba(255,255,255,0.9)",
+                  }}
+                >
+                  <VideoSlot src={src} isActive={activeIdx === i} />
+                </Card>
+              ))}
             </CardSwap>
           </div>
         </div>
@@ -187,24 +223,34 @@ export default function GpaMath() {
 }
 
 /**
- * Per-card placeholder. Replace the inner div with a real <video> or
- * <iframe> when ready. Each Card already gets width/height via
- * CardSwap's cloneElement, so children should fill 100% h/w.
+ * Per-card video. Plays only while `isActive` is true; otherwise paused at
+ * its current frame. Each Card gets width/height via CardSwap's
+ * cloneElement, so the <video> just fills 100% h/w.
  */
-function VideoSlot({ label }: { label: string }) {
+function VideoSlot({ src, isActive }: { src: string; isActive: boolean }) {
+  const ref = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    if (isActive) {
+      v.play().catch(() => {});
+    } else {
+      v.pause();
+    }
+  }, [isActive]);
+
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/70">
-      {/*
-        Replace this whole block with the actual video, e.g.
-          <video src="/demo-1.mp4" autoPlay loop muted playsInline
-                 className="absolute inset-0 h-full w-full object-cover" />
-      */}
-      <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/25">
-        <Play className="h-4 w-4 ml-0.5" fill="currentColor" strokeWidth={1.6} />
-      </div>
-      <p className="text-[11px] font-medium tracking-[0.25em] uppercase text-white/45">
-        {label}
-      </p>
+    <div className="absolute inset-5 overflow-hidden rounded-2xl">
+      <video
+        ref={ref}
+        src={src}
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        className="h-full w-full object-contain"
+      />
     </div>
   );
 }
