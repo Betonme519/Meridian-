@@ -3,7 +3,7 @@
 > 新 AI 5 分钟读完即可上手。每个里程碑 5–15 行摘要，不是开发日志。
 > 短期 sprint 看 `CURRENT_TASK.md`；技术债 backlog 看 `TECH_DEBT.md`。
 
-> Last snapshot: **2026-05-11**  ·  Branch: `main`
+> Last snapshot: **2026-05-14**  ·  Branch: `main`
 
 ---
 
@@ -23,9 +23,9 @@
 | 维度 | 状态 |
 |---|---|
 | 阶段 | 前端 demo 完成（落地页 + 5 功能页），业务接入期 |
-| 已接通业务表 | `profiles` ✅ · `rag_source` ✅ |
-| 待接通业务表 | `plan` · `rule` · `rule_conflict` · `chat_message` |
-| 下一里程碑 | 排队 4b（`/course-planner` 接 `plan`）/ 4c（`/schedule` 接 `rule`）/ 2（AI provider 抽象） |
+| 已接通业务表 | `profiles` ✅ · `rag_source` ✅ · `plan` ✅ |
+| 待接通业务表 | `rule` · `rule_conflict` · `chat_message` |
+| 下一里程碑 | 排队 4c（`/schedule` 接 `rule`）/ 2（AI provider 抽象） |
 | 主要风险 | bun.lockb 与 node_modules 可能不同步；中国高校本地化文案未做；解析 pipeline 未建 |
 
 ---
@@ -106,6 +106,9 @@ Supabase auth 接入 + 注册 / 登录 / 登出 / 多 tab 同步；`_app.tsx` be
 ### `rag_source` 接入 — `100%`
 `/import` 真上传到 Supabase Storage + 写 `rag_source` 表 + 列表读 DB + 删除。文件路径 `<auth_uid>/<rag_source_id>.<ext>`。upload 兜底清孤儿 storage。当前 `parsed_status` 永远 pending（解析流程依赖 AI provider，TD-2）。
 
+### `plan` 接入 — `100%`
+`/course-planner` 接通 `plan` 表（整图 JSONB，决策 D6a）。URL `?id=<uuid>` 是 source of truth；800ms debounce 自动保存；空账号 / 删光时自动建「我的第一张规划」（SEED 12 节点 + 13 边）；多 plan 切换 / 新建 / inline 重命名 / 删除（最后一张禁删）；lane 骨架渲染时拼接，不入 DB；访客模式喂 SEED 只读预览。`saveGraph` 用 `activePlanIdRef` 给 patch 盖戳，回调稳定化防"切 plan 瞬间用旧数据写新 id"。
+
 ### 文档体系 — `100%`
 `CURRENT_TASK.md`（sprint）· `AI_MEMORY.md`（本文，长期）· `TECH_DEBT.md`（backlog）· `PROJECT_OVERVIEW.md` · `ARCHITECTURE.md` · `DESIGN_SYSTEM.md` · `DATA_MODEL.md` · `ARCHITECTURE_AUDIT.md`（一次性深度审计）。
 
@@ -144,6 +147,10 @@ HTML5 规范禁止 button 内含 interactive content。React 不报错但 a11y /
 父级 re-render 时组件函数引用变 → React 卸载重挂 → CSS transition 没机会跑。
 **修法**：组件定义在模块顶层，或改成函数调用返回 JSX（不当组件用）。
 
+### Debounce save 用 selectedId 给 patch 盖戳 → 切 plan 瞬间错存
+`saveGraph` 回调依赖 `selectedId` 的话，切 plan 时 selectedId 先 set 到 NEW，current（实际数据）还是 OLD。save-watcher effect 因为 saveGraph 引用变了被触发重跑，用 OLD nodes/edges + NEW id 调 saveGraph → 800ms 后 UPDATE NEW SET=OLD-content。新 plan 被旧数据覆盖。
+**修法**：用 `activePlanIdRef`（镜像 `current?.id`）给 patch 盖戳，saveGraph 依赖只剩 flushSave（稳定）。save-watcher 不会因切 plan 被误触发。`remove` 删 plan 时若 pendingPlanIdRef 指向被删行，要主动清 timer + refs（不然 DELETE 后 timer 还会 UPDATE 死行）。
+
 ### 子页面菜单单一真理
 原 Navbar 和 DashboardLayout 各写一份菜单，改一处忘另一处 = UI 不一致。已抽到 `src/config/menu.ts`，加菜单项只动这一处。
 
@@ -156,7 +163,6 @@ HTML5 规范禁止 button 内含 interactive content。React 不报错但 a11y /
 ## 8. 下一阶段方向
 
 ### 短期（当前 sprint）
-- **排队 4b** — `/course-planner` 接 `plan` 表（ReactFlow nodes/edges → JSONB 自动保存）
 - **排队 4c** — `/schedule` 接 `rule` + `rule_conflict`
 - **排队 2** — AI provider 抽象 + streaming 协议骨架（mock provider 跑通 `/ai-advisor` 流式渲染）
 
@@ -178,6 +184,14 @@ HTML5 规范禁止 button 内含 interactive content。React 不报错但 a11y /
 ---
 
 ## 9. 项目时间线（按 commit 倒序，5-15 行/里程碑）
+
+### 2026-05-14 · `/course-planner` 接通 `plan` 表（排队 4b）
+- 新建 `planApi.ts`（list / get / create / updateGraph / rename / delete，整图 JSONB）+ `usePlans.ts`（list + current + 800ms debounce save + 空态自动建 + remove 删当前自动切下一张 / 删空再补一张）+ `seedGraph.ts`（types + lane 骨架 + SEED_MERIDIAN_NODES 12 节点 + SEED_EDGES 13 边抽出）
+- 改 Planner 页：删 initial state，加 header bar（plan 名 inline 编辑 + 切换下拉 + 新建 + 删除[下拉每项 hover 出垃圾桶 + window.confirm，最后一张禁删] + 保存状态 + 画布锁挪过来）；URL `?id=<uuid>` 同步，刷新 / 直链 / 切换 / 新建 / 删除都可恢复；lane 骨架渲染时拼接不入 DB；viewport 只在 interactive=true 时持久化（锁定态 fitView 不写）；onMoveEnd 触发 debounce 保存
+- 访客模式：`!authLoading && !user` 喂 SEED 只读预览，编辑不入 DB，header 显示「访客预览 · 登录后保存」+「示例规划」+ 禁用切换 / 新建 / 重命名（loadedPlanIdRef = "__GUEST__" sentinel）
+- `course-planner` route 加 `validateSearch` 暴露 `?id=`（空串归 undefined）；Dashboard / Schedule 的 Link 同步加 `search={{ id: undefined }}`
+- 审计修 3 条：B1 saveGraph 改用 `activePlanIdRef`（镜像 `current?.id`）给 patch 盖戳，回调稳定化，防"切 plan 瞬间用 stale 数据写新 id"；B2 `remove` 删 plan 时若 pendingPlanIdRef 指向被删行，主动清 timer + refs；B3 validateSearch 空串归 undefined（之前 `typeof === "string"` 会让 `?id=` 通过）
+- 不动：MeridianNode / LaneHeader / NodeDrawer 视觉组件、kindMeta 配色、5 功能页 routes 目录其它部分、AuthContext / supabase 接入面。tsc 干净（仅 CardSwap 历史遗留错）；vite build 通过
 
 ### 2026-05-11 · `/import` 接通 Storage + `rag_source` 表（排队 4a）
 - 新建 `ragSourceApi.ts`（list / upload / delete + RagSourceKind / ParsedStatus 类型 + 兜底清孤儿 storage）+ `useRagSources.ts`（本地 hook，登入即拉，乐观更新，race 防护）

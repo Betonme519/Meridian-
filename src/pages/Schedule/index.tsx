@@ -321,6 +321,7 @@ export default function SchedulePage() {
 
         <Link
           to="/course-planner"
+          search={{ id: undefined }}
           className="mt-6 inline-flex items-center gap-1 text-xs font-medium text-slate-700 transition-colors hover:text-slate-950"
         >
           回到 Workspace 看影响传播

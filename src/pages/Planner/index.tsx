@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import {
   Background,
   BackgroundVariant,
   Controls,
   Handle,
-  MarkerType,
   MiniMap,
   Position,
   ReactFlow,
@@ -14,9 +13,9 @@ import {
   useNodesState,
   useReactFlow,
   type Edge,
-  type Node,
   type NodeMouseHandler,
   type NodeProps,
+  type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
@@ -26,50 +25,36 @@ import {
   BookOpen,
   BookOpenCheck,
   Briefcase,
+  Check,
+  ChevronDown,
   Gauge,
   HeartHandshake,
   ListChecks,
   Medal,
   MousePointerClick,
+  Pencil,
   Plane,
+  Plus,
   Target as TargetIcon,
+  Trash2,
   TrendingUp,
   X,
   type LucideIcon,
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { usePlans } from "@/hooks/usePlans";
+import {
+  laneNodes,
+  SEED_EDGES,
+  SEED_MERIDIAN_NODES,
+  type FlowNode,
+  type LaneFlowNode,
+  type MeridianFlowNode,
+  type NodeData,
+  type NodeKind,
+} from "./seedGraph";
 
-/* ───────────────────────── Node taxonomy ───────────────────────── */
-
-type NodeKind =
-  | "course"
-  | "requirement"
-  | "gpa"
-  | "risk"
-  | "goal"
-  | "workload"
-  | "abroad"
-  | "internship"
-  | "second-class"
-  | "volunteer"
-  | "alternative";
-
-type NodeData = {
-  label: string;
-  kind: NodeKind;
-  value?: string;
-  source?: string;
-  trust?: "high" | "med" | "low";
-};
-
-type LaneData = {
-  label: string;     // L0、L1...
-  title: string;     // 中文小标题
-  hint?: string;     // 一句解释
-};
-
-type MeridianFlowNode = Node<NodeData, "meridian">;
-type LaneFlowNode = Node<LaneData, "lane">;
-type FlowNode = MeridianFlowNode | LaneFlowNode;
+/* ───────────────────────── Visual taxonomy（视觉层，本文件独享） ───────────────────────── */
 
 type KindMeta = { label: string; hex: string; icon: LucideIcon };
 
@@ -168,107 +153,7 @@ function LaneHeader({ data }: NodeProps<LaneFlowNode>) {
 
 const nodeTypes = { meridian: MeridianNode, lane: LaneHeader };
 
-/* ───────────────────────── Mock data ───────────────────────── */
-
-/**
- * 5 层分层布局，自顶向下因果传播：
- *   L0 长期目标       — 整张图的源头
- *   L1 关注指标       — 由目标驱动的可量化维度
- *   L2 Requirement   — 必须满足的硬约束
- *   L3 课程选择       — 同一级别的不同动作（4 选 N）
- *   L4 外部资源/替代  — 平行可叠加的资源/替代
- *
- * X 轴对齐到 4 列网格（columns），让同层节点等距排列。
- *   col centers: 250, 500, 750, 1000
- */
-
-const ROW = { L0: 100, L1: 280, L2: 460, L3: 640, L4: 820 };
-const NODE_W = 220;
-const cx = (center: number) => center - NODE_W / 2; // node x = center - half-width
-// 4 列网格中心点（gap 240）
-const COL = { c1: 230, c2: 470, c3: 710, c4: 950 };
-// 3 / 2 / 1 节点居中分布
-const COL3 = { a: 350, b: 590, c: 830 };
-const COL2 = { a: 470, b: 710 };
-const COL1 = 590;
-const LANE_X = -200;
-
-const laneNodes: LaneFlowNode[] = [
-  { id: "lane-0", type: "lane", position: { x: LANE_X, y: ROW.L0 + 10 }, draggable: false, selectable: false, focusable: false, data: { label: "L0", title: "长期目标",    hint: "整张图的起点" } },
-  { id: "lane-1", type: "lane", position: { x: LANE_X, y: ROW.L1 + 10 }, draggable: false, selectable: false, focusable: false, data: { label: "L1", title: "关注指标",    hint: "由目标驱动" } },
-  { id: "lane-2", type: "lane", position: { x: LANE_X, y: ROW.L2 + 10 }, draggable: false, selectable: false, focusable: false, data: { label: "L2", title: "Requirement", hint: "硬约束" } },
-  { id: "lane-3", type: "lane", position: { x: LANE_X, y: ROW.L3 + 10 }, draggable: false, selectable: false, focusable: false, data: { label: "L3", title: "课程选择",    hint: "同级 · 不同选择" } },
-  { id: "lane-4", type: "lane", position: { x: LANE_X, y: ROW.L4 + 10 }, draggable: false, selectable: false, focusable: false, data: { label: "L4", title: "外部资源",    hint: "平行可叠加" } },
-];
-
-const meridianNodes: MeridianFlowNode[] = [
-  // L0 — 单节点居中
-  { id: "goal-1",   type: "meridian", position: { x: cx(COL1),   y: ROW.L0 }, data: { label: "保研路线",        kind: "goal",        value: "权重 60%", source: "用户设定" } },
-
-  // L1 — 3 个并列指标
-  { id: "gpa-1",    type: "meridian", position: { x: cx(COL3.a), y: ROW.L1 }, data: { label: "GPA 3.78",        kind: "gpa",         value: "目标 ≥ 3.8" } },
-  { id: "risk-1",   type: "meridian", position: { x: cx(COL3.b), y: ROW.L1 }, data: { label: "压分风险",        kind: "risk",        value: "中-高",   source: "学生评价 / 课评" } },
-  { id: "wl-1",     type: "meridian", position: { x: cx(COL3.c), y: ROW.L1 }, data: { label: "Workload 上限",   kind: "workload",    value: "≤ 22h/周" } },
-
-  // L2 — 2 个并列硬约束
-  { id: "req-1",    type: "meridian", position: { x: cx(COL2.a), y: ROW.L2 }, data: { label: "专业必修",        kind: "requirement", value: "缺 2 学分", source: "培养方案 v2024 第 6 页" } },
-  { id: "req-2",    type: "meridian", position: { x: cx(COL2.b), y: ROW.L2 }, data: { label: "第二课堂",        kind: "second-class",value: "缺 2 分",   source: "学校教务处" } },
-
-  // L3 — 4 个并列课程选择（满 4 列网格）
-  { id: "hist-118", type: "meridian", position: { x: cx(COL.c1), y: ROW.L3 }, data: { label: "HIST 118 中国近代史", kind: "course",  value: "A- · 3h/周" } },
-  { id: "math-233", type: "meridian", position: { x: cx(COL.c2), y: ROW.L3 }, data: { label: "MATH 233 线代",      kind: "course",  value: "B+ · 6h/周" } },
-  { id: "cs-241",   type: "meridian", position: { x: cx(COL.c3), y: ROW.L3 }, data: { label: "CS 241 系统编程",    kind: "course",  value: "B · 9h/周",  source: "教务系统" } },
-  { id: "mus-102",  type: "meridian", position: { x: cx(COL.c4), y: ROW.L3 }, data: { label: "MUS 102 音乐与社会",  kind: "course",  value: "A · P/F 可" } },
-
-  // L4 — 3 个并列外部资源
-  { id: "abr-1",    type: "meridian", position: { x: cx(COL3.a), y: ROW.L4 }, data: { label: "海外暑研",        kind: "abroad",      value: "可选" } },
-  { id: "intern-1", type: "meridian", position: { x: cx(COL3.b), y: ROW.L4 }, data: { label: "本学期实习",      kind: "internship",  value: "8h/周" } },
-  { id: "alt-1",    type: "meridian", position: { x: cx(COL3.c), y: ROW.L4 }, data: { label: "比赛抵 2 课分",    kind: "alternative", value: "AI 推测",   source: "AI 规则分析", trust: "med" } },
-];
-
-const initialNodes: FlowNode[] = [...laneNodes, ...meridianNodes];
-
-const edgeMarker = (color: string) => ({
-  type: MarkerType.ArrowClosed,
-  color,
-  width: 16,
-  height: 16,
-});
-
-const styledEdge = (color: string, animated = false) => ({
-  type: "smoothstep" as const,
-  animated,
-  style: { stroke: color, strokeWidth: 1.6 },
-  markerEnd: edgeMarker(color),
-  labelStyle: { fontSize: 11, fill: color, fontWeight: 600 },
-  labelBgStyle: { fill: "#ffffff", fillOpacity: 0.95 },
-  labelBgPadding: [6, 3] as [number, number],
-  labelBgBorderRadius: 6,
-});
-
-const NEUTRAL = "#94a3b8";
-const ROSE    = "#e11d48";
-const SKY     = "#0ea5e9";
-const VIOLET  = "#a855f7";
-const EMERALD = "#10b981";
-
-const initialEdges: Edge[] = [
-  { id: "e1",  source: "goal-1",   target: "gpa-1",    label: "驱动",         ...styledEdge(NEUTRAL, true) },
-  { id: "e2",  source: "gpa-1",    target: "cs-241",   label: "影响",         ...styledEdge(NEUTRAL) },
-  { id: "e3",  source: "gpa-1",    target: "math-233", label: "影响",         ...styledEdge(NEUTRAL) },
-  { id: "e4",  source: "gpa-1",    target: "hist-118", label: "影响",         ...styledEdge(NEUTRAL) },
-  { id: "e5",  source: "cs-241",   target: "risk-1",   label: "贡献风险",     ...styledEdge(ROSE) },
-  { id: "e6",  source: "math-233", target: "cs-241",   label: "prerequisite", ...styledEdge(SKY) },
-  { id: "e7",  source: "hist-118", target: "wl-1",     label: "占用",         ...styledEdge(NEUTRAL) },
-  { id: "e8",  source: "cs-241",   target: "wl-1",     label: "占用",         ...styledEdge(NEUTRAL) },
-  { id: "e9",  source: "mus-102",  target: "wl-1",     label: "占用",         ...styledEdge(NEUTRAL) },
-  { id: "e10", source: "alt-1",    target: "req-2",    label: "替代",         ...styledEdge(VIOLET) },
-  { id: "e11", source: "intern-1", target: "wl-1",     label: "冲突",         ...styledEdge(ROSE) },
-  { id: "e12", source: "abr-1",    target: "goal-1",   label: "支持",         ...styledEdge(EMERALD) },
-  { id: "e13", source: "math-233", target: "req-1",    label: "满足",         ...styledEdge(EMERALD) },
-];
-
-/* ───────────────────────── Course Intelligence ───────────────────────── */
+/* ───────────────────────── Course Intelligence (展示用静态) ───────────────────────── */
 
 type CourseRow = {
   code: string;
@@ -299,12 +184,149 @@ export default function PlannerPage() {
 }
 
 function WorkspaceInner() {
-  const [nodes, , onNodesChange] = useNodesState<FlowNode>(initialNodes);
-  const [edges, , onEdgesChange] = useEdgesState<Edge>(initialEdges);
+  // URL 读 `?id=` —— 通过 course-planner route 的 validateSearch 暴露
+  const search = useSearch({ from: "/_app/course-planner" });
+  const navigate = useNavigate();
+  const urlId = search.id;
+
+  // 访客模式（_app.tsx 已放行未登录用户进入）：本页拿 SEED 当只读预览，
+  // 编辑不入 DB；登录后 hook 接管真实 plan 加载。
+  const { user, loading: authLoading } = useAuth();
+  const isGuest = !authLoading && !user;
+
+  const {
+    plans,
+    current,
+    loading: plansLoading,
+    loadingCurrent,
+    saving,
+    error: plansError,
+    selectPlan,
+    createPlan,
+    rename,
+    remove,
+    saveGraph,
+  } = usePlans();
+
+  // ReactFlow 局部状态：用空数组起手，等 plan 加载后 setNodes/setEdges 注入。
+  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // 默认锁定 — 滚轮穿透到页面，避免画布吃掉滚动事件
   const [interactive, setInteractive] = useState(false);
 
+  const { fitView, setViewport, getViewport } = useReactFlow();
+
+  // —— URL ↔ usePlans 同步 ——————————————————————————————————————————————————————
+  // 1) URL 有 id → 走那个 plan（仅登录态）
+  // 2) URL 无 id 但列表已加载 → fallback 最近编辑的 plan + 同步 URL（replace 不留 history）
+  // 访客态：跳过整段，由下方"访客 SEED 加载" effect 接管
+  useEffect(() => {
+    if (isGuest) return;
+    if (plansLoading) return;
+    if (urlId) {
+      selectPlan(urlId);
+      return;
+    }
+    if (plans.length > 0) {
+      const fallback = plans[0];
+      selectPlan(fallback.id);
+      void navigate({
+        to: "/course-planner",
+        search: { id: fallback.id },
+        replace: true,
+      });
+    }
+  }, [isGuest, urlId, plans, plansLoading, selectPlan, navigate]);
+
+  // —— 加载 plan 到画布 ——————————————————————————————————————————————————————
+  // loadedPlanIdRef 记录"当前画布上是谁"。current.id 变化才重灌；同一张的乐观更新
+  // 不触发重灌（saveGraph 已经更新过 current.nodes/edges，不能反过来覆盖本地 React Flow
+  // 的拖拽中间态）。
+  const loadedPlanIdRef = useRef<string | null>(null);
+  // skipNextChangeSaveRef：刚 setNodes/setEdges 注入新 plan 时，紧跟着的
+  // useEffect([nodes, edges]) 不能触发 saveGraph（那是加载产生的同值变化，不是用户编辑）。
+  const skipNextChangeSaveRef = useRef(false);
+
+  useEffect(() => {
+    // 访客模式 → 走另一个 effect 喂 SEED，跳过这里
+    if (isGuest) return;
+    if (!current) {
+      // current=null（loadingCurrent / 切到不存在 id）— 不清画布，避免闪烁
+      return;
+    }
+    if (loadedPlanIdRef.current === current.id) return;
+    loadedPlanIdRef.current = current.id;
+    skipNextChangeSaveRef.current = true;
+
+    setNodes([...laneNodes, ...(current.nodes as MeridianFlowNode[])]);
+    setEdges(current.edges as Edge[]);
+
+    if (current.viewport) {
+      setViewport(current.viewport, { duration: 0 });
+    } else {
+      // 给 fitView 让出一个 frame 等 setNodes 落地
+      requestAnimationFrame(() => fitView({ padding: 0.06, duration: 0 }));
+    }
+    // 切 plan 关闭 drawer
+    setSelectedId(null);
+  }, [isGuest, current, setNodes, setEdges, setViewport, fitView]);
+
+  // —— 访客 SEED 加载（一次性） ——————————————————————————————————————————————
+  // user=null 且 auth 已 ready → 喂 SEED 当只读预览；编辑不入 DB（saveGraph 那 effect 会
+  // 因 loadedPlanIdRef === "__GUEST__" 但 user=null 跳过）。
+  useEffect(() => {
+    if (!isGuest) return;
+    if (loadedPlanIdRef.current === "__GUEST__") return;
+    loadedPlanIdRef.current = "__GUEST__";
+    skipNextChangeSaveRef.current = true;
+    setNodes([...laneNodes, ...SEED_MERIDIAN_NODES]);
+    setEdges(SEED_EDGES);
+    setSelectedId(null);
+    requestAnimationFrame(() => fitView({ padding: 0.06, duration: 0 }));
+  }, [isGuest, setNodes, setEdges, fitView]);
+
+  // —— 用户编辑 → debounce 保存 ——————————————————————————————————————————————
+  // 监听 nodes / edges 变化；过滤掉 lane（render-only），喂给 saveGraph。
+  // 第一次注入时跳过（loadedPlanIdRef 设置那一拍）。
+  // 访客态不存盘。
+  useEffect(() => {
+    if (skipNextChangeSaveRef.current) {
+      skipNextChangeSaveRef.current = false;
+      return;
+    }
+    if (isGuest) return;
+    if (!loadedPlanIdRef.current || loadedPlanIdRef.current === "__GUEST__")
+      return;
+
+    const meridianOnly = nodes.filter(
+      (n): n is MeridianFlowNode => n.type === "meridian",
+    );
+    saveGraph({
+      nodes: meridianOnly,
+      edges,
+      viewport: getViewport(),
+    });
+  }, [isGuest, nodes, edges, saveGraph, getViewport]);
+
+  // —— Viewport 持久化 ——————————————————————————————————————————————————————
+  // 只在用户主动 pan/zoom 时存（interactive=true）；锁定态的 fitView 不写。
+  // 访客态不存盘。
+  const onMoveEnd = useCallback(
+    (_: unknown, viewport: Viewport) => {
+      if (!interactive) return;
+      if (isGuest) return;
+      if (!loadedPlanIdRef.current || loadedPlanIdRef.current === "__GUEST__")
+        return;
+      const meridianOnly = nodes.filter(
+        (n): n is MeridianFlowNode => n.type === "meridian",
+      );
+      saveGraph({ nodes: meridianOnly, edges, viewport });
+    },
+    [interactive, isGuest, nodes, edges, saveGraph],
+  );
+
+  // —— Drawer & 选中 ——————————————————————————————————————————————————————
   const selectedNode = useMemo(() => {
     const n = nodes.find((node) => node.id === selectedId);
     return n && n.type === "meridian" ? (n as MeridianFlowNode) : null;
@@ -331,7 +353,6 @@ function WorkspaceInner() {
   }, [interactive]);
 
   // 退出画布时自动 fitView 回默认展示比例（带过渡动画）
-  const { fitView } = useReactFlow();
   const isFirst = useRef(true);
   useEffect(() => {
     if (isFirst.current) {
@@ -352,13 +373,83 @@ function WorkspaceInner() {
     [edges, selectedId],
   );
 
+  // —— Header bar handlers ——————————————————————————————————————————————————
+  const handleCreate = useCallback(async () => {
+    const created = await createPlan({ name: "未命名规划" });
+    if (!created) return;
+    selectPlan(created.id);
+    void navigate({
+      to: "/course-planner",
+      search: { id: created.id },
+    });
+  }, [createPlan, selectPlan, navigate]);
+
+  const handleSwitch = useCallback(
+    (id: string) => {
+      if (id === current?.id) return;
+      selectPlan(id);
+      void navigate({
+        to: "/course-planner",
+        search: { id },
+      });
+    },
+    [current?.id, selectPlan, navigate],
+  );
+
+  const handleDelete = useCallback(
+    async (id: string) => {
+      const target = plans.find((p) => p.id === id);
+      if (!target) return;
+      const ok = window.confirm(
+        `确定删除「${target.name}」？\n此操作不可恢复，画布上的节点会一起删掉。`,
+      );
+      if (!ok) return;
+      try {
+        const { nextCurrentId } = await remove(id);
+        // 删的是当前 plan → 同步 URL；删别的不动 URL
+        if (id === current?.id) {
+          // hook 内部已置位 selectedId/current；URL 跟着切
+          // 删光后 nextCurrentId=null，URL 暂时挂 undefined，hook 的自动建会补上一张，
+          // page 的 fallback effect 侦测到 plans.length>0 + 无 urlId 会再 navigate。
+          void navigate({
+            to: "/course-planner",
+            search: { id: nextCurrentId ?? undefined },
+            replace: true,
+          });
+          // 切走 → 重置 loadedPlanIdRef，让 current effect 重新注入
+          loadedPlanIdRef.current = null;
+        }
+      } catch {
+        /* 错误已 set 到 plansError，UI 走 header 那条提示 */
+      }
+    },
+    [plans, current?.id, remove, navigate],
+  );
+
   return (
     <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
-      {/* Hero — 与其他页面一致 */}
+      {/* Header bar — plan 切换 / 重命名 / 新建 / 删除 / 保存状态 / 画布锁 */}
+      <PlannerHeader
+        plans={plans}
+        current={current}
+        loading={plansLoading || loadingCurrent}
+        saving={saving}
+        error={plansError}
+        isGuest={isGuest}
+        interactive={interactive}
+        onToggleInteractive={() => setInteractive((v) => !v)}
+        onSwitch={handleSwitch}
+        onCreate={handleCreate}
+        onRename={(name) => {
+          if (!current) return;
+          void rename(current.id, name).catch(() => {});
+        }}
+        onDelete={handleDelete}
+      />
 
       {/* Canvas — 主舞台，至少撑满 5 层内容；视口大时往下扩展 */}
       <div
-        className="animate-fade-in-up-soft relative mt-8 h-[calc(100vh-260px)] min-h-[840px] overflow-hidden rounded-2xl border border-slate-200 bg-[#fafbfc]"
+        className="animate-fade-in-up-soft relative mt-6 h-[calc(100vh-260px)] min-h-[840px] overflow-hidden rounded-2xl border border-slate-200 bg-[#fafbfc]"
         style={{ animationDelay: "60ms" }}
       >
         <ReactFlow
@@ -369,7 +460,7 @@ function WorkspaceInner() {
           onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick}
           onPaneClick={onPaneClick}
-          fitView
+          onMoveEnd={onMoveEnd}
           fitViewOptions={{ padding: 0.06 }}
           proOptions={{ hideAttribution: true }}
           // 锁定态：可点节点看详情，但禁掉拖拽 / 缩放 / 滚轮捕获，让滚轮穿透到页面
@@ -428,34 +519,11 @@ function WorkspaceInner() {
           })}
         </div>
 
-        {/* 右上角：进入 / 退出画布开关 */}
-        <button
-          type="button"
-          onClick={() => setInteractive((v) => !v)}
-          className={`absolute right-4 top-4 z-20 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-medium shadow-sm transition-colors ${
-            interactive
-              ? "border-slate-200 bg-white/95 text-slate-700 hover:bg-white"
-              : "border-slate-900 bg-slate-950 text-white hover:bg-slate-800"
-          }`}
-        >
-          {interactive ? (
-            <>
-              <X className="h-3.5 w-3.5" />
-              退出画布 · ESC
-            </>
-          ) : (
-            <>
-              <MousePointerClick className="h-3.5 w-3.5" />
-              点击进入画布
-            </>
-          )}
-        </button>
-
         {/* 选中节点 → 浮动 drawer（锁定态也可弹，便于只读查看） */}
         {selectedNode && (
           <aside
             key={selectedNode.id}
-            className="animate-fade-in-up-soft absolute right-4 top-16 z-10 w-[320px] max-h-[calc(100%-5rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-lg sm:w-[340px]"
+            className="animate-fade-in-up-soft absolute right-4 top-4 z-10 w-[320px] max-h-[calc(100%-2rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-lg sm:w-[340px]"
           >
             <NodeDrawer
               node={selectedNode}
@@ -539,6 +607,244 @@ function WorkspaceInner() {
         </div>
       </div>
     </section>
+  );
+}
+
+/* ───────────────────────── Header bar ───────────────────────── */
+
+function PlannerHeader({
+  plans,
+  current,
+  loading,
+  saving,
+  error,
+  isGuest,
+  interactive,
+  onToggleInteractive,
+  onSwitch,
+  onCreate,
+  onRename,
+  onDelete,
+}: {
+  plans: { id: string; name: string; updated_at: string }[];
+  current: { id: string; name: string } | null;
+  loading: boolean;
+  saving: boolean;
+  error: string | null;
+  isGuest: boolean;
+  interactive: boolean;
+  onToggleInteractive: () => void;
+  onSwitch: (id: string) => void;
+  onCreate: () => void;
+  onRename: (name: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // 点击外部 / ESC 关下拉
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!dropdownRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  // 进入编辑态自动聚焦 + 选中
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  const startEdit = () => {
+    if (!current) return;
+    setDraft(current.name);
+    setEditing(true);
+  };
+
+  const commitEdit = () => {
+    if (!current) {
+      setEditing(false);
+      return;
+    }
+    const next = draft.trim();
+    if (next && next !== current.name) {
+      onRename(next);
+    }
+    setEditing(false);
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+      {/* Plan 名 + inline 编辑 */}
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+          Plan
+        </span>
+        {editing ? (
+          <input
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commitEdit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitEdit();
+              if (e.key === "Escape") {
+                setDraft(current?.name ?? "");
+                setEditing(false);
+              }
+            }}
+            maxLength={60}
+            className="h-8 min-w-[180px] rounded-lg border border-slate-300 bg-white px-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-slate-900"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={startEdit}
+            disabled={isGuest || !current || loading}
+            className="group inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold tracking-tight text-slate-900 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+            title={isGuest ? "登录后可重命名" : "点击重命名"}
+          >
+            <span className="max-w-[260px] truncate">
+              {isGuest
+                ? "示例规划"
+                : loading && !current
+                  ? "加载中…"
+                  : current?.name ?? "（无规划）"}
+            </span>
+            {!isGuest && (
+              <Pencil className="h-3 w-3 text-slate-400 transition-colors group-hover:text-slate-700" />
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* 切换下拉（访客态隐藏，没东西可切） */}
+      {!isGuest && (
+        <div ref={dropdownRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            disabled={plans.length === 0}
+            className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            切换
+            <ChevronDown className="h-3.5 w-3.5" />
+          </button>
+          {open && (
+            <div className="absolute left-0 top-9 z-30 w-[280px] max-h-[320px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+              {plans.length === 0 ? (
+                <p className="px-3 py-2 text-xs text-slate-500">暂无规划</p>
+              ) : (
+                plans.map((p) => {
+                  const isActive = p.id === current?.id;
+                  const isLast = plans.length === 1;
+                  return (
+                    <div
+                      key={p.id}
+                      className={`group flex items-center gap-1 rounded-lg px-1 transition-colors ${
+                        isActive ? "bg-slate-100" : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSwitch(p.id);
+                          setOpen(false);
+                        }}
+                        className={`flex flex-1 items-center gap-2 px-1.5 py-1.5 text-left text-xs ${
+                          isActive ? "text-slate-900" : "text-slate-700"
+                        }`}
+                      >
+                        <span className="flex-1 truncate font-medium">{p.name}</span>
+                        {isActive && (
+                          <Check className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(p.id);
+                        }}
+                        disabled={isLast}
+                        title={isLast ? "至少保留一张规划" : "删除"}
+                        aria-label="删除"
+                        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 opacity-0 transition-all hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 新建（访客态禁用） */}
+      <button
+        type="button"
+        onClick={onCreate}
+        disabled={isGuest}
+        title={isGuest ? "登录后可新建" : undefined}
+        className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-400 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-slate-200 disabled:hover:text-slate-700"
+      >
+        <Plus className="h-3.5 w-3.5" />
+        新建
+      </button>
+
+      {/* 保存状态 / 错误 / 访客提示 — 中段 */}
+      <div className="text-xs tabular-nums text-slate-400">
+        {isGuest ? (
+          <span>访客预览 · 登录后保存</span>
+        ) : error ? (
+          <span className="text-rose-600">{error}</span>
+        ) : saving ? (
+          <span>保存中…</span>
+        ) : current ? (
+          <span>已保存</span>
+        ) : null}
+      </div>
+
+      {/* 画布锁 / 解锁 — 右侧 */}
+      <button
+        type="button"
+        onClick={onToggleInteractive}
+        className={`ml-auto inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-medium shadow-sm transition-colors ${
+          interactive
+            ? "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            : "border-slate-900 bg-slate-950 text-white hover:bg-slate-800"
+        }`}
+      >
+        {interactive ? (
+          <>
+            <X className="h-3.5 w-3.5" />
+            退出画布 · ESC
+          </>
+        ) : (
+          <>
+            <MousePointerClick className="h-3.5 w-3.5" />
+            点击进入画布
+          </>
+        )}
+      </button>
+    </div>
   );
 }
 

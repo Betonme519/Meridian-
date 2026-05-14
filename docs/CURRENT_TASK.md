@@ -3,23 +3,18 @@
 > 短期工作内存。**AI 接手优先读这份**，再按需查 `AI_MEMORY.md` / `TECH_DEBT.md`。
 > 铁律：只做下方「排队」里的事，做完停下汇报。「不要修改」当只读。
 
-> Last updated: **2026-05-11**
+> Last updated: **2026-05-14**
 
 ---
 
 ## 目标
 
-排队 4a 已完成（`/import` 接通 Supabase Storage + `rag_source` 表 + 审计修了 3 条中度问题）。
-下一步进 4b（`/course-planner` 接 `plan` 表）或 4c（`/schedule` 接 `rule` + `rule_conflict`），由用户指定。
+排队 4b 已完成（`/course-planner` 接 `plan` 表 + URL `?id=` 同步 + debounce 自动保存 + 多 plan 切换 / 新建 / 重命名）。
+下一步进 4c（`/schedule` 接 `rule` + `rule_conflict`），由用户启动。
 
 ---
 
 ## 排队（按优先级，一次开一条）
-
-- [ ] **🟡 排队 4b** — `/course-planner` 接 `plan` 表（约半天）
-  - 把 ReactFlow 写死 nodes / edges 改成读 `plan` 表 + 自动保存（debounce）
-  - 「新建 plan」按钮 → `INSERT INTO plan` → 跳到该 plan
-  - 依赖：profiles 接入已完成；schema 已落地
 
 - [ ] **🟡 排队 4c** — `/schedule` 接 `rule` + `rule_conflict`（约半天）
   - 规则树按 branch 分组拉取，trust 三档着色保留
@@ -67,6 +62,9 @@
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
 
+- **2026-05-14** — 排队 4b — `/course-planner` 接 `plan` 表
+  - 新建 `planApi.ts`（list/get/create/updateGraph/rename/**delete**）+ `usePlans.ts`（list / current / debounce save 800ms / 空态自动建 / **remove 删当前自动切下一张、删空再补一张**）+ `seedGraph.ts`（types / lane 骨架 / SEED_*data 抽出）；Planner 页删 initial state，加 header bar（plan 名 inline 编辑 + 切换下拉 + 新建 + **删除（下拉每项垃圾桶 hover + window.confirm，禁删最后一张）** + 保存状态 + 画布锁挪过来）；URL `?id=<uuid>` 同步，刷新 / 直链 / 多 plan 切换都可恢复；800ms debounce 自动保存；空账号自动建「我的第一张规划」（用 seed 12 节点 + 13 边）；lane 骨架渲染时拼接，**不入 DB**。**访客模式**（`!authLoading && !user`）改成喂 SEED 只读预览（不入 DB，header 显示「访客预览 · 登录后保存」+「示例规划」），保 4b 之前的视觉感。`course-planner` route 加 `validateSearch` 暴露 `?id=` 类型；Dashboard / Schedule 的 Link 同步加 `search={{ id: undefined }}`。`tsc --noEmit` 干净（除 CardSwap 历史遗留）；`vite build` 通过。
+
 - **2026-05-11** — 排队 4a — `/import` 接通 Storage + `rag_source` 表
   - 新建 `ragSourceApi.ts` + `useRagSources.ts`，改 Upload 页接通拖拽 / 选文件 / 列表读 DB / 删除；审计修 3 条中度问题（button→label、useEffect dep 守卫、loading 初值 true）
 
@@ -78,6 +76,3 @@
 
 - **2026-05-10** — 路由鉴权门禁 + 访客模式 + 退出回首页
   - `_app.tsx` beforeLoad 4 道守卫；`guestMode.ts` localStorage 薄壳；Login 「暂时跳过」按钮；Home CTA 鉴权
-
-- **2026-05-09** — Supabase auth 接入（mock 退役） + 死文件清扫 + 架构审计
-  - 21 文件 + 8 目录死代码清；react-query 移除；`AuthContext` 公共 API 保稳

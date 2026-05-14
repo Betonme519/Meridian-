@@ -386,6 +386,7 @@ export default function DashboardPage() {
 
             <Link
               to="/course-planner"
+              search={{ id: undefined }}
               className="mt-5 inline-flex items-center gap-1 text-xs font-medium text-slate-700 transition-colors hover:text-slate-950"
             >
               在 Workspace 看连锁影响
