@@ -15,17 +15,9 @@
 
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
-export type GoalMode =
-  | "高 GPA"
-  | "最轻松毕业"
-  | "保研路线"
-  | "留学路线"
-  | "实习优先"
-  | "时间自由"
-  | "低压力模式"
-  | "个性化定制";
-
-export const GOAL_MODES: GoalMode[] = [
+// 从常量数组派生 GoalMode union —— 让 zod z.enum / 运行时校验复用同一份数据
+// 而不需要手维护两处。外部调用方看到的 GoalMode 类型不变。
+export const GOAL_MODES = [
   "高 GPA",
   "最轻松毕业",
   "保研路线",
@@ -34,7 +26,9 @@ export const GOAL_MODES: GoalMode[] = [
   "时间自由",
   "低压力模式",
   "个性化定制",
-];
+] as const;
+
+export type GoalMode = (typeof GOAL_MODES)[number];
 
 /**
  * Profile shape — 与 docs/DATA_MODEL.md § 3.1 字段表 1:1 对齐。

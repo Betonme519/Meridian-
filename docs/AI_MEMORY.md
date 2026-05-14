@@ -25,7 +25,8 @@
 | 阶段 | 前端 demo 完成（落地页 + 5 功能页），业务接入期 |
 | 已接通业务表 | `profiles` ✅ · `rag_source` ✅ · `plan` ✅ |
 | 待接通业务表 | `rule` · `rule_conflict` · `chat_message` |
-| 下一里程碑 | 排队 4c（`/schedule` 接 `rule`）/ 2（AI provider 抽象） |
+| AI 抽象层 | 骨架 + mock provider ✅；真 provider 留 stub（TD-1 余尾） |
+| 下一里程碑 | 接真 Anthropic / `chat_message` 接入 / TD-2 解析 pipeline / 排队 4c（等 TD-2 后） |
 | 主要风险 | bun.lockb 与 node_modules 可能不同步；中国高校本地化文案未做；解析 pipeline 未建 |
 
 ---
@@ -109,6 +110,9 @@ Supabase auth 接入 + 注册 / 登录 / 登出 / 多 tab 同步；`_app.tsx` be
 ### `plan` 接入 — `100%`
 `/course-planner` 接通 `plan` 表（整图 JSONB，决策 D6a）。URL `?id=<uuid>` 是 source of truth；800ms debounce 自动保存；空账号 / 删光时自动建「我的第一张规划」（SEED 12 节点 + 13 边）；多 plan 切换 / 新建 / inline 重命名 / 删除（最后一张禁删）；lane 骨架渲染时拼接，不入 DB；访客模式喂 SEED 只读预览。`saveGraph` 用 `activePlanIdRef` 给 patch 盖戳，回调稳定化防"切 plan 瞬间用旧数据写新 id"。
 
+### AI 抽象层 — `~70%`（骨架完成，真 provider 待接）
+`src/ai/` 6 文件骨架：`stream.ts`（`Chat = (opts) => AsyncIterable<Token>` 协议核心）· `schema.ts`（`Recommendation` / `ChatMessage` / `RagAnswer` zod schema，对齐 DATA_MODEL）· `prompts.ts`（`recommendModePrompt`）· `providers/mock.ts`（默认实现，正则 + 模板化 rationale，18ms/字 yield）· `providers/anthropic.ts`（stub，抛"未实现"）· `index.ts`（VITE_AI_PROVIDER 选 provider，默认 mock）。`/ai-advisor` 已接通：`handleParse` 走 chat()，for-await 流式渲染到 parsedNote，按钮 streaming 态 + `▍` 光标 + AbortController（连点 / 切模式 / 卸载都 abort）。Anthropic key 必须走 Edge Function / Worker，**不能**放 VITE_*。
+
 ### 文档体系 — `100%`
 `CURRENT_TASK.md`（sprint）· `AI_MEMORY.md`（本文，长期）· `TECH_DEBT.md`（backlog）· `PROJECT_OVERVIEW.md` · `ARCHITECTURE.md` · `DESIGN_SYSTEM.md` · `DATA_MODEL.md` · `ARCHITECTURE_AUDIT.md`（一次性深度审计）。
 
@@ -163,8 +167,10 @@ HTML5 规范禁止 button 内含 interactive content。React 不报错但 a11y /
 ## 8. 下一阶段方向
 
 ### 短期（当前 sprint）
-- **排队 4c** — `/schedule` 接 `rule` + `rule_conflict`
-- **排队 2** — AI provider 抽象 + streaming 协议骨架（mock provider 跑通 `/ai-advisor` 流式渲染）
+- **接真 Anthropic provider** — TD-1 余尾；API key 走 Edge Function / Worker；归一 SSE 事件成 Token
+- **`chat_message` 表接 `/ai-advisor`** — 流式对话历史持久化（TD-7 余尾）
+- **TD-2 解析 pipeline** — 推进 rag_source.parsed_status；做完后 4c 才有展示价值
+- **排队 4c** — TD-2 跑通后做（详见 TECH_DEBT TD-24）
 
 ### 中期
 - `chat_message` 表接 `/ai-advisor` 历史
@@ -184,6 +190,13 @@ HTML5 规范禁止 button 内含 interactive content。React 不报错但 a11y /
 ---
 
 ## 9. 项目时间线（按 commit 倒序，5-15 行/里程碑）
+
+### 2026-05-14 · AI provider 抽象 + streaming 协议骨架（排队 2）
+- 新建 `src/ai/` 6 文件：`stream.ts`（`Chat = (opts) => AsyncIterable<Token>` 协议 + `collect()` helper）· `schema.ts`（zod：`Recommendation` / `ChatMessage` / `RagAnswer`，`ChatMessage` 对齐 DATA_MODEL § 3.6 / 决策 D9）· `prompts.ts`（`recommendModePrompt` 系统提示词）· `providers/mock.ts`（默认实现，沿用原 AIAdvisor recommendMode 正则 + 8 模式模板化 rationale + 关键词原话引用 + 18ms/字 yield + signal.aborted 优雅 return）· `providers/anthropic.ts`（stub 抛错，预留接口位）· `index.ts`（`VITE_AI_PROVIDER` env 选 provider，默认 mock）
+- `profileApi.GoalMode` 改成从 `GOAL_MODES as const` 数组派生（不破 API），让 zod `z.enum(GOAL_MODES)` 复用
+- AIAdvisor `handleParse` 重写：abortRef + AbortController；for-await 消费 chat() 流式 token，逐字 setState 累加；流完正则解析「推荐：<mode>」校验在 GOAL_MODES 后 updateProfile；catch AbortError 沉默；卸载 / 切模式都 abort 上一轮
+- AIAdvisor UI 适配：按钮 streaming 时禁用 + 「分析中…」 + Sparkles `animate-spin`；parsedNote `<p>` 改 `flex items-start whitespace-pre-wrap` 撑多行 + 末尾 `▍` `animate-pulse` 流式光标；空输入禁用按钮
+- 不动：AIAdvisor 视觉布局（grid / 模式卡 / textarea / aside）、profileApi 公共 API（仅 readonly tuple 化）、ProfileContext / useProfile / Supabase 接入面。tsc 干净（仅 CardSwap 历史遗留）；vite build 通过
 
 ### 2026-05-14 · `/course-planner` 接通 `plan` 表（排队 4b）
 - 新建 `planApi.ts`（list / get / create / updateGraph / rename / delete，整图 JSONB）+ `usePlans.ts`（list + current + 800ms debounce save + 空态自动建 + remove 删当前自动切下一张 / 删空再补一张）+ `seedGraph.ts`（types + lane 骨架 + SEED_MERIDIAN_NODES 12 节点 + SEED_EDGES 13 边抽出）

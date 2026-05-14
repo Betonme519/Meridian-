@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   Gauge,
@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
-import type { GoalMode } from "@/api/profileApi";
+import { GOAL_MODES, type GoalMode } from "@/api/profileApi";
+import { chat, recommendModePrompt } from "@/ai";
 
 type Mode = {
   title: GoalMode;
@@ -85,44 +86,76 @@ const modes: Mode[] = [
   },
 ];
 
-function recommendMode(text: string) {
-  const content = text.toLowerCase();
-  if (/保研|排名|科研|导师/.test(content)) return "保研路线";
-  if (/留学|申请|推荐信|海外|gre|托福|雅思/.test(content)) return "留学路线";
-  if (/实习|工作|上班|面试|offer/.test(content)) return "实习优先";
-  if (/压力|焦虑|睡眠|轻松|健康/.test(content)) return "低压力模式";
-  if (/毕业|requirement|学分|第二课堂|劳动教育/.test(content)) return "最轻松毕业";
-  if (/自由|时间|兴趣|社团|生活/.test(content)) return "时间自由";
-  return "高 GPA";
-}
-
 export default function AIAdvisorPage() {
   const { profile, updateProfile } = useProfile();
   // selectedMode 从 profile.goal_mode 派生；guest / loading 时 fallback 高 GPA
   const selectedMode: GoalMode = profile?.goal_mode ?? "高 GPA";
 
-  const [profileText, setProfileText] = useState(
-    "我想保持 GPA，但这学期还要实习，每周最多只能学习 20 小时。",
-  );
+  // 初值留空让 placeholder 显示（浅灰示例），用户点击 / 输入后自然消失
+  const [profileText, setProfileText] = useState("");
+  // parsedNote 现在挂的是流式输出（多行）：「推荐：...\n\n理由：...」
   const [parsedNote, setParsedNote] = useState("");
+  const [streaming, setStreaming] = useState(false);
+  // 取消上一轮 stream（用户连点 / 切模式 / 卸载）
+  const abortRef = useRef<AbortController | null>(null);
 
   const activeMode = useMemo(
     () => modes.find((mode) => mode.title === selectedMode) ?? modes[0],
     [selectedMode],
   );
 
-  // 切换模式 = 写回 profile（乐观更新立刻反映；失败由 ProfileContext.error 暴露）
+  // 切换模式 = abort 进行中的 stream + 写回 profile（乐观更新立刻反映；
+  // 失败由 ProfileContext.error 暴露）
   const setSelectedMode = (mode: GoalMode) => {
+    abortRef.current?.abort();
     void updateProfile({ goal_mode: mode }).catch((e) =>
       console.warn("[AIAdvisor] 保存目标模式失败:", e),
     );
   };
 
-  function handleParse() {
-    const nextMode = recommendMode(profileText) as GoalMode;
-    setSelectedMode(nextMode);
-    setParsedNote(`AI 已根据你的描述推荐：${nextMode}`);
+  // 用 AI 流式推荐 goal_mode：
+  //  1. abort 上一轮（连点 / 切模式 / 卸载 时也走这条路）
+  //  2. for-await 消费 token，逐字累加到 parsedNote（实时渲染）
+  //  3. 流完正则解析"推荐：<mode>"，校验在 GOAL_MODES 里再写 profile
+  //  4. 抛 AbortError 时沉默退出；其它错误 set 到 parsedNote
+  async function handleParse() {
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+
+    setParsedNote("");
+    setStreaming(true);
+
+    try {
+      let acc = "";
+      for await (const tok of chat({
+        messages: recommendModePrompt(profileText),
+        signal: ctrl.signal,
+      })) {
+        acc += tok;
+        setParsedNote(acc);
+      }
+      const m = acc.match(/推荐[：:]\s*(.+?)(?:\n|$)/);
+      const candidate = m?.[1]?.trim();
+      if (
+        candidate &&
+        (GOAL_MODES as readonly string[]).includes(candidate)
+      ) {
+        setSelectedMode(candidate as GoalMode);
+      }
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError") return;
+      setParsedNote(`AI 推荐失败：${(e as Error).message}`);
+    } finally {
+      if (abortRef.current === ctrl) {
+        setStreaming(false);
+        abortRef.current = null;
+      }
+    }
   }
+
+  // 卸载时 abort：避免 setState on unmounted + provider 继续 yield
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   return (
     <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
@@ -211,10 +244,12 @@ export default function AIAdvisorPage() {
             </div>
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-1 transition-colors focus-within:border-slate-400">
               <textarea
+                id="ai-advisor-profile-text"
+                name="profileText"
                 value={profileText}
                 onChange={(event) => setProfileText(event.target.value)}
                 className="block min-h-32 w-full resize-none bg-transparent px-3 py-2.5 text-sm leading-6 text-slate-800 outline-none placeholder:text-slate-400"
-                placeholder="例如：我想保研，但这学期有实习，不能让 workload 超过 20 小时。"
+                placeholder="例：我想保研，但这学期有实习，不能让 workload 超过 20 小时。"
               />
               <div className="flex items-center justify-between border-t border-slate-200/70 px-3 py-2 text-[11px] text-slate-400 tabular-nums">
                 <span>{profileText.length} 字</span>
@@ -224,15 +259,25 @@ export default function AIAdvisorPage() {
             <button
               type="button"
               onClick={handleParse}
-              className="group mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+              disabled={streaming || !profileText.trim()}
+              className="group mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-slate-950"
             >
-              <Sparkles className="h-4 w-4 transition-transform duration-500 ease-out group-hover:rotate-12" />
-              让 AI 选择模式
+              <Sparkles
+                className={`h-4 w-4 transition-transform duration-500 ease-out ${
+                  streaming ? "animate-spin" : "group-hover:rotate-12"
+                }`}
+              />
+              {streaming ? "分析中…" : "让 AI 选择模式"}
             </button>
             {parsedNote ? (
-              <p className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                {parsedNote}
+              <p className="mt-3 flex items-start gap-1.5 whitespace-pre-wrap text-sm font-medium text-emerald-700">
+                <CheckCircle2 className="mt-1 h-3.5 w-3.5 shrink-0" />
+                <span>
+                  {parsedNote}
+                  {streaming && (
+                    <span className="ml-0.5 animate-pulse">▍</span>
+                  )}
+                </span>
               </p>
             ) : null}
           </div>

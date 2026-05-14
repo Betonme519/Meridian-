@@ -7,10 +7,10 @@
 
 ## 🔴 高 — 业务接入前必须解决
 
-### TD-1 · AI provider 抽象 + streaming 协议骨架
-- **风险**：未定 `chat()` 签名 / streaming 形态 / zod schema，7 个 caller 自由发明会发散
-- **原因**：排队 2，已暂缓
-- **建议**：先建 `src/ai/{providers,prompts,stream,schema,index}.ts`，定 `({ messages, signal }) => AsyncIterable<Token>` + `Recommendation` / `ChatMessage` / `RagAnswer` schema；mock provider 跑通 `/ai-advisor` 流式渲染
+### TD-1 · AI provider 抽象 + streaming 协议骨架（**骨架完成，余尾：接真 Anthropic**）
+- **现状**：2026-05-14 排队 2 已落地骨架 —— `src/ai/{stream,schema,prompts,providers/mock,providers/anthropic,index}.ts` + 3 zod schema + `chat({ messages, signal }) => AsyncIterable<Token>` 签名 + mock provider + `/ai-advisor` 流式 UI（含 abort）。VITE_AI_PROVIDER env 选 provider，默认 mock
+- **余尾风险**：`providers/anthropic.ts` 当前是 stub，抛错；真接入还要：(1) API key 走 Edge Function / Worker（**不能** VITE_*）；(2) SSE / fetch streaming 读 `content_block_delta` 归一成 Token；(3) signal abort 时取消 fetch；(4) 错误归一成 Error
+- **建议**：等 TD-2 解析 pipeline 启动时一起做（rag_source 解析也要 AI 调用）
 
 ### TD-2 · `rag_source.parsed_status` 永远卡 pending
 - **风险**：上传文件后 UI 永远显示"待解析"，用户认为坏掉了
@@ -38,9 +38,10 @@
 - **风险**：A tab 改了字段 / 删了文件，B tab 看到旧值直到刷新
 - **建议**：各 Context / hook 订阅 `supabase.channel('<table>').on('postgres_changes', ...)`
 
-### TD-7 · 5 功能页仍有写死 const（plan / rule / chat_message）
-- **风险**：profile + rag_source 已接通；其余 3 张表仍假数据。排队 4b / 4c / 2 各对应一项
-- **建议**：4b 接 plan，4c 接 rule + rule_conflict，2 接 chat_message
+### TD-7 · 功能页仍有写死 const（rule / chat_message）
+- **风险**：profile + rag_source + plan 已接通；其余 2 张表仍假数据。
+- **现状**：`/schedule` 接 `rule` + `rule_conflict` 本期跳过（见 TD-24）；`chat_message` 等排队 2 + AI provider 抽象落地后再接
+- **建议**：先做排队 2，AI 抽象稳了再回头补 rule / chat_message
 
 ### TD-8 · `_app.tsx` beforeLoad context 注入未做
 - **风险**：当前 `getSession()` 读 localStorage 够稳，但服务端鉴权（D3=b）切不过去
@@ -117,3 +118,8 @@
 ### TD-23 · `displayName` API 已开但 UI 未暴露
 - **风险**：用户不能改名（rag_source 直接用 `file.name`）
 - **建议**：要做改名 UI 时直接连接 API
+
+### TD-24 · 排队 4c 跳过（`/schedule` 接 `rule` + `rule_conflict`）
+- **风险**：`/schedule` 仍展示写死规则；与 `rule` 表脱钩
+- **原因**：4c 短期只能接通骨架（按 branch 分组 + trust 三档着色 + 冲突独立），但 `rule` 表内容来自 `rag_source` 解析 pipeline；TD-2 没跑通前 `rule` 永远是手工测试数据，"接通"价值有限。本期优先做排队 2（AI provider 抽象），TD-2 解析 pipeline 推进后再回头做 4c
+- **建议**：TD-2 跑通 → 4c 一起做，此时 `rule` 表已有真实内容，前端接通才有展示价值

@@ -9,21 +9,14 @@
 
 ## 目标
 
-排队 4b 已完成（`/course-planner` 接 `plan` 表 + URL `?id=` 同步 + debounce 自动保存 + 多 plan 切换 / 新建 / 重命名）。
-下一步进 4c（`/schedule` 接 `rule` + `rule_conflict`），由用户启动。
+排队 2 骨架已完成（`src/ai/` 抽象层 + mock provider + `/ai-advisor` 流式 UI）。Anthropic 真 provider 留 stub，等 TD-2 解析 pipeline 启动时再实现。
+当前**无活跃排队**。下一步候选：(a) 接真 Anthropic provider（TD-1 剩余）；(b) `chat_message` 表接 `/ai-advisor` 对话历史；(c) TD-2 解析 pipeline；(d) TD-4 全局错误 Toaster。由用户启动。
 
 ---
 
 ## 排队（按优先级，一次开一条）
 
-- [ ] **🟡 排队 4c** — `/schedule` 接 `rule` + `rule_conflict`（约半天）
-  - 规则树按 branch 分组拉取，trust 三档着色保留
-  - 冲突独立从 `rule_conflict` 加载
-  - 真发挥价值要等 4a 解析 pipeline 跑通后；现在初期只能用手工测试数据
-
-- [ ] **🔴 排队 2（暂缓）** — AI provider 抽象 + streaming 协议骨架（约 1–2 小时）
-  - 4b / 4c 跑通后再做（业务表写入稳了再叠 AI 抽象层）
-  - 详见 `TECH_DEBT.md` TD-1
+_（暂无活跃排队，等用户指派）_
 
 ---
 
@@ -62,6 +55,9 @@
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
 
+- **2026-05-14** — 排队 2 — AI provider 抽象 + streaming 协议骨架
+  - 新建 `src/ai/{stream,schema,prompts,providers/mock,providers/anthropic,index}.ts` 6 文件；定 `chat({ messages, signal }) => AsyncIterable<Token>` 签名 + 3 个 zod schema（`Recommendation` / `ChatMessage` / `RagAnswer`，与 DATA_MODEL § 3.6 对齐）+ `recommendModePrompt` 模板；mock provider 沿用原 `recommendMode` 正则 + 模板化 rationale，18ms/字 流式 yield、signal aborted 时优雅 return；Anthropic stub 抛"未实现"错。`profileApi.GoalMode` 改成从 `GOAL_MODES as const` 数组派生，给 zod `z.enum` 复用。AIAdvisor `handleParse` 改成 async：abort 上一轮 → for-await 流式累加到 `parsedNote` → 正则解析「推荐：<mode>」→ 写 profile；按钮 streaming 态禁用 + 「分析中…」 + spinner；parsedNote multi-line + `▍` 光标；卸载 abort；切模式 abort。`VITE_AI_PROVIDER` env 切 provider（默认 mock）。`tsc --noEmit` 干净（除 CardSwap 历史遗留）；`vite build` 通过。
+
 - **2026-05-14** — 排队 4b — `/course-planner` 接 `plan` 表
   - 新建 `planApi.ts`（list/get/create/updateGraph/rename/**delete**）+ `usePlans.ts`（list / current / debounce save 800ms / 空态自动建 / **remove 删当前自动切下一张、删空再补一张**）+ `seedGraph.ts`（types / lane 骨架 / SEED_*data 抽出）；Planner 页删 initial state，加 header bar（plan 名 inline 编辑 + 切换下拉 + 新建 + **删除（下拉每项垃圾桶 hover + window.confirm，禁删最后一张）** + 保存状态 + 画布锁挪过来）；URL `?id=<uuid>` 同步，刷新 / 直链 / 多 plan 切换都可恢复；800ms debounce 自动保存；空账号自动建「我的第一张规划」（用 seed 12 节点 + 13 边）；lane 骨架渲染时拼接，**不入 DB**。**访客模式**（`!authLoading && !user`）改成喂 SEED 只读预览（不入 DB，header 显示「访客预览 · 登录后保存」+「示例规划」），保 4b 之前的视觉感。`course-planner` route 加 `validateSearch` 暴露 `?id=` 类型；Dashboard / Schedule 的 Link 同步加 `search={{ id: undefined }}`。`tsc --noEmit` 干净（除 CardSwap 历史遗留）；`vite build` 通过。
 
@@ -73,6 +69,3 @@
 
 - **2026-05-10** — `docs/DATA_MODEL.md` 起草 + SQL migration 落地
   - 6 主表 + 1 RAG 表 schema + 6 决策确认 + 工程审计；`0001_init_schema.sql` 跑通；Storage bucket + RLS 已建
-
-- **2026-05-10** — 路由鉴权门禁 + 访客模式 + 退出回首页
-  - `_app.tsx` beforeLoad 4 道守卫；`guestMode.ts` localStorage 薄壳；Login 「暂时跳过」按钮；Home CTA 鉴权
