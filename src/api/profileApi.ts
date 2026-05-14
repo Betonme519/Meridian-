@@ -14,6 +14,7 @@
  */
 
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import type { Database } from "@/types/db";
 
 // 从常量数组派生 GoalMode union —— 让 zod z.enum / 运行时校验复用同一份数据
 // 而不需要手维护两处。外部调用方看到的 GoalMode 类型不变。
@@ -31,21 +32,18 @@ export const GOAL_MODES = [
 export type GoalMode = (typeof GOAL_MODES)[number];
 
 /**
- * Profile shape — 与 docs/DATA_MODEL.md § 3.1 字段表 1:1 对齐。
- * Postgres 的 NULL → TS 的 null（不用 undefined）。
+ * Profile shape — DB 行类型派生 + 业务层 narrowing。
+ * 列集合自动跟随 `supabase gen types` 生成的 db.ts；只手维护两处 narrowing：
+ *   - `goal_mode`: DB 是宽口 `string | null`，业务层窄到 `GoalMode` 枚举
+ *   - `goal_weights`: DB 是宽口 `Json`，业务层窄到 `Record<string, number>`
+ * 新增/删除列时不再需要改这里。
  */
-export interface Profile {
-  id: string;
-  name: string | null;
-  school: string | null;
-  major: string | null;
-  grade: number | null;
-  target_gpa: number | null;
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+
+export type Profile = Omit<ProfileRow, "goal_mode" | "goal_weights"> & {
   goal_mode: GoalMode;
   goal_weights: Record<string, number>;
-  created_at: string;
-  updated_at: string;
-}
+};
 
 /**
  * 可写字段子集 —— 排除 id / timestamps（DB 维护）。

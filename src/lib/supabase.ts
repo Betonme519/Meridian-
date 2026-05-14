@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/db";
 
 /**
  * Supabase 客户端单例。
@@ -34,7 +35,9 @@ if (!isSupabaseConfigured && typeof console !== "undefined") {
 const isBrowser = typeof window !== "undefined";
 
 // 用占位 URL / key 让 createClient 能初始化；真调 auth 方法时由 authApi.ts 再次校验
-export const supabase = createClient(
+// 泛型 <Database> 让 supabase.from("xxx") 自动推断列类型（types/db.ts 由
+// `supabase gen types typescript --project-id ... --schema public` 生成）。
+export const supabase = createClient<Database>(
   SUPABASE_URL ?? "https://placeholder.supabase.co",
   SUPABASE_ANON_KEY ?? "placeholder-anon-key",
   {

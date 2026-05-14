@@ -17,10 +17,12 @@
 - **原因**：4a 只写入流程，没写解析流程；依赖 TD-1
 - **建议**：TD-1 完成后加 worker / Edge Function 推进 `pending → parsing → parsed/failed`，并恢复"重新解析"按钮（替代当前"删除"）
 
-### TD-3 · Supabase 类型手维护（`as Profile` / `as RagSource`）
-- **风险**：schema drift 时编译过运行时挂
-- **原因**：未跑 `supabase gen types typescript`
-- **建议**：下次 schema 调整前先生成 `src/types/database.ts`，profileApi / ragSourceApi 切 typed client
+### ~~TD-3 · Supabase 类型手维护（`as Profile` / `as RagSource`）~~ ✅ 2026-05-14 完成（排队 5）
+- 跑了 `supabase gen types typescript --project-id tukdczwcygcgpxmdhobl --schema public > src/types/db.ts`（471 行，7 表自动派生）
+- `src/lib/supabase.ts` 切 `createClient<Database>()`
+- `Profile / Plan / RagSource` 改成 `Omit<XxxRow, narrow字段> & { narrow字段: 业务窄类型 }` 派生，列集合自动跟随 DB
+- 仍保留：(1) `Profile.goal_mode → GoalMode` (2) `Plan.nodes/edges/viewport → ReactFlow` (3) `RagSource.kind/parsed_status → 枚举`；这些是业务层 narrowing，不是债。读出侧用 `as unknown as` 桥接 Json→ReactFlow（TS 不递归推断）
+- 之后加 chat_message / rule / rule_conflict / course / track_* 表都直接 `Database['public']['Tables']['x']['Row']`，不用再手维护 interface
 
 ---
 

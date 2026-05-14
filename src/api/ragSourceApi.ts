@@ -17,6 +17,7 @@
  */
 
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import type { Database } from "@/types/db";
 
 export type RagSourceKind =
   | "培养方案"
@@ -36,24 +37,20 @@ export const RAG_SOURCE_KINDS: RagSourceKind[] = [
 export type ParsedStatus = "pending" | "parsing" | "parsed" | "failed";
 
 /**
- * RagSource shape —— 与 docs/DATA_MODEL.md § 3.3 字段表 1:1 对齐。
- * Postgres NULL → TS null。
+ * RagSource shape —— DB 行类型派生 + 业务层 narrowing。
+ *
+ * 列集合自动跟随 `supabase gen types` 生成的 db.ts；只手维护两处 narrowing：
+ *   - `kind`: DB 是宽口 `string`，业务层窄到 `RagSourceKind` 枚举
+ *   - `parsed_status`: DB 是宽口 `string`，业务层窄到 `ParsedStatus` 枚举
+ * 新增/删除列时不再需要改这里。
  */
-export interface RagSource {
-  id: string;
-  user_id: string;
-  name: string;
+type RagSourceRow = Database["public"]["Tables"]["rag_source"]["Row"];
+type RagSourceInsert = Database["public"]["Tables"]["rag_source"]["Insert"];
+
+export type RagSource = Omit<RagSourceRow, "kind" | "parsed_status"> & {
   kind: RagSourceKind;
-  mime: string | null;
-  size_bytes: number | null;
-  storage_path: string;
   parsed_status: ParsedStatus;
-  parsed_text: string | null;
-  parse_error: string | null;
-  parsed_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
+};
 
 const BUCKET = "rag_sources";
 
@@ -128,7 +125,7 @@ export async function uploadRagSource(
   }
 
   // 3) 写 rag_source 行
-  const row = {
+  const row: RagSourceInsert = {
     id,
     user_id: userId,
     name: displayName?.trim() || file.name,
@@ -136,7 +133,7 @@ export async function uploadRagSource(
     mime: file.type || null,
     size_bytes: Number.isFinite(file.size) ? file.size : null,
     storage_path: storagePath,
-    parsed_status: "pending" as ParsedStatus,
+    parsed_status: "pending",
   };
 
   const { data, error } = await supabase

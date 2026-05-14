@@ -23,27 +23,29 @@
 
 import type { Edge, Node, Viewport } from "@xyflow/react";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import type { Database, Json } from "@/types/db";
 
 /**
- * Plan shape —— 与 docs/DATA_MODEL.md § 3.3 字段表 1:1 对齐。
- * Postgres NULL → TS null。
+ * Plan shape —— DB 行类型派生 + 业务层 narrowing。
+ *
+ * 列集合自动跟随 `supabase gen types` 生成的 db.ts；这里只手维护三处 narrowing：
+ *   - `nodes` / `edges`: DB 是宽口 `Json`，业务层窄到 ReactFlow `Node[]` / `Edge[]`
+ *   - `viewport`: DB 是宽口 `Json | null`，业务层窄到 ReactFlow `Viewport | null`
+ * 新增/删除列时不再需要改这里。
  *
  * `nodes` JSONB 的元素 shape 见 seedGraph.ts 的 MeridianFlowNode；
  * 这里用宽口 `Node[]` / `Edge[]` 让本层与具体业务节点 schema 解耦。
  * 业务层（Planner 页面）自行 narrow 类型。
  */
-export interface Plan {
-  id: string;
-  user_id: string;
-  name: string;
-  goal_mode: string | null;
+type PlanRow = Database["public"]["Tables"]["plan"]["Row"];
+type PlanInsert = Database["public"]["Tables"]["plan"]["Insert"];
+type PlanUpdate = Database["public"]["Tables"]["plan"]["Update"];
+
+export type Plan = Omit<PlanRow, "nodes" | "edges" | "viewport"> & {
   nodes: Node[];
   edges: Edge[];
   viewport: Viewport | null;
-  is_archived: boolean;
-  created_at: string;
-  updated_at: string;
-}
+};
 
 const NOT_CONFIGURED_MSG =
   "Supabase 未配置：请在 .env.local 设置 VITE_SUPABASE_URL 和 VITE_SUPABASE_ANON_KEY 后重启 dev server。";
@@ -63,7 +65,9 @@ export async function listPlans(userId: string): Promise<Plan[]> {
     .order("updated_at", { ascending: false });
 
   if (error) throw new Error(`加载规划列表失败：${error.message}`);
-  return (data ?? []) as Plan[];
+  // `as unknown as` 桥接：DB 行的 `nodes/edges/viewport` 是宽口 Json，业务层窄到
+  // ReactFlow `Node[]/Edge[]/Viewport`。TS 不递归推断 Json→Node[]，所以经 unknown 转。
+  return (data ?? []) as unknown as Plan[];
 }
 
 /**
@@ -79,7 +83,7 @@ export async function getPlan(planId: string): Promise<Plan | null> {
     .maybeSingle();
 
   if (error) throw new Error(`加载规划失败：${error.message}`);
-  return (data ?? null) as Plan | null;
+  return (data ?? null) as unknown as Plan | null;
 }
 
 /**
@@ -96,12 +100,12 @@ export async function createPlan(opts: {
 }): Promise<Plan> {
   if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
 
-  const row: Record<string, unknown> = {
-    user_id: opts.userId,
-  };
+  // ReactFlow Node[]/Edge[] 在结构上是 JSON-safe（仅普通 object），但 TS 不自己
+  // 递归推断到 Json，所以写入侧显式 `as unknown as Json` 一次。读出侧反过来 narrow。
+  const row: PlanInsert = { user_id: opts.userId };
   if (opts.name !== undefined) row.name = opts.name;
-  if (opts.nodes !== undefined) row.nodes = opts.nodes;
-  if (opts.edges !== undefined) row.edges = opts.edges;
+  if (opts.nodes !== undefined) row.nodes = opts.nodes as unknown as Json;
+  if (opts.edges !== undefined) row.edges = opts.edges as unknown as Json;
 
   const { data, error } = await supabase
     .from("plan")
@@ -112,7 +116,7 @@ export async function createPlan(opts: {
   if (error || !data) {
     throw new Error(`新建规划失败：${error?.message ?? "未知错误"}`);
   }
-  return data as Plan;
+  return data as unknown as Plan;
 }
 
 /**
@@ -132,13 +136,14 @@ export async function updatePlanGraph(
 ): Promise<void> {
   if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
 
+  const update: PlanUpdate = {
+    nodes: patch.nodes as unknown as Json,
+    edges: patch.edges as unknown as Json,
+    viewport: patch.viewport as unknown as Json | null,
+  };
   const { error } = await supabase
     .from("plan")
-    .update({
-      nodes: patch.nodes,
-      edges: patch.edges,
-      viewport: patch.viewport,
-    })
+    .update(update)
     .eq("id", planId);
 
   if (error) throw new Error(`保存规划失败：${error.message}`);
