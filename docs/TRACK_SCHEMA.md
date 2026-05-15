@@ -4,7 +4,7 @@
 > `rule` 是用户主观偏好与零散知识（"我想保研"、"体育课压分"），track 是学校官方规则。
 > 决策依据见 [project memory: track schema pivot 2026-05-14]。
 >
-> Last updated: **2026-05-15**
+> Last updated: **2026-05-15**（v2 — scope 三档演进）
 > Related: `docs/DATA_MODEL.md`（前 7 张表）/ `docs/CURRENT_TASK.md` 排队 8–13 / `docs/AI_MEMORY.md`
 >
 > 本文档不是最终落地 SQL —— 字段定型后由排队 9 写 `0002_add_track_schema.sql`。
@@ -15,7 +15,7 @@
 
 1. **track_* 四张表是「学校公共数据」**：所有登录用户 `SELECT` 可读，写权限只给 service_role（后端手动 SQL seed / 管理员脚本）。**这是与 DATA_MODEL.md 现有 7 张表的根本区别**。
 2. **`user_progress` 是用户私有数据**，沿用 DATA_MODEL.md 通用模板（owner-only RLS）。
-3. **track 按 (school, major, year) 三元组唯一**：培养方案每届修订就开新 track；老届毕业生数据不被覆盖。
+3. **track 按 (school, year, scope_level, college, major) 唯一**：scope 三档（school / college / major）表达「适用范围」，全校通用是默认档，学院/专业级用于局部覆盖。培养方案每届修订就开新 track；老届毕业生数据不被覆盖。
 4. **option 是「可选项」**，不一定是课程：用 `kind: 'course' | 'alt' | 'project'` 字段区分（D-track-4）。
 5. **结构平铺**：category → requirement → option 三层固定，不允许 requirement 嵌套 requirement（D-track-3）。复杂表达留 schema v2。
 6. **`order_index`** 字段统一控同级排序，前端按它渲染。
@@ -28,7 +28,7 @@
 | ID | 题 | 选定 | 理由 |
 |---|---|---|---|
 | **D-track-1** | track / category / requirement / option 谁能写？ | ✅ **公共表 + service_role 写** | 学校规则录一份所有用户读；user_progress 仍 owner-only。与 `rule`（D7=a 用户私有）分工清晰：rule 是主观偏好，track 是客观规则 |
-| **D-track-2** | track 颗粒度？ | ✅ **(school, major, year)** | 培养方案每届有差异，按入学年份分版本最贴行业惯例；老届毕业生数据可保留 |
+| **D-track-2** | track 颗粒度？ | ✅ **(school, year, scope_level, college, major)** — v2 升级 | 2026-05-15 用户指出「学校多数规则全专业通用，学院之间才有不同」。改为 scope 三档（school / college / major）表达适用范围；school 级为常态，college/major 级用于局部覆盖。详见 §3.1 字段表 + 业务层 fallback 匹配规则。SQL 落地走 `0003_relax_track_scope.sql` |
 | **D-track-3** | requirement 是否嵌套？ | ✅ **平铺** | 三层 category → requirement → option 够用；嵌套留 schema v2 |
 | **D-track-4** | option 表达力？ | ✅ **`kind` 区分 course / alt / project** | 兼容比赛抵学分、海外交换、转专业等非课程项 |
 | **D-track-5** | user_progress 粒度？ | ✅ **option 级** | 状态由数据推导（修了哪几个 option → requirement 满足度计算），最细可信 |
@@ -63,21 +63,33 @@ auth.users
 
 ### 3.1 `track`
 
-**用途：** 一条 track = 「某学校某专业某入学届的毕业要求快照」。同 (school, major, year) 唯一。
+**用途：** 一条 track = 「某学校某届的毕业要求快照」。scope 三档（school / college / major）表达适用范围；同 (school, year, scope_level, college, major) 唯一。
 
 | 字段 | 类型 | 必填 | 默认 | 说明 |
 |---|---|---|---|---|
 | `id` | uuid | ✅ | `gen_random_uuid()` | PK |
 | `school` | text | ✅ | — | 学校名（自由文本；未来引 `schools` 字典表再迁） |
-| `major` | text | ✅ | — | 专业名（自由文本） |
-| `year` | smallint | ✅ | — | 入学年份（如 `2024`），不是大几 |
-| `name` | text | ✅ | — | 对外展示名（如 `"上理 CS 2024 级培养方案"`） |
-| `version` | text | ❌ | `null` | 培养方案版本号（如 `"v2024.1"`） |
+| `year` | smallint | ✅ | — | 入学年份（如 `2023`），不是大几 |
+| `scope_level` | text | ✅ | `'school'` | CHECK IN (`'school'`,`'college'`,`'major'`)。表达适用范围档位 |
+| `college` | text | ❌ | `null` | 学院名；`scope_level='college'` 或 `'major'` 时必填，`'school'` 时必须为 `null` |
+| `major` | text | ❌ | `null` | 专业名；`scope_level='major'` 时必填，其余档位必须为 `null` |
+| `name` | text | ✅ | — | 对外展示名（如 `"华师大 2023 级培养方案 · 全校通用"`） |
+| `version` | text | ❌ | `null` | 培养方案版本号（如 `"v2023.1"`） |
 | `source_url` | text | ❌ | `null` | 原文链接（PDF / 教务网页） |
 | `total_credits` | numeric(5,1) | ❌ | `null` | 毕业总学分要求（如 `158.0`） |
-| `description` | text | ❌ | `null` | 备注（如「含暑期学期」） |
+| `description` | text | ❌ | `null` | 备注 |
 | `created_at` | timestamptz | ✅ | `now()` | |
 | `updated_at` | timestamptz | ✅ | `now()` | trigger 维护 |
+
+**`scope_level` 语义 + 三档自洽**
+
+| scope_level | college | major | 适用范围 | 示例 |
+|---|---|---|---|---|
+| `'school'` | `null` | `null` | 全校通用 | 华师大 2023 级 |
+| `'college'` | 非空 | `null` | 学院通用 | 华师大 设计学院 2023 |
+| `'major'` | 非空 | 非空 | 专业级 | 华师大 设计学院 视觉传达 2023 |
+
+**业务层 fallback 匹配规则**：用户 `profiles` 的 (school, college, major) 查 track 时，按 `major → college → school` 三档逐层 fallback。例：profile 是「视觉传达」，先找 major 级 track，没有就找 college 级（设计学院），没有就找 school 级（全校通用）。多条规则在 AI prompt 层合并。
 
 **RLS**
 
@@ -91,14 +103,23 @@ DELETE  : false
 **约束**
 
 ```
-UNIQUE (school, major, year)
 CHECK (year BETWEEN 1990 AND 2099)
+CHECK (scope_level IN ('school','college','major'))
+CHECK (
+  (scope_level = 'school'  AND college IS NULL     AND major IS NULL)
+  OR (scope_level = 'college' AND college IS NOT NULL AND major IS NULL)
+  OR (scope_level = 'major'   AND college IS NOT NULL AND major IS NOT NULL)
+)
+-- UNIQUE 用表达式索引实现（NULL ≠ NULL 用 COALESCE 兜底）:
+UNIQUE INDEX (school, year, scope_level, COALESCE(college,''), COALESCE(major,''))
 ```
 
 **索引**
 
 ```
-idx_track_school_major  (school, major)   -- 按学校专业找所有届
+idx_track_school_major     (school, major)              -- 0002 遗留，按学校专业找
+idx_track_school_college   (school, college) WHERE college IS NOT NULL  -- 0003 新加
+idx_track_scope_unique     UNIQUE (school, year, scope_level, COALESCE(college,''), COALESCE(major,''))
 ```
 
 ---
@@ -284,7 +305,7 @@ idx_user_progress_option      (option_id)                 -- 反查某 option �
 
 ```sql
 -- 排队 10 seed SQL 直接 INSERT，不需要切角色，SQL Editor 默认就是 service_role
-INSERT INTO track (school, major, year, name) VALUES (...);
+INSERT INTO track (school, year, scope_level, name) VALUES (...);
 ```
 
 **前端写防护**：四张公共表写策略全 `false`，普通用户的 supabase-js client 任何 INSERT/UPDATE/DELETE 都会被 RLS 拒，不需要应用层守卫。
@@ -295,7 +316,7 @@ INSERT INTO track (school, major, year, name) VALUES (...);
 
 ```
                    ┌────────────────────┐
-                   │      track         │  (school, major, year) UNIQUE
+                   │      track         │  (school, year, scope_level, college, major) UNIQUE
                    │  公共表             │
                    └────────┬───────────┘
                             │ 1:N

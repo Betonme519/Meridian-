@@ -101,21 +101,16 @@
 
 ## 当前阻塞
 
-**等三件事齐才能动排队 10 转 SQL：**
+**排队 10 输入收集中。等三件事齐：**
 
-1. **0002 SQL 是否跑通** — `supabase/migrations/0002_add_track_schema.sql` + `0002_verify.sql`。用户还未回报。
-2. **具体专业全称** — track 锁定「华东师范大学 / 设计学院 / 2023 级」，但「设计学院」下具体专业未定（视觉传达 / 环境设计 / 产品设计 / 数字媒体艺术 / 公共艺术 / 美术学 之一）。会写进 `track.major` 字段，需用户确认。
-3. **5 张截图到位** — 用户在 2026-05-15 选「截图路径」（密码路线已否决：教务密码常被复用 / Claude 无持久会话 / CLAUDE.md 禁动 auth）；将一张张发，时间跨度可能长。已建好 `docs/raw/`（`.gitignore` 全过滤，README 留命名约定）。
+1. ~~**0002 SQL 跑通**~~ ✅ 2026-05-15 用户回报全 OK
+2. **0003_relax_track_scope SQL 跑通** — schema 演进：`track.major` 改 nullable + 新增 `scope_level` + `college` + 三档 CHECK 约束 + 新 UNIQUE INDEX。用户 2026-05-15 决定「不按专业分」，scope 三档（school / college / major）改成稳定结构而非靠字段语义约定。**等用户在 Dashboard 跑 `supabase/migrations/0003_relax_track_scope.sql` + `0003_verify.sql`**；跑完需重新 `supabase gen types typescript --project-id tukdczwcygcgpxmdhobl --schema public > src/types/db.ts`。
+3. **读规则 md** — 用户已把规则导出到 `docs/华师大公示文件/`（**未读，等用户说『开始』**）。用户明确「先别读，规则比较复杂」。`docs/raw/` 已删除（不再需要图片路径）。
 
-**截图清单（已建议命名）：**
-
-- [ ] `ecnu-design-2023-overview.png` — 培养方案总览（毕业总学分 / 学分结构汇总）
-- [ ] `ecnu-design-2023-major-required.png` — 专业必修课表（代码 / 名 / 学分 / 学期）
-- [ ] `ecnu-design-2023-major-elective.png` — 专业选修课表
-- [ ] `ecnu-design-2023-general.png` — 通识 / 公选课表
-- [ ] `ecnu-design-2023-second-class.png` — 第二课堂 / 实践（如有）
-
-**新会话回来怎么接续：** 进 `docs/raw/` `ls` 看有哪些图 → Read 图 → 对比上面 checklist 看缺哪几张 → 缺的就等 / 提醒用户 → 齐了启动 Task #12（写 `supabase/migrations/0003_seed_ecnu_design_2023.sql`）。
+**新会话回来怎么接续：**
+- 先看 0003 SQL 跑了没（问用户 / 看 `src/types/db.ts` 里 `track` Row 是否含 `scope_level` / `college`）
+- 没跑 → 提醒用户去 Dashboard 跑 0003
+- 跑了 + 用户说「开始」 → 读 `docs/华师大公示文件/` 下所有 md → 启动 Task #12（写 `supabase/migrations/0004_seed_ecnu_2023.sql`，首条 track 用 `scope_level='school'`，全校通用）
 
 ---
 
@@ -145,6 +140,14 @@
 ## 最近完成（最多 5 条）
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
+
+- **2026-05-15** — 0003 — track schema scope 三档演进（排队 9 之后插入的小迭代，不算新排队）
+  - 用户决定「学校多数规则全专业通用，学院间才有差异」→ track 字段从 `(school, major, year)` UNIQUE 演进为 scope 三档表达适用范围。
+  - 新建 `supabase/migrations/0003_relax_track_scope.sql`：ALTER 现有 track 表（保留 RLS / trigger / 旧索引），DROP 旧 UNIQUE 约束 → `major` 改 nullable → 新增 `scope_level text DEFAULT 'school'` + `college text`（可空）→ 两个 CHECK 约束（`scope_level` 三档枚举 + 三档语义自洽）→ 新建表达式 UNIQUE INDEX 用 COALESCE 处理 NULL → partial index `idx_track_school_college`。
+  - 新建 `supabase/migrations/0003_verify.sql`：9 段验证（新列存在 / CHECK 约束就位 / 旧 UNIQUE 已删新 INDEX 已建 / 插入合法 school+college+major 三档示例 / 违规数据被拦截测试段注释保留 / 自动 cleanup）。
+  - 更新 `docs/TRACK_SCHEMA.md`：§3.1 track 表字段表加 scope_level + college；约束段升级为表达式 UNIQUE；新增「scope_level 语义 + 三档自洽」表 + 业务层 fallback 匹配规则（profile.college/major → major track → college track → school track 逐层降级）；D-track-2 决策点 v2 升级标注。
+  - `docs/raw/` 目录删除（用户改成 md 路径，规则文件已挪到 `docs/华师大公示文件/`，未读）。
+  - 用户侧待操作：在 Supabase Dashboard 跑 `0003_relax_track_scope.sql` + `0003_verify.sql` → 跑通后重新跑 `supabase gen types typescript --project-id tukdczwcygcgpxmdhobl --schema public > src/types/db.ts` 让 typed client 反映新列。
 
 - **2026-05-15** — 排队 9 — `0002_add_track_schema.sql` migration + verify + DATA_MODEL 入口
   - 新建 `supabase/migrations/0002_add_track_schema.sql`：5 张表（track / track_category / track_requirement / track_option / user_progress）+ 8 索引 + RLS（4 公共表 `SELECT USING (true)` + user_progress 4 条 owner CRUD policy）+ 5 个 `set_updated_at` trigger（沿用 0001）+ 所有 CHECK 约束（kind 枚举 / threshold 必填规则 / course kind credits 必填 / user_progress status 枚举 / year 范围）+ UNIQUE 约束（track 三元组 / category code / requirement code / option code / user_progress user-option）。**完全幂等**（DROP IF EXISTS + CREATE IF NOT EXISTS），失败回滚重跑即可。
