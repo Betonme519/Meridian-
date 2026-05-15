@@ -48,7 +48,19 @@ auth.users                  ← Supabase 内置，不动
   └── chat_message          (1:N)  AI 对话历史，按 conversation_id 分组
   └── rag_source            (1:N)  上传文件清单（培养方案 / 成绩单 / 课表 / ...）
                                    实际文件在 Supabase Storage，本表只存元数据 + 解析状态
+
+(独立公共表族 — 学校客观规则，见 docs/TRACK_SCHEMA.md)
+track                       公共表，无 user_id
+  └── track_category        (1:N)  一级分类（专业必修 / 公选 / ...）
+       └── track_requirement (1:N)  具体要求（如 "数学基础 4 门"）
+            └── track_option (1:N)  可选项（课程 / 抵学分 / project）
+
+user_progress               (1:N)  用户在 track 中的进度，option 级
+  ← auth.users / track / track_option
 ```
+
+> **track_* 五张表的 schema 详情、决策点、迁移路径** 全部见 `docs/TRACK_SCHEMA.md`。
+> 本文件仅维护 7 张 user-owned 表；track_* 是独立公共表族，文档分开避免互相挤占。
 
 ---
 

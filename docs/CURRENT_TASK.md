@@ -45,13 +45,6 @@
 
 ### 第二阶段 · 毕业路径主线
 
-#### 排队 9 — `0002_add_track_schema.sql` migration
-
-- 按排队 8 文档建 5 张表 + RLS + index + trigger。
-- `track_*`：`SELECT` public，`INSERT/UPDATE/DELETE` 限 service_role。
-- `user_progress`：owner only。
-- 在 `DATA_MODEL.md` 补 §3.8-§3.12。
-
 #### 排队 10 — 学校种子数据 seed SQL
 
 - 手动 SQL `0003_seed_<school>_<major>.sql` —— 把培养方案录成 ~50-200 行 insert。
@@ -108,7 +101,7 @@
 
 ## 当前阻塞
 
-无。排队 8 已完成（7 个决策点用户拍板 + TRACK_SCHEMA.md 起草）。等用户启动**排队 9**（`0002_add_track_schema.sql` migration）。排队 10 起需用户提供培养方案原始资料。
+**等用户在 Supabase Dashboard 跑 `0002_add_track_schema.sql` + `0002_verify.sql`**（排队 9 收尾）。跑完后启动**排队 10**（用户需提供培养方案原始资料 PDF / 网页 / 手抄列表）。
 
 ---
 
@@ -138,6 +131,12 @@
 ## 最近完成（最多 5 条）
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
+
+- **2026-05-15** — 排队 9 — `0002_add_track_schema.sql` migration + verify + DATA_MODEL 入口
+  - 新建 `supabase/migrations/0002_add_track_schema.sql`：5 张表（track / track_category / track_requirement / track_option / user_progress）+ 8 索引 + RLS（4 公共表 `SELECT USING (true)` + user_progress 4 条 owner CRUD policy）+ 5 个 `set_updated_at` trigger（沿用 0001）+ 所有 CHECK 约束（kind 枚举 / threshold 必填规则 / course kind credits 必填 / user_progress status 枚举 / year 范围）+ UNIQUE 约束（track 三元组 / category code / requirement code / option code / user_progress user-option）。**完全幂等**（DROP IF EXISTS + CREATE IF NOT EXISTS），失败回滚重跑即可。
+  - 新建 `supabase/migrations/0002_verify.sql`：9 段独立验证查询（表数 5 / RLS 全开 / policy 合计 8 / trigger 数 5 / 4 公共表空读不报错 / service_role 写公共表 / CASCADE 跟删链路 / user_progress 留排队 10 后再验）。
+  - `docs/DATA_MODEL.md` §2 表清单速览段后加 track_* + user_progress 段 + cross-link 指 TRACK_SCHEMA.md（明确说"本文件仅维护 7 张 user-owned 表；track_* 文档独立避免互相挤占"）。
+  - **用户侧待操作**：去 Supabase Dashboard SQL Editor 粘 `0002_add_track_schema.sql` 跑 → 粘 `0002_verify.sql` 逐段跑确认输出 → 然后启动排队 10（提供培养方案原始资料）。
 
 - **2026-05-15** — 排队 8 — `docs/TRACK_SCHEMA.md` 起草（毕业路径五层结构契约）
   - 用户拍板 7 个决策点（D-track-1 ~ D-track-7）：track_* 公共表 + service_role 写 / track 颗粒度 (school, major, year) / requirement 平铺不嵌套 / option `kind: course|alt|project` / user_progress option 级 / AI 整 JSON 喂 prompt / prerequisite 用 `option.prerequisites text[]` 弱实现。
