@@ -45,10 +45,31 @@
 
 ### 第二阶段 · 毕业路径主线
 
-#### 排队 10 — 学校种子数据 seed SQL
+#### 排队 10 — 学校种子数据 seed SQL（华师大 2023 级）
 
-- 手动 SQL `0003_seed_<school>_<major>.sql` —— 把培养方案录成 ~50-200 行 insert。
+- 手动 SQL `0005_seed_ecnu_2023.sql` —— 把培养方案录成 ~50-200 行 insert（首条 track 用 `scope_level='school'` 全校通用）。
 - **不做 RAG，不做爬虫**。
+
+**前置子任务（2026-05-15 拍板，分 4 批读 + 双层记录 + schema 加 source_ref）**：
+
+1. **分批读 + 逐批校验** — 34 个 md 分 4 批，每批读完先出 digest 让用户拍板，再进下一批：
+   - 批 A · 毕业资格核心（5 个）：学籍管理 / 毕业资格审核 / 学士学位授予 / 成绩及学分认定 / 课程考核
+   - 批 B · 学业规则类（6 个）：选课退课 / 成绩管理 / 学业预警 / 考勤 / 体质健康 / 学分制收费
+   - 批 C · 特殊计划/加分（7 个）：辅修 / 双学位 / 强基计划 / 个性化培养 / 转专业 / 创新创业学分 / 学科竞赛
+   - 批 D · 过程类（5 个）：注册 / 休学复学 / 实习 / 毕业论文 / 创新训练
+   - 跳过：研究生免试 / 师范生教育教学考核 / 第二学士学位 / 少数民族预科 / 境外联合培养 / 学籍学历电子注册 / 学生证 / 学分制收费(老版) / 本科论文抽检
+2. **两层记录**：
+   - 人读层 `docs/ecnu_rules_digest_{A,B,C,D}.md` —— 每条规则 4 字段：规则中文 / 原文片段 / 来源(文件名 §章节) / 落地(入 track_requirement / 入 prompt / 不入)
+   - 机读层 `supabase/migrations/0005_seed_ecnu_2023.sql` —— 可结构化的入 track_requirement / track_option，每行 INSERT 带 `-- source:` 注释
+3. **schema 加 source_ref（在 seed 之前）** — 新建 `supabase/migrations/0004_add_source_ref.sql`：
+   - `track_requirement.source_ref text` 可空
+   - `track_option.source_ref text` 可空
+   - 自由字符串，存 "文件名 §章节"；AI 输出时引；UI hover 显示
+4. **过程类规则** — 单出 `docs/ecnu_process_rules.md` 精炼版（~500 行内）：选课退课流程、转专业流程、考勤等不入 track_* 但 AI 顾问要知道的内容。排队 13 写 `gradPathAdvisorPrompt` 时一起喂。
+
+**触发顺序**：用户说「开始批 A」→ 读 5 个 md → 写 digest A → 停 → 用户拍板 → 同样跑 B/C/D → 4 个 digest 都过 → 写 0004 + 0005 + ecnu_process_rules.md → 排队 13 接 AI prompt + UI 展示 citations。
+
+**只做本科生内容**，硕士/博士相关全跳。
 
 #### 排队 11 — `course` 表接 API + UI 入口
 
@@ -104,19 +125,33 @@
 **排队 10 输入收集中。状态盘点：**
 
 1. ~~**0002 SQL 跑通**~~ ✅ 2026-05-15 用户回报全 OK
-2. **0003_relax_track_scope SQL 状态未确认（❓ 下会话首问）** — schema 演进：`track.major` 改 nullable + 新增 `scope_level` + `college` + 三档 CHECK 约束 + 新 UNIQUE INDEX。文件已写好（`supabase/migrations/0003_relax_track_scope.sql` + `0003_verify.sql`），但**用户没明确回报 Dashboard 跑通了没**。下会话首问。
+2. ~~**0003_relax_track_scope SQL 跑通**~~ ✅ 2026-05-15 用户回报「没问题了」
 3. ~~**重新 gen types 同步 db.ts**~~ → **推到排队 11**。2026-05-15 用户跑 `> src/types/db.ts` 命中 `Access token not provided` 错误，shell 已 truncate 旧 db.ts → 已用 `git checkout HEAD -- src/types/db.ts` 从 commit `387e5ba` 恢复（471 行，含 0002 之前的 7 表）。**db.ts 暂不含 0003 列（scope_level / college）**，但 src/ 里还没业务代码用 track 表，所以不阻塞 schema 演进；等排队 11 真正写 `courseApi` / 涉及 track 时再用[[feedback-supabase-gen-types-safe]] 安全跑法重生成。
 4. **读规则 md** — 用户已把规则导出到 `docs/华师大公示文件/`（**未读，等用户说『开始』**）。用户明确「先别读，规则比较复杂」。`docs/raw/` 已删除（不再需要图片路径）。
 
-**新会话回来怎么接续：**
-1. **先问用户**：「0003 SQL 跑通了吗？」（用户上次没明确回报，只回报过 0002 跑通）
-2. 跑通 + 用户说「开始」 → 读 `docs/华师大公示文件/` 下所有 md → 启动 Task #12（写 `supabase/migrations/0004_seed_ecnu_2023.sql`，首条 track 用 `scope_level='school'`，全校通用）
-3. 没跑通 → 提醒用户去 Supabase Dashboard SQL Editor 粘 `0003_relax_track_scope.sql` 跑 → 粘 `0003_verify.sql` 逐段跑验证
-4. **gen types 不再阻塞当前主线**，推到排队 11 一起做；要重新跑时务必用[[feedback-supabase-gen-types-safe]] 的安全跑法（双步 `.tmp` 文件），不要直接 `> src/types/db.ts`
+**2026-05-15 状态（AI 一次性读完批 A/B/C/D 共 23 个 md → 4 份 digest 已生成 → 用户陆续修订）：**
 
-**会话 2026-05-15 末期遗留：**
-- TaskList 里 #14 (in_progress) = 等用户提供 md；#12 (pending) = 写 seed SQL；#21 (pending) = 下会话首问 0003 SQL 状态。其他都已完成或删除。
-- 最后一个 commit：`387e5ba 审计修瑕疵：CURRENT_TASK 裁到 5 条 + 0002_verify 加 0003 覆盖 banner`
+| digest | 文件 | 用户审阅状态 | 剩余 ⚠️ |
+|---|---|---|---|
+| 批 A | `docs/ecnu_rules_digest_A.md` | ✅ 用户已补 A1-6 / A1-8 / A2-2（肄业→毕业）。AI 已同步 A2-2 落地行 | 无重大 ⚠️ |
+| 批 B | `docs/ecnu_rules_digest_B.md` | ✅ 用户已补 B2-3 / B2-4 / B3-1 / B3-7 / B3-8 (含三条件) / B4-3 (连续两周退学)。AI 已同步 B3-8 落地行 | 无重大 ⚠️ |
+| 批 C | `docs/ecnu_rules_digest_C.md` | ✅ 用户已补 C1-3 / C1-8 / C2-1 / C2-2 / C3-3 / C3-6 / C4-3 / C4-4 / C4-5 / C5-2 / C5-3 / C5-4 / C5-9 / C5-13 / C7-2。三张分值表 C6-5 / C6-6 / C6-9 通过桌面图片 OCR 录入完毕。AI 已同步全部落地行去 ⚠️ | C2-4 双学位补入/退出时间窗未抓全 |
+| 批 D | `docs/ecnu_rules_digest_D.md` | ✅ 用户已补 D1-2 / D1-8 / D2-3 / D2-4 / D2-11 / D2-13 / D3-1 / D3-3 (1:30) / D3-6 / D4-1 / D4-3 / D4-4 (≥2%) / D4-5 / D4-8 (≤20%) / D4-10 / D4-14 / D4-15 / D5-2 / D5-4 (≤2项/年) / D5-6 (≤20%) / D5-7 / D5-8 (15/20学时)。AI 已同步全部落地行去 ⚠️ | D2-8 因病医药费（小，prompt 类）/ D5-8 教师工作量（不入 track） |
+
+**下一步**：
+1. **4 份 digest 全部拍板完毕** → task #4 unblocked，可启动：写 `0004_add_source_ref.sql`（schema 加 source_ref 列） + `0005_seed_ecnu_2023.sql`（按 4 份 digest 把可结构化规则录成 INSERT）+ `docs/ecnu_process_rules.md`（过程类精炼版给 AI prompt 用）。
+2. **gen types 不再阻塞当前主线**，推到排队 11 一起做；要重新跑时务必用[[feedback-supabase-gen-types-safe]] 的安全跑法（双步 `.tmp` 文件），不要直接 `> src/types/db.ts`
+
+**用户修改 digest 的工作流（已确认）**：
+- 用户在 IDE 里直接编辑 4 份 `ecnu_rules_digest_*.md`，补 ⚠️ 处或修正「规则」行。
+- AI 收到 system-reminder 看到文件被改 → 同步对应的「落地」行去掉 ⚠️ / 写真实结构。
+- chat 里互相确认（typo / 不一致由 AI 主动质询）。
+- 工具 OCR：用户把表格放桌面 `C:\Users\J-R-N\Desktop\` 用文件名 `Cx-y.png` 标记，AI 用 Read 读图。
+
+**会话 2026-05-15 状态：**
+- 4 份 digest 全部用户审阅 + AI 同步落地行完毕。⚠️ 剩余项极少且不影响 track 结构化。
+- Task #1~#3 / #5 / #7 / #8 已 completed。**#4 阻塞解除**（写 0004_add_source_ref.sql + 0005_seed_ecnu_2023.sql + ecnu_process_rules.md）。
+- 工具补强：AI 工具 OCR（用户桌面 `Cx-y.png` 命名 → AI Read 读图 → 录入 markdown table）。批 C 三张表入文（C6-5 / C6-6 / C6-9）。
 
 ---
 
@@ -148,6 +183,20 @@
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
 > 早于 2026-05-14 的里程碑（排队 5 / 2 / 4b / 4a / profiles / DATA_MODEL）已挪到 `docs/AI_MEMORY.md` § 9。
 
+- **2026-05-15** — 排队 10 前置 — 华师大 23 个 md → 4 份 ECNU 规则 digest 录入完毕
+  - **AI 一次性读完 23 个 md（剔除硕博/二学位等不相关 11 个）→ 写 4 份 digest**：
+    - `docs/ecnu_rules_digest_A.md` 毕业资格核心（学籍管理 / 毕业资格 / 学士学位 / 成绩学分认定 / 课程考核）
+    - `docs/ecnu_rules_digest_B.md` 学业规则（选课退课 / 成绩管理 / 学业预警 / 考勤 / 体质健康 / 学分制收费）
+    - `docs/ecnu_rules_digest_C.md` 特殊计划（辅修 / 双学位 / 强基 / 个性化 / 转专业 / 创新创业学分 / 学科竞赛）
+    - `docs/ecnu_rules_digest_D.md` 过程类（注册 / 休学复学 / 实习 / 毕业论文 / 创新训练）
+  - **每条规则强制 4 字段**：规则中文 / 原文片段 / 来源(§条款) / 落地(track_requirement 或 prompt)。结构稳定，下游 seed SQL 可机器扫描。
+  - **用户审阅工作流**：用户在 IDE 直接改 4 份 md 补 ⚠️ / 修正规则行 → AI 收 system-reminder 同步「落地」行去 ⚠️ / 升级到 track_requirement 结构 → chat 互验 typo（A2-2 肄业 → 毕业 这种被 AI 主动质询）。
+  - **工具补强：AI OCR**：用户把表格放桌面 `C:\Users\J-R-N\Desktop\Cx-y.png` 命名 → AI Read 读图 → 录入 markdown 表 + 落地行结构。批 C 三张表（C6-5 项目 / C6-6 竞赛 / C6-9 论文专利著作）就是这样录入。
+  - **拍板覆盖度**：A/B/C/D 4 份的「待用户拍板要点」段几乎全部 ⚠️ 解决；剩余 2-3 条不影响 track 结构化（D2-8 因病医药费 / D5-8 教师工作量）。
+  - 修两个 typo：A2-2 落地行同步「肄业→毕业」；D3-6 用户重复粘贴的句子去重。
+  - **解锁 task #4**：写 `0004_add_source_ref.sql`（schema 加 source_ref 列）+ `0005_seed_ecnu_2023.sql`（按 4 份 digest 把 track_requirement 候选录成 INSERT）+ `docs/ecnu_process_rules.md`（过程类精炼版给 AI prompt 用）。
+  - 新增技术债：TD-25 落地页「规则透明与来源」section 闪屏 bug（用户报）。
+
 - **2026-05-15** — 0003 — track schema scope 三档演进（排队 9 之后插入的小迭代，不算新排队）
   - 用户决定「学校多数规则全专业通用，学院间才有差异」→ track 字段从 `(school, major, year)` UNIQUE 演进为 scope 三档表达适用范围。
   - 新建 `supabase/migrations/0003_relax_track_scope.sql`：ALTER 现有 track 表（保留 RLS / trigger / 旧索引），DROP 旧 UNIQUE 约束 → `major` 改 nullable → 新增 `scope_level text DEFAULT 'school'` + `college text`（可空）→ 两个 CHECK 约束（`scope_level` 三档枚举 + 三档语义自洽）→ 新建表达式 UNIQUE INDEX 用 COALESCE 处理 NULL → partial index `idx_track_school_college`。
@@ -178,9 +227,3 @@
   - 工程细节：rule_conflict CHECK (a < b) 由 API 层强制 sort，UI 不暴露顺序概念；SEED_RULES 用合成 string id（不是 UUID）但不入 DB 所以不会触发 PK 校验；trust 切档用 `as const` 数组取 `(idx + 1) % 3`，类型安全循环。
   - 完成标准：`tsc --noEmit` 干净（仅 CardSwap 历史）；`vite build` 通过；schedule bundle 54.62 kB；UI 增删改跑通；访客 / 空账号见 SEED；冲突区按 resolved_by 高亮。
 
-- **2026-05-14** — 排队 6 — `chat_message` 表接 `/ai-advisor` 对话历史（TD-7 chat_message 部分收尾）
-  - 新建 `src/api/chatMessageApi.ts`：`listConversations(userId, rowLimit)` / `listConversationMessages(conversationId)` / `insertChatMessage({...})` / `deleteConversation(userId, conversationId)`；ChatMessage 走 typed client 派生（窄 role / mode / metadata 三字段）；PostgREST 不原生 group by → 客户端从 idx_chat_user_created 拉最近 100 行后 JS 压平成 ConversationSummary（preview / mode / aborted / last_at / message_count）。
-  - 新建 `src/hooks/useChatMessages.ts`：同款 race 守卫（listReqIdRef + activeReqIdRef + loadedUserIdRef + auth-loading 短路）；`persistRound({userMessage, assistantMessage, mode, aborted})` 生成 conversation_id → 串行 insert user/assistant 两条 → 乐观 prepend 到本地 conversations；`selectConversation(id)` 拉详情；`clearActive()` 退出查看；`remove(id)` 硬删。
-  - AIAdvisor 页：每次 handleParse = 一个新 conversation_id（单次推荐场景，不开多轮）；流式完成 / abort 都落库（abort 时 meta.aborted=true，content 是部分输出，profile 不写回避免半截解析）。aside 新增「对话历史」卡片（animationDelay 300ms，列表项含 mode badge / 中断标记 / 相对时间 / hover-删除按钮）；textarea / parse 按钮上方加「正在查看历史会话」banner + 「返回新建」入口；点历史条目 effect 同步 user/assistant 内容到 textarea + parsedNote；点 active 自己 = 退出查看；编辑 textarea 自动 clearActive。
-  - 工程细节：`as unknown as ChatMessage` / `as unknown as Json` 桥接 Json↔业务窄类型（TS 不递归推断）；mock provider abort 是优雅 return（不抛），用 `ctrl.signal.aborted` 而不是 catch 判断是否中断。
-  - 完成标准：`tsc --noEmit` 干净（仅 CardSwap 历史）；`vite build` 通过；ai-advisor bundle 35.05 kB；刷新看得到上次会话；点历史载入上下文；abort 落库且标记中断。
