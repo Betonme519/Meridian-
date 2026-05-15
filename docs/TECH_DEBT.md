@@ -40,10 +40,10 @@
 - **风险**：A tab 改了字段 / 删了文件，B tab 看到旧值直到刷新
 - **建议**：各 Context / hook 订阅 `supabase.channel('<table>').on('postgres_changes', ...)`
 
-### TD-7 · 功能页仍有写死 const（rule / chat_message）
-- **风险**：profile + rag_source + plan 已接通；其余 2 张表仍假数据。
-- **现状**：`/schedule` 接 `rule` + `rule_conflict` 本期跳过（见 TD-24）；`chat_message` 等排队 2 + AI provider 抽象落地后再接
-- **建议**：先做排队 2，AI 抽象稳了再回头补 rule / chat_message
+### TD-7 · 功能页仍有写死 const（**仅剩 rule**）
+- **风险**：profile + rag_source + plan + chat_message 已接通；只剩 rule + rule_conflict 仍 const。
+- **现状**：`chat_message` 已于 2026-05-14 排队 6 接通 `/ai-advisor` 对话历史；`/schedule` 接 `rule` + `rule_conflict` = 排队 7（即将做）
+- **建议**：跑完排队 7 这条整体消掉
 
 ### TD-8 · `_app.tsx` beforeLoad context 注入未做
 - **风险**：当前 `getSession()` 读 localStorage 够稳，但服务端鉴权（D3=b）切不过去

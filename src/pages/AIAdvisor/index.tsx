@@ -4,15 +4,20 @@ import {
   Gauge,
   GraduationCap,
   HeartPulse,
+  History,
   Plane,
   Sparkles,
   Target,
   Timer,
+  Trash2,
   Trophy,
+  Undo2,
   Wand2,
+  XCircle,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
+import { useChatMessages } from "@/hooks/useChatMessages";
 import { GOAL_MODES, type GoalMode } from "@/api/profileApi";
 import { chat, recommendModePrompt } from "@/ai";
 
@@ -24,6 +29,24 @@ type Mode = {
   example: string;
   pro?: boolean;
 };
+
+/**
+ * 把 ISO 时间格式化成"刚刚 / N 分钟前 / N 小时前 / N 天前 / 绝对日期"。
+ * 历史列表上的时间戳，不需要精确到秒。
+ */
+function formatRelativeTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const diffMs = Date.now() - date.getTime();
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return "刚刚";
+  if (min < 60) return `${min} 分钟前`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} 小时前`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day} 天前`;
+  return date.toLocaleDateString("zh-CN");
+}
 
 const modes: Mode[] = [
   {
@@ -99,6 +122,29 @@ export default function AIAdvisorPage() {
   // 取消上一轮 stream（用户连点 / 切模式 / 卸载）
   const abortRef = useRef<AbortController | null>(null);
 
+  // 对话历史持久化（chat_message 表）
+  const {
+    conversations,
+    loading: loadingConversations,
+    activeConversationId,
+    activeMessages,
+    loadingActive,
+    persistRound,
+    selectConversation,
+    clearActive,
+    remove: removeConversation,
+  } = useChatMessages();
+
+  // 选中历史会话后，把 user msg 灌进 textarea + assistant msg 灌进 parsedNote，
+  // 让用户直接看到那次推荐的内容。切走（clearActive）时由对应 handler 清空。
+  useEffect(() => {
+    if (!activeConversationId || activeMessages.length === 0) return;
+    const userMsg = activeMessages.find((m) => m.role === "user");
+    const assistantMsg = activeMessages.find((m) => m.role === "assistant");
+    if (userMsg) setProfileText(userMsg.content);
+    if (assistantMsg) setParsedNote(assistantMsg.content);
+  }, [activeConversationId, activeMessages]);
+
   const activeMode = useMemo(
     () => modes.find((mode) => mode.title === selectedMode) ?? modes[0],
     [selectedMode],
@@ -114,44 +160,93 @@ export default function AIAdvisorPage() {
   };
 
   // 用 AI 流式推荐 goal_mode：
-  //  1. abort 上一轮（连点 / 切模式 / 卸载 时也走这条路）
+  //  1. abort 上一轮（连点 / 切模式 / 卸载 时也走这条路）；同时退出"查看历史"态
   //  2. for-await 消费 token，逐字累加到 parsedNote（实时渲染）
   //  3. 流完正则解析"推荐：<mode>"，校验在 GOAL_MODES 里再写 profile
-  //  4. 抛 AbortError 时沉默退出；其它错误 set 到 parsedNote
+  //  4. mock provider abort 走优雅 return（不抛）；真 provider 抛 AbortError
+  //  5. 不管走哪条路，都把 user + assistant 两条 message 落 chat_message 表
+  //     （aborted=true 时 assistantMessage 可能是部分输出，meta.aborted=true 标识）
   async function handleParse() {
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
+    const snapshotUserText = profileText;
+    // 启动新一轮 = 退出"查看历史"态。selectConversation(null) 会清 active marker
+    // + 清空 activeMessages；sync-effect 因 activeConversationId 变 null 会早退，
+    // 不会把刚刚 setParsedNote("") 的清空回滚。
+    selectConversation(null);
     setParsedNote("");
     setStreaming(true);
 
+    let acc = "";
+    let crashed = false;
     try {
-      let acc = "";
       for await (const tok of chat({
-        messages: recommendModePrompt(profileText),
+        messages: recommendModePrompt(snapshotUserText),
         signal: ctrl.signal,
       })) {
         acc += tok;
         setParsedNote(acc);
       }
-      const m = acc.match(/推荐[：:]\s*(.+?)(?:\n|$)/);
-      const candidate = m?.[1]?.trim();
-      if (
-        candidate &&
-        (GOAL_MODES as readonly string[]).includes(candidate)
-      ) {
-        setSelectedMode(candidate as GoalMode);
-      }
     } catch (e) {
-      if ((e as Error)?.name === "AbortError") return;
-      setParsedNote(`AI 推荐失败：${(e as Error).message}`);
+      // mock provider abort = 优雅 return，不进 catch；进 catch 的多半是真 provider 抛的 AbortError 或其它错
+      if ((e as Error)?.name !== "AbortError") {
+        crashed = true;
+        setParsedNote(`AI 推荐失败：${(e as Error).message}`);
+      }
     } finally {
       if (abortRef.current === ctrl) {
         setStreaming(false);
         abortRef.current = null;
       }
     }
+
+    if (crashed) return;
+
+    const wasAborted = ctrl.signal.aborted;
+
+    // 解析 mode（部分输出也可能含「推荐：xxx」首行，宽松提取）
+    const m = acc.match(/推荐[：:]\s*(.+?)(?:\n|$)/);
+    const candidate = m?.[1]?.trim();
+    const mode: GoalMode | null =
+      candidate && (GOAL_MODES as readonly string[]).includes(candidate)
+        ? (candidate as GoalMode)
+        : null;
+
+    // 干净跑完才写 profile（abort 时 acc 可能不完整，不要把半截解析写回）
+    if (!wasAborted && mode) setSelectedMode(mode);
+
+    // 落库：用户有输入 + acc 非空（至少有半截 assistant 内容）才写
+    if (snapshotUserText.trim() && acc) {
+      void persistRound({
+        userMessage: snapshotUserText,
+        assistantMessage: acc,
+        mode,
+        aborted: wasAborted,
+      });
+    }
+  }
+
+  /**
+   * 用户点"返回新建"：清空 textarea / parsedNote / active 标识，回到空白态。
+   */
+  function handleNewConversation() {
+    selectConversation(null);
+    setProfileText("");
+    setParsedNote("");
+  }
+
+  /**
+   * 用户点历史条目：先 select（异步拉取详情），detail 回来后 effect 灌进
+   * textarea + parsedNote。点 active 自己等于退出查看。
+   */
+  function handleSelectHistory(conversationId: string) {
+    if (activeConversationId === conversationId) {
+      handleNewConversation();
+      return;
+    }
+    selectConversation(conversationId);
   }
 
   // 卸载时 abort：避免 setState on unmounted + provider 继续 yield
@@ -247,7 +342,11 @@ export default function AIAdvisorPage() {
                 id="ai-advisor-profile-text"
                 name="profileText"
                 value={profileText}
-                onChange={(event) => setProfileText(event.target.value)}
+                onChange={(event) => {
+                  setProfileText(event.target.value);
+                  // 用户开始编辑 = 退出"查看历史"态，下次 parse 自然是新会话
+                  if (activeConversationId) selectConversation(null);
+                }}
                 className="block min-h-32 w-full resize-none bg-transparent px-3 py-2.5 text-sm leading-6 text-slate-800 outline-none placeholder:text-slate-400"
                 placeholder="例：我想保研，但这学期有实习，不能让 workload 超过 20 小时。"
               />
@@ -256,6 +355,22 @@ export default function AIAdvisorPage() {
                 <span className="uppercase tracking-[0.18em]">中文 · 自然语言</span>
               </div>
             </div>
+            {activeConversationId && (
+              <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+                <span className="flex items-center gap-1.5">
+                  <History className="h-3.5 w-3.5" />
+                  正在查看历史会话
+                </span>
+                <button
+                  type="button"
+                  onClick={handleNewConversation}
+                  className="flex items-center gap-1 rounded-full px-2 py-0.5 font-medium hover:bg-slate-100"
+                >
+                  <Undo2 className="h-3 w-3" />
+                  返回新建
+                </button>
+              </div>
+            )}
             <button
               type="button"
               onClick={handleParse}
@@ -305,6 +420,92 @@ export default function AIAdvisorPage() {
             <p className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
               {activeMode.example}
             </p>
+          </div>
+
+          {/* Conversation history */}
+          <div
+            className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-5"
+            style={{ animationDelay: "300ms" }}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="flex items-center gap-2 font-semibold">
+                <History className="h-4 w-4 text-slate-500" />
+                对话历史
+              </h2>
+              {conversations.length > 0 && (
+                <span className="text-[11px] tabular-nums text-slate-400">
+                  最近 {conversations.length} 条
+                </span>
+              )}
+            </div>
+
+            {loadingConversations ? (
+              <p className="mt-4 text-sm text-slate-400">加载中…</p>
+            ) : conversations.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-400">
+                暂无历史。让 AI 跑一次推荐，就会出现在这里。
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {conversations.map((c) => {
+                  const active = c.conversation_id === activeConversationId;
+                  return (
+                    <li key={c.conversation_id}>
+                      <div
+                        className={`group flex items-start gap-2 rounded-xl border p-3 transition-colors ${
+                          active
+                            ? "border-slate-950 bg-slate-50"
+                            : "border-slate-100 bg-white hover:border-slate-300"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleSelectHistory(c.conversation_id)}
+                          className="min-w-0 flex-1 text-left"
+                          disabled={loadingActive && active}
+                        >
+                          <p className="truncate text-sm font-medium text-slate-800">
+                            {c.preview || "（无内容）"}
+                          </p>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
+                            {c.mode && (
+                              <span className="rounded-full bg-slate-100 px-1.5 py-0.5">
+                                {c.mode}
+                              </span>
+                            )}
+                            {c.aborted && (
+                              <span className="flex items-center gap-1 text-rose-600">
+                                <XCircle className="h-3 w-3" />
+                                中断
+                              </span>
+                            )}
+                            <span className="tabular-nums">
+                              {formatRelativeTime(c.last_at)}
+                            </span>
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (window.confirm("删除这条对话历史？")) {
+                              void removeConversation(c.conversation_id).catch(
+                                (err) =>
+                                  console.warn("[AIAdvisor] 删除失败:", err),
+                              );
+                            }
+                          }}
+                          className="text-slate-400 opacity-0 transition-opacity hover:text-rose-500 group-hover:opacity-100"
+                          aria-label="删除对话"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         </aside>
       </div>

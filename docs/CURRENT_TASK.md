@@ -106,7 +106,7 @@
 
 ## 当前阻塞
 
-无。排队 5 已完成。等用户启动**排队 6**（chat_message 接 /ai-advisor）。
+无。排队 5 + 6 已完成。等用户启动**排队 7**（rule + rule_conflict 接 /schedule）。
 
 ---
 
@@ -136,6 +136,13 @@
 ## 最近完成（最多 5 条）
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
+
+- **2026-05-14** — 排队 6 — `chat_message` 表接 `/ai-advisor` 对话历史（TD-7 chat_message 部分收尾）
+  - 新建 `src/api/chatMessageApi.ts`：`listConversations(userId, rowLimit)` / `listConversationMessages(conversationId)` / `insertChatMessage({...})` / `deleteConversation(userId, conversationId)`；ChatMessage 走 typed client 派生（窄 role / mode / metadata 三字段）；PostgREST 不原生 group by → 客户端从 idx_chat_user_created 拉最近 100 行后 JS 压平成 ConversationSummary（preview / mode / aborted / last_at / message_count）。
+  - 新建 `src/hooks/useChatMessages.ts`：同款 race 守卫（listReqIdRef + activeReqIdRef + loadedUserIdRef + auth-loading 短路）；`persistRound({userMessage, assistantMessage, mode, aborted})` 生成 conversation_id → 串行 insert user/assistant 两条 → 乐观 prepend 到本地 conversations；`selectConversation(id)` 拉详情；`clearActive()` 退出查看；`remove(id)` 硬删。
+  - AIAdvisor 页：每次 handleParse = 一个新 conversation_id（单次推荐场景，不开多轮）；流式完成 / abort 都落库（abort 时 meta.aborted=true，content 是部分输出，profile 不写回避免半截解析）。aside 新增「对话历史」卡片（animationDelay 300ms，列表项含 mode badge / 中断标记 / 相对时间 / hover-删除按钮）；textarea / parse 按钮上方加「正在查看历史会话」banner + 「返回新建」入口；点历史条目 effect 同步 user/assistant 内容到 textarea + parsedNote；点 active 自己 = 退出查看；编辑 textarea 自动 clearActive。
+  - 工程细节：`as unknown as ChatMessage` / `as unknown as Json` 桥接 Json↔业务窄类型（TS 不递归推断）；mock provider abort 是优雅 return（不抛），用 `ctrl.signal.aborted` 而不是 catch 判断是否中断。
+  - 完成标准：`tsc --noEmit` 干净（仅 CardSwap 历史）；`vite build` 通过；ai-advisor bundle 35.05 kB；刷新看得到上次会话；点历史载入上下文；abort 落库且标记中断。
 
 - **2026-05-14** — 排队 5 — `supabase gen types` 切 typed client（TD-3 收尾）
   - 跑 `supabase gen types typescript --project-id tukdczwcygcgpxmdhobl --schema public > src/types/db.ts`（471 行，7 表自动派生）。
