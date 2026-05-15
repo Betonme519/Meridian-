@@ -101,16 +101,22 @@
 
 ## 当前阻塞
 
-**排队 10 输入收集中。等三件事齐：**
+**排队 10 输入收集中。状态盘点：**
 
 1. ~~**0002 SQL 跑通**~~ ✅ 2026-05-15 用户回报全 OK
-2. **0003_relax_track_scope SQL 跑通** — schema 演进：`track.major` 改 nullable + 新增 `scope_level` + `college` + 三档 CHECK 约束 + 新 UNIQUE INDEX。用户 2026-05-15 决定「不按专业分」，scope 三档（school / college / major）改成稳定结构而非靠字段语义约定。**等用户在 Dashboard 跑 `supabase/migrations/0003_relax_track_scope.sql` + `0003_verify.sql`**；跑完需重新 `supabase gen types typescript --project-id tukdczwcygcgpxmdhobl --schema public > src/types/db.ts`。
-3. **读规则 md** — 用户已把规则导出到 `docs/华师大公示文件/`（**未读，等用户说『开始』**）。用户明确「先别读，规则比较复杂」。`docs/raw/` 已删除（不再需要图片路径）。
+2. **0003_relax_track_scope SQL 状态未确认（❓ 下会话首问）** — schema 演进：`track.major` 改 nullable + 新增 `scope_level` + `college` + 三档 CHECK 约束 + 新 UNIQUE INDEX。文件已写好（`supabase/migrations/0003_relax_track_scope.sql` + `0003_verify.sql`），但**用户没明确回报 Dashboard 跑通了没**。下会话首问。
+3. ~~**重新 gen types 同步 db.ts**~~ → **推到排队 11**。2026-05-15 用户跑 `> src/types/db.ts` 命中 `Access token not provided` 错误，shell 已 truncate 旧 db.ts → 已用 `git checkout HEAD -- src/types/db.ts` 从 commit `387e5ba` 恢复（471 行，含 0002 之前的 7 表）。**db.ts 暂不含 0003 列（scope_level / college）**，但 src/ 里还没业务代码用 track 表，所以不阻塞 schema 演进；等排队 11 真正写 `courseApi` / 涉及 track 时再用[[feedback-supabase-gen-types-safe]] 安全跑法重生成。
+4. **读规则 md** — 用户已把规则导出到 `docs/华师大公示文件/`（**未读，等用户说『开始』**）。用户明确「先别读，规则比较复杂」。`docs/raw/` 已删除（不再需要图片路径）。
 
 **新会话回来怎么接续：**
-- 先看 0003 SQL 跑了没（问用户 / 看 `src/types/db.ts` 里 `track` Row 是否含 `scope_level` / `college`）
-- 没跑 → 提醒用户去 Dashboard 跑 0003
-- 跑了 + 用户说「开始」 → 读 `docs/华师大公示文件/` 下所有 md → 启动 Task #12（写 `supabase/migrations/0004_seed_ecnu_2023.sql`，首条 track 用 `scope_level='school'`，全校通用）
+1. **先问用户**：「0003 SQL 跑通了吗？」（用户上次没明确回报，只回报过 0002 跑通）
+2. 跑通 + 用户说「开始」 → 读 `docs/华师大公示文件/` 下所有 md → 启动 Task #12（写 `supabase/migrations/0004_seed_ecnu_2023.sql`，首条 track 用 `scope_level='school'`，全校通用）
+3. 没跑通 → 提醒用户去 Supabase Dashboard SQL Editor 粘 `0003_relax_track_scope.sql` 跑 → 粘 `0003_verify.sql` 逐段跑验证
+4. **gen types 不再阻塞当前主线**，推到排队 11 一起做；要重新跑时务必用[[feedback-supabase-gen-types-safe]] 的安全跑法（双步 `.tmp` 文件），不要直接 `> src/types/db.ts`
+
+**会话 2026-05-15 末期遗留：**
+- TaskList 里 #14 (in_progress) = 等用户提供 md；#12 (pending) = 写 seed SQL；#21 (pending) = 下会话首问 0003 SQL 状态。其他都已完成或删除。
+- 最后一个 commit：`387e5ba 审计修瑕疵：CURRENT_TASK 裁到 5 条 + 0002_verify 加 0003 覆盖 banner`
 
 ---
 
