@@ -1,0 +1,5 @@
+# 原始培养方案资料（PDF / 截图 / markdown）—— 排队 10 输入源。
+# 内容可能含学校 / 个人识别信息，不入版本库；但保留本目录与 .gitignore。
+*
+!.gitignore
+!README.md

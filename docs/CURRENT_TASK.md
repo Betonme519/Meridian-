@@ -101,7 +101,21 @@
 
 ## 当前阻塞
 
-**等用户在 Supabase Dashboard 跑 `0002_add_track_schema.sql` + `0002_verify.sql`**（排队 9 收尾）。跑完后启动**排队 10**（用户需提供培养方案原始资料 PDF / 网页 / 手抄列表）。
+**等三件事齐才能动排队 10 转 SQL：**
+
+1. **0002 SQL 是否跑通** — `supabase/migrations/0002_add_track_schema.sql` + `0002_verify.sql`。用户还未回报。
+2. **具体专业全称** — track 锁定「华东师范大学 / 设计学院 / 2023 级」，但「设计学院」下具体专业未定（视觉传达 / 环境设计 / 产品设计 / 数字媒体艺术 / 公共艺术 / 美术学 之一）。会写进 `track.major` 字段，需用户确认。
+3. **5 张截图到位** — 用户在 2026-05-15 选「截图路径」（密码路线已否决：教务密码常被复用 / Claude 无持久会话 / CLAUDE.md 禁动 auth）；将一张张发，时间跨度可能长。已建好 `docs/raw/`（`.gitignore` 全过滤，README 留命名约定）。
+
+**截图清单（已建议命名）：**
+
+- [ ] `ecnu-design-2023-overview.png` — 培养方案总览（毕业总学分 / 学分结构汇总）
+- [ ] `ecnu-design-2023-major-required.png` — 专业必修课表（代码 / 名 / 学分 / 学期）
+- [ ] `ecnu-design-2023-major-elective.png` — 专业选修课表
+- [ ] `ecnu-design-2023-general.png` — 通识 / 公选课表
+- [ ] `ecnu-design-2023-second-class.png` — 第二课堂 / 实践（如有）
+
+**新会话回来怎么接续：** 进 `docs/raw/` `ls` 看有哪些图 → Read 图 → 对比上面 checklist 看缺哪几张 → 缺的就等 / 提醒用户 → 齐了启动 Task #12（写 `supabase/migrations/0003_seed_ecnu_design_2023.sql`）。
 
 ---
 
