@@ -140,6 +140,7 @@
 ## 最近完成（最多 5 条）
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
+> 早于 2026-05-14 的里程碑（排队 5 / 2 / 4b / 4a / profiles / DATA_MODEL）已挪到 `docs/AI_MEMORY.md` § 9。
 
 - **2026-05-15** — 0003 — track schema scope 三档演进（排队 9 之后插入的小迭代，不算新排队）
   - 用户决定「学校多数规则全专业通用，学院间才有差异」→ track 字段从 `(school, major, year)` UNIQUE 演进为 scope 三档表达适用范围。
@@ -177,27 +178,3 @@
   - AIAdvisor 页：每次 handleParse = 一个新 conversation_id（单次推荐场景，不开多轮）；流式完成 / abort 都落库（abort 时 meta.aborted=true，content 是部分输出，profile 不写回避免半截解析）。aside 新增「对话历史」卡片（animationDelay 300ms，列表项含 mode badge / 中断标记 / 相对时间 / hover-删除按钮）；textarea / parse 按钮上方加「正在查看历史会话」banner + 「返回新建」入口；点历史条目 effect 同步 user/assistant 内容到 textarea + parsedNote；点 active 自己 = 退出查看；编辑 textarea 自动 clearActive。
   - 工程细节：`as unknown as ChatMessage` / `as unknown as Json` 桥接 Json↔业务窄类型（TS 不递归推断）；mock provider abort 是优雅 return（不抛），用 `ctrl.signal.aborted` 而不是 catch 判断是否中断。
   - 完成标准：`tsc --noEmit` 干净（仅 CardSwap 历史）；`vite build` 通过；ai-advisor bundle 35.05 kB；刷新看得到上次会话；点历史载入上下文；abort 落库且标记中断。
-
-- **2026-05-14** — 排队 5 — `supabase gen types` 切 typed client（TD-3 收尾）
-  - 跑 `supabase gen types typescript --project-id tukdczwcygcgpxmdhobl --schema public > src/types/db.ts`（471 行，7 表自动派生）。
-  - `src/lib/supabase.ts`：`createClient(...)` → `createClient<Database>(...)`，`supabase.from("xxx")` 自动推断列类型。
-  - `profileApi.ts`：`interface Profile {...}` → `type Profile = Omit<ProfileRow, "goal_mode" | "goal_weights"> & { goal_mode: GoalMode; goal_weights: Record<string, number> }`。列集合自动跟随 db.ts。
-  - `planApi.ts`：同款 narrow 派生（保留 `Node[] / Edge[] / Viewport`）；`createPlan` row 改用 `PlanInsert` 类型；`updatePlanGraph` 用 `PlanUpdate` 类型 + 显式 `as unknown as Json` 桥接 ReactFlow→Json（TS 不递归推断）；读出侧 3 处 `as unknown as Plan` 桥接 Json→Node[]。
-  - `ragSourceApi.ts`：同款 narrow 派生（保留 `RagSourceKind / ParsedStatus` 枚举）；uploadRagSource row 改用 `RagSourceInsert`。
-  - `authApi.ts` 无表调用，不动。
-  - 完成标准：4 个 API 文件移除所有手维护 interface 主体（保留 narrow 那两层）；`tsc --noEmit` 干净（仅剩允许的 CardSwap 历史错）；新加 chat_message/rule/rule_conflict/course/track_* 自动有类型。
-
-- **2026-05-14** — 排队 2 — AI provider 抽象 + streaming 协议骨架
-  - 新建 `src/ai/{stream,schema,prompts,providers/mock,providers/anthropic,index}.ts` 6 文件；定 `chat({ messages, signal }) => AsyncIterable<Token>` 签名 + 3 个 zod schema（`Recommendation` / `ChatMessage` / `RagAnswer`，与 DATA_MODEL § 3.6 对齐）+ `recommendModePrompt` 模板；mock provider 沿用原 `recommendMode` 正则 + 模板化 rationale，18ms/字 流式 yield、signal aborted 时优雅 return；Anthropic stub 抛"未实现"错。`profileApi.GoalMode` 改成从 `GOAL_MODES as const` 数组派生，给 zod `z.enum` 复用。AIAdvisor `handleParse` 改成 async：abort 上一轮 → for-await 流式累加到 `parsedNote` → 正则解析「推荐：<mode>」→ 写 profile；按钮 streaming 态禁用 + 「分析中…」 + spinner；parsedNote multi-line + `▍` 光标；卸载 abort；切模式 abort。`VITE_AI_PROVIDER` env 切 provider（默认 mock）。`tsc --noEmit` 干净（除 CardSwap 历史遗留）；`vite build` 通过。
-
-- **2026-05-14** — 排队 4b — `/course-planner` 接 `plan` 表
-  - 新建 `planApi.ts`（list/get/create/updateGraph/rename/**delete**）+ `usePlans.ts`（list / current / debounce save 800ms / 空态自动建 / **remove 删当前自动切下一张、删空再补一张**）+ `seedGraph.ts`（types / lane 骨架 / SEED_*data 抽出）；Planner 页删 initial state，加 header bar（plan 名 inline 编辑 + 切换下拉 + 新建 + **删除（下拉每项垃圾桶 hover + window.confirm，禁删最后一张）** + 保存状态 + 画布锁挪过来）；URL `?id=<uuid>` 同步，刷新 / 直链 / 多 plan 切换都可恢复；800ms debounce 自动保存；空账号自动建「我的第一张规划」（用 seed 12 节点 + 13 边）；lane 骨架渲染时拼接，**不入 DB**。**访客模式**（`!authLoading && !user`）改成喂 SEED 只读预览（不入 DB，header 显示「访客预览 · 登录后保存」+「示例规划」），保 4b 之前的视觉感。`course-planner` route 加 `validateSearch` 暴露 `?id=` 类型；Dashboard / Schedule 的 Link 同步加 `search={{ id: undefined }}`。`tsc --noEmit` 干净（除 CardSwap 历史遗留）；`vite build` 通过。
-
-- **2026-05-11** — 排队 4a — `/import` 接通 Storage + `rag_source` 表
-  - 新建 `ragSourceApi.ts` + `useRagSources.ts`，改 Upload 页接通拖拽 / 选文件 / 列表读 DB / 删除；审计修 3 条中度问题（button→label、useEffect dep 守卫、loading 初值 true）
-
-- **2026-05-10** — `profiles` 表前端接通
-  - 新建 `profileApi.ts` + `ProfileContext.tsx` + `useProfile.ts`；4 处页面接入（Upload / AIAdvisor / Dashboard / UserMenu）
-
-- **2026-05-10** — `docs/DATA_MODEL.md` 起草 + SQL migration 落地
-  - 6 主表 + 1 RAG 表 schema + 6 决策确认 + 工程审计；`0001_init_schema.sql` 跑通；Storage bucket + RLS 已建

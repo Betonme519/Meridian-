@@ -191,6 +191,13 @@ HTML5 规范禁止 button 内含 interactive content。React 不报错但 a11y /
 
 ## 9. 项目时间线（按 commit 倒序，5-15 行/里程碑）
 
+### 2026-05-14 · `supabase gen types` typed client 切换（排队 5，TD-3 收尾）
+- 跑 `supabase gen types typescript --project-id tukdczwcygcgpxmdhobl --schema public > src/types/db.ts`（471 行，7 表自动派生）
+- `src/lib/supabase.ts` 从 `createClient(...)` 升级到 `createClient<Database>(...)`，`supabase.from("xxx")` 自动推断列类型
+- 4 个 API 文件改用 typed client 派生：`profileApi.ts` / `planApi.ts` / `ragSourceApi.ts` 都改成 `type X = Omit<XRow, "narrow_fields"> & { narrow_fields }` —— 列集合自动跟随 db.ts，未来加 chat_message / rule / rule_conflict / course / track_* 自动有类型
+- 写入侧用 `<Table>Insert` / `<Table>Update`；JSONB 字段（ReactFlow Node[]/Edge[] / goal_weights）用 `as unknown as Json` 桥接，读出侧 `as unknown as Plan` 反向 narrow（TS 不递归推断 Json↔结构化业务类型）
+- 不动：authApi（无表调用）、视觉组件、Supabase 接入面公共 API。tsc 干净（仅 CardSwap 历史遗留错）；vite build 通过
+
 ### 2026-05-14 · AI provider 抽象 + streaming 协议骨架（排队 2）
 - 新建 `src/ai/` 6 文件：`stream.ts`（`Chat = (opts) => AsyncIterable<Token>` 协议 + `collect()` helper）· `schema.ts`（zod：`Recommendation` / `ChatMessage` / `RagAnswer`，`ChatMessage` 对齐 DATA_MODEL § 3.6 / 决策 D9）· `prompts.ts`（`recommendModePrompt` 系统提示词）· `providers/mock.ts`（默认实现，沿用原 AIAdvisor recommendMode 正则 + 8 模式模板化 rationale + 关键词原话引用 + 18ms/字 yield + signal.aborted 优雅 return）· `providers/anthropic.ts`（stub 抛错，预留接口位）· `index.ts`（`VITE_AI_PROVIDER` env 选 provider，默认 mock）
 - `profileApi.GoalMode` 改成从 `GOAL_MODES as const` 数组派生（不破 API），让 zod `z.enum(GOAL_MODES)` 复用
