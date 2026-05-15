@@ -3,7 +3,7 @@
 > 短期工作内存。**AI 接手优先读这份**，再按需查 `AI_MEMORY.md` / `TECH_DEBT.md`。
 > 铁律：只做下方「排队」里的事，做完停下汇报。「不要修改」当只读。
 
-> Last updated: **2026-05-14**
+> Last updated: **2026-05-15**
 
 ---
 
@@ -40,12 +40,6 @@
 - 页面加历史列表（按 `conversation_id` 分组 / 时间倒序，最近 N 条）。
 - 流式中途 abort 也要落库（保 user msg + 部分 assistant 内容 + metadata.aborted=true）。
 - 完成标准：刷新页面看得到上次对话；切 conversation 切上下文；与 `metadata` 字段对齐（DATA_MODEL §3.6）。
-
-#### 排队 7 — `rule` + `rule_conflict` 表接 `/schedule`（原 4c，TD-24）
-
-- 新建 `src/api/ruleApi.ts` + `ruleConflictApi.ts` + `src/hooks/useRules.ts`。
-- `/schedule` 删 const 数据，CRUD 跑通：增删改 rule + rule_conflict。
-- 完成标准：UI 可增删改 + 冲突高亮 + `tsc --noEmit` 干净 + 没碰「不要修改」清单。
 
 ---
 
@@ -106,7 +100,7 @@
 
 ## 当前阻塞
 
-无。排队 5 + 6 已完成。等用户启动**排队 7**（rule + rule_conflict 接 /schedule）。
+无。排队 5 + 6 + 7 已完成（第一阶段「无关基础」收尾）。等用户启动**排队 8**（`docs/TRACK_SCHEMA.md` 起草，毕业路径主线开局）。
 
 ---
 
@@ -136,6 +130,15 @@
 ## 最近完成（最多 5 条）
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
+
+- **2026-05-15** — 排队 7 — `rule` + `rule_conflict` 表接 `/schedule`（TD-24 收尾，第一阶段「无关基础」完成）
+  - 新建 `src/api/ruleApi.ts`：`listRules(userId)` / `createRule({...})` / `updateRule(id, patch)` / `deleteRule(id)`；Rule 走 typed client 派生 + 窄 `trust: TrustLevel` 枚举；从 `TRUST_LEVELS as const` 数组派生 union。
+  - 新建 `src/api/ruleConflictApi.ts`：`listConflicts(userId)` / `createConflict({...})` / `updateConflict(id, patch)` / `deleteConflict(id)`；插入前 `sortRulePair` 强制 (a, b) 字典序满足 CHECK (a < b)；同 id 自检；`confidence` / `resolved_by` 都派生 const 数组；CONFIDENCE_LEVELS / RESOLVED_BY_VALUES 公开导出。
+  - 新建 `src/hooks/useRules.ts`：同款 race 守卫（requestIdRef + loadedUserIdRef + auth-loading 短路）；`Promise.all` 并发拉两表；CRUD 乐观写本地 + 失败 revert；`removeRule` 同步清掉本地引用该 rule 的 conflicts（DB 上靠 ON DELETE CASCADE）；派生 view `rulesByBranch` / `rulesByTrust` / `ruleMap` 走 useMemo。
+  - 新建 `src/pages/Schedule/scheduleSeed.ts`：12 条 SEED_RULES（DB Rule shape 对齐 + 合成 `seed-rule-*` id）+ 2 条 SEED_CONFLICTS（满足 CHECK a<b）+ 4 条 SEED_POLICIES（学校特殊政策本轮不入库，登录用户 + 访客共用）+ TRUST_META（lucide icon / 配色 / 中文短称三档元数据）。
+  - Schedule 页改造：删 4 段 hardcode → 接 useRules + useAuth；访客模式（!authLoading && !user）= 全 SEED 只读预览 + 横幅；登录用户空态也 fallback SEED + 「以下为示例…立即新建」amber 横幅；error 横幅含「重试」走 refresh()；rule 树 hover 显示删除 ✕；trust 列项 hover 显示「⇄ 调档」（点 cycle high→med→low）+ 删除 ✕；conflict 卡片 join `ruleMap` 显示 A/B title + source；`resolved_by` 端高亮（emerald）；新建规则 inline 表单（分组/可信度/标题/详情/来源/页码 6 字段）；新建冲突 inline 表单（A/B 下拉 + 标题 + 判断 + 置信度，rule 数 < 2 时按钮禁用）；删除走 window.confirm。
+  - 工程细节：rule_conflict CHECK (a < b) 由 API 层强制 sort，UI 不暴露顺序概念；SEED_RULES 用合成 string id（不是 UUID）但不入 DB 所以不会触发 PK 校验；trust 切档用 `as const` 数组取 `(idx + 1) % 3`，类型安全循环。
+  - 完成标准：`tsc --noEmit` 干净（仅 CardSwap 历史）；`vite build` 通过；schedule bundle 54.62 kB；UI 增删改跑通；访客 / 空账号见 SEED；冲突区按 resolved_by 高亮。
 
 - **2026-05-14** — 排队 6 — `chat_message` 表接 `/ai-advisor` 对话历史（TD-7 chat_message 部分收尾）
   - 新建 `src/api/chatMessageApi.ts`：`listConversations(userId, rowLimit)` / `listConversationMessages(conversationId)` / `insertChatMessage({...})` / `deleteConversation(userId, conversationId)`；ChatMessage 走 typed client 派生（窄 role / mode / metadata 三字段）；PostgREST 不原生 group by → 客户端从 idx_chat_user_created 拉最近 100 行后 JS 压平成 ConversationSummary（preview / mode / aborted / last_at / message_count）。
