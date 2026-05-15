@@ -45,12 +45,6 @@
 
 ### 第二阶段 · 毕业路径主线
 
-#### 排队 8 — `docs/TRACK_SCHEMA.md` 起草（毕业路径五层结构）
-
-- 定五层契约：`track` / `track_category` / `track_requirement` / `track_option` / `user_progress`。
-- 关键待决策：track_* 公共 SELECT + service_role WRITE，还是用户私有？推**公共 + service_role**（D7 rule 私有不冲突，rule 是用户主观偏好，track 是学校客观规则）。
-- 不写 SQL，只定结构 + 决策点，跟 `DATA_MODEL.md` 同款格式。
-
 #### 排队 9 — `0002_add_track_schema.sql` migration
 
 - 按排队 8 文档建 5 张表 + RLS + index + trigger。
@@ -84,6 +78,20 @@
 
 ---
 
+### 第三阶段 · UI 重设计（在主线全部跑通后）
+
+#### 排队 14 — 全局功能页前端视觉重设计
+
+- **触发条件：排队 12 完成（画布改造跑通、数据层稳定）后才启动**。在此之前不动功能页 UI。
+- 用户 2026-05-15 决定：「现在改 UI = 白做」，等 track schema + 画布交互模型确定再批量对齐视觉。
+- 范围：`/dashboard` / `/ai-advisor` / `/schedule` / `/import` / `/course-planner` 五个功能页（落地页 + 路由 + 全局布局仍在「不要修改」清单）。
+- 准备工作（可以提前做，不阻塞主线）：
+  - 更新 `docs/DESIGN_SYSTEM.md` 风格指南（颜色 / 字体 / 间距 / 卡片 / 动效原则）—— 稳定层，schema 变也不失效。
+  - 排队 8 完成（schema 锁了）后可以画 Figma 稿，但**不要动代码**。
+- 完成标准：五个功能页对齐新视觉；保持 CLAUDE.md 的 "low saturation / Apple-like / clean academic"；mobile responsive。
+
+---
+
 ## 并行/穿插（不阻塞主线，但要做）
 
 - **TD-4 全局 Toaster** — 排队 6/7 错误会变多，做完更稳，但不卡。
@@ -100,7 +108,7 @@
 
 ## 当前阻塞
 
-无。排队 5 + 6 + 7 已完成（第一阶段「无关基础」收尾）。等用户启动**排队 8**（`docs/TRACK_SCHEMA.md` 起草，毕业路径主线开局）。
+无。排队 8 已完成（7 个决策点用户拍板 + TRACK_SCHEMA.md 起草）。等用户启动**排队 9**（`0002_add_track_schema.sql` migration）。排队 10 起需用户提供培养方案原始资料。
 
 ---
 
@@ -130,6 +138,13 @@
 ## 最近完成（最多 5 条）
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
+
+- **2026-05-15** — 排队 8 — `docs/TRACK_SCHEMA.md` 起草（毕业路径五层结构契约）
+  - 用户拍板 7 个决策点（D-track-1 ~ D-track-7）：track_* 公共表 + service_role 写 / track 颗粒度 (school, major, year) / requirement 平铺不嵌套 / option `kind: course|alt|project` / user_progress option 级 / AI 整 JSON 喂 prompt / prerequisite 用 `option.prerequisites text[]` 弱实现。
+  - 新建 `docs/TRACK_SCHEMA.md`（420 行）：§0 设计原则 / §1 决策点表 / §2 表清单速览 / §3 五张表详情（track / track_category / track_requirement / track_option / user_progress 各含字段表 + RLS + 约束 + 索引）/ §4 RLS 总览 / §5 ASCII 关系图（含冗余 track_id 链路说明）/ §6 推迟项（prerequisite 关系表、requirement 嵌套、schools / majors 字典表、catalog 公共表已弃）/ §7 排队 9-13 迁移路径。
+  - 关键设计：track 按 (school, major, year) UNIQUE；category / requirement / option 都用 `order_index` 排序 + `code` 机器名 + `title` 展示名；requirement.kind 四档（count / credits / one_of / all_of）+ threshold；option.kind 三档（course / alt / project）；user_progress.status 五档（planned / enrolled / done / waived / dropped）+ UNIQUE (user_id, option_id)。
+  - 不写 SQL（留排队 9）；不写 seed（留排队 10，等用户提供原始培养方案）。
+  - 完成标准：与 DATA_MODEL.md 同款 markdown 格式 + 表格风格；与 `rule` 表（D7=a 用户私有）分工清晰：rule = 主观偏好，track = 客观规则。
 
 - **2026-05-15** — 排队 7 — `rule` + `rule_conflict` 表接 `/schedule`（TD-24 收尾，第一阶段「无关基础」完成）
   - 新建 `src/api/ruleApi.ts`：`listRules(userId)` / `createRule({...})` / `updateRule(id, patch)` / `deleteRule(id)`；Rule 走 typed client 派生 + 窄 `trust: TrustLevel` 枚举；从 `TRUST_LEVELS as const` 数组派生 union。
