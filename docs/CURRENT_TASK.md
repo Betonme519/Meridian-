@@ -182,48 +182,48 @@
 
 ---
 
-### ⏸ 阶段 3 - 0005 seed SQL 进度（试点 A 完毕，B/C/D/E 待续）
+### ⏸ 阶段 3 - 0005 seed SQL 全段写完，待用户在 Supabase Dashboard 跑通
 
-**已完成（2026-05-16）**：
-- ✅ `0005_seed_ecnu_2023.sql` 试点 A 段（commit `9e19339`）—— 1 track + 5 category + 23 requirement，PL/pgSQL DO 块，ON CONFLICT 幂等可重跑
-- ✅ `0005_verify.sql` 8 段单行验证（commit `0785c92`）
-- ✅ 用户 Supabase Dashboard 跑通：track=1 / category=5 / requirement=23
-- ✅ 测试残留清理：旧 0002_verify 8 条 NULL source_ref 行已删（DELETE 8）
-- ✅ source_ref 100% 覆盖 / empty_metadata = 0
+**全段已完成（2026-05-16）**：
+- ✅ `0005_seed_ecnu_2023.sql` 全段写入 —— 2 track + 30 category + **198 requirement**，整片 PL/pgSQL DO 块 + ON CONFLICT 幂等可重跑
+  - 单文件分批 Edit 注入：A(已有, 23) + B(48) + C(56) + D(49) + E全校(14) + E师范(8)
+  - 198 个 metadata JSON 全部 `JSON.parse` 通过（修了 D4-6 一处 `"key:value":value` 误写）
+  - 段分布与计划完全对齐：A1=9 / A2=2 / A3=4 / A4=3 / A5=5 / B1=6 / B2=14 / B3=5 / B4=6 / B5=7 / B6=10 / C1=10 / C2=7 / C3=4 / C4=2 / C5=8 / C6=9 / C7=4 / C8=4 / C9=8 / D1=5 / D2=7 / D3=6 / D4=15 / D5=7 / D6=9 / E1=2 / E2=8 / E3=4 / E4=8
+- ✅ `0005_verify.sql` 扩 8 段 → 15 段全段验证（含 5 个抽样 + module 分布 + 师范学院 track 单查）
 
-**待续：B/C/D/E 段共 175 条 INSERT**（条款分析完毕，下次直接照清单写 SQL）：
+**两 track 颗粒度（用户拍板）**：
+- `track[school='华东师范大学', year=2023, scope_level='school', college=NULL, major=NULL]` → 挂 29 category (A1-A5/B1-B6/C1-C9/D1-D6/E1-E3) + 190 requirement
+- `track[..., scope_level='college', college='师范学院', major=NULL]` → 挂 1 category (E4) + 8 requirement
 
-| 段 | 条数 | track | category 数 | category codes | 主要 kind |
-|---|---|---|---|---|---|
-| B 学业规则 | 48 | school | 6 | B1-B6 | score_scheme / assessment_rule / tuition |
-| C 特殊计划 | 56 | school | 9 | C1-C9 | program_rule（含三张分值表） |
-| D 过程类 | 49 | school | 6 | D1-D6 | program_rule / time_limit / assessment_rule |
-| E 全校通用 | 14 | school | 3 | E1-E3 | credits / all_of |
-| E 师范学院 | 8 | college='师范学院' | 1 | E4 | program_rule / credits |
-| **小计** | **175** | — | **25** | — | — |
+**12 档 kind 分布（期望，§ 4 验证用）**：
+| kind | n | 主要来源 |
+|---|---|---|
+| program_rule | 56 | C 项目级 + D 项目级 + E4 师范段 |
+| assessment_rule | 37 | A5 课程考核 + B 过程类 + D 过程类 |
+| status_gate | 31 | 各段状态门槛 |
+| time_limit | 21 | A 学籍/休复学 + B 免听免修 + D 注册/休学 |
+| credits | 13 | E2/E3 全校公共必修 + 通识 + E4 师范课程结构 |
+| gpa_threshold | 11 | A3-2 学位 / B5 体测 / C9-1 推免 / D 优秀率 |
+| score_scheme | 11 | B2/B5/B6 成绩记分 + D4 五级记分 |
+| warning_threshold | 8 | A1-10 / B3 预警退学 / D 重修阈值 / D5 抽检 |
+| tuition | 8 | B6 学分制收费 + C1-5 辅修学费 |
+| all_of | 2 | E2-1 思政 6 门 / E2-5 国情教育 2 门 |
+| count / one_of | 0 | 留给排队 11 课程列表 |
 
-**每段去掉 prompt 行（不入 track_requirement）的清单**：
-- **A**: 已录 23 条（A1-1/2/3/5/6/9/10/12/13, A2-1/2, A3-1/2/3/7, A4-2/3/5, A5-2/3/4/5/7）。prompt 条款 A1-4/7/8/11, A2-3/4/5, A3-4/5/6, A4-1/4, A5-1/6 (14 条 prompt，进阶段 4)
-- **B**: 48 条 = B1(6) + B2(14) + B3(5) + B4(6) + B5(7) + B6(10)。prompt 条款 B1-1, B2-14, B3-2, B3-5, B5-2, B5-7, B5-10, B6-2, B6-12 (9 条)
-- **C**: 56 条 = C1(10) + C2(7) + C3(4) + C4(2) + C5(8) + C6(9) + C7(4) + C8(4) + C9(8)。prompt 条款 C2-8, C4-2, C5-3, C5-6, C5-8, C6-9, C7-5, C8-2, C9-6 (9 条)
-- **D**: 49 条 = D1(5) + D2(7) + D3(6) + D4(15) + D5(7) + D6(9)。prompt 条款 D1-1, D2-1, D2-4, D3-7, D4-15, D6-10 (6 条)
-- **E 全校**: 14 条 = E1(2) + E2(8) + E3(4)。prompt 条款 E1-1 (1 条)
-- **E 师范学院**: 8 条 = E4(1-8) 全 track_requirement
+**用户下一步**：
+1. Supabase Dashboard SQL Editor 整片粘 `0005_seed_ecnu_2023.sql` → Run
+2. 跑 `0005_verify.sql` 15 段单独验证（§ 3 应 school=190 college=8 / § 4 共 198 / § 6-7 应 0 / § 14 应 8 行）
+3. 报回结果 → AI 看是否还需修
 
-**实现策略（下次直接照搬）**：
-- 整文件重写（含 A 段 23 行），`INSERT ... ON CONFLICT (category_id, code) DO UPDATE SET ...` 幂等；A 段的 23 行 ON CONFLICT 命中 UPDATE 无新增，B/C/D/E 175 行新 INSERT
-- 用 `INSERT ... ON CONFLICT ... RETURNING id INTO v_xxx` 模式（比试点 A 的 SELECT 然后 IF NULL 简洁），track 表也用此模式但要先 SELECT（expression UNIQUE INDEX 处理 NULL 略 tricky）
-- 2 个 track（school + 师范学院）、30 个 category 变量、198 行 requirement 一次 INSERT
-- 估文件 ~1500-2000 行 SQL（pilot 365 行 → 全文件 5x 体量）
-- 师范学院 track：`school='华东师范大学'`, `year=2023`, `scope_level='college'`, `college='师范学院'`, `major=NULL`
+**下一步（用户跑通后）**：
+1. ~~阶段 3 0005 seed SQL~~ ✅ AI 完成 / 待用户 Dashboard 跑
+2. **阶段 4** `docs/ecnu_process_rules.md` —— 各 digest 末尾「与阶段 4 边界」段的 prompt 类规则 + AI 顾问背景知识，精炼版（~500 行内）喂排队 13 `gradPathAdvisorPrompt`
+3. **gen types** 推到排队 11 一起做，用 [[feedback-supabase-gen-types-safe]] 安全跑法
 
-**接下来一句话开工**：用户说"开 0005 全段"或类似即可启动，AI 直接 Write 重写 0005_seed_ecnu_2023.sql，整文件 idempotent 重跑。
-
-**会话 2026-05-16 状态**：
-- 5 份 digest v2 全部 AI 重写完毕（共 ~3000 行 / 227 条 track_requirement 候选 / 5 张完整保留的分值/奖金 markdown table）。
-- 旧 23 份 md + 4 份旧 digest 已归档 `_archive/`。
-- 推免段（旧 batch 跳过）C9 新增；微专业 + 卓越学院进 C8；师范生入 E4 段（scope=college）。
-- **0005 seed SQL 已可启动**：用户审 5 份 digest 后给开工信号。
+**⏳ 已采纳决策（不再追问）**：
+- C3 强基计划独立办法在新 PDF 未收录 → 接受 4 条散见现状（2026-05-16 用户拍板）
+- E2 公共必修「约 40 学分」→ AI 顾问直接引用指南，不强制求和（2026-05-16 用户拍板）
+- 师范学院 track 颗粒度 = 单一 `college='师范学院'`，不按具体师范专业拆（2026-05-16 用户拍板）
 
 ---
 
@@ -254,6 +254,14 @@
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
 > 早于 2026-05-14 的里程碑（排队 5 / 2 / 4b / 4a / profiles / DATA_MODEL）已挪到 `docs/AI_MEMORY.md` § 9。
+
+- **2026-05-16** — 阶段 3 — 0005 seed SQL 全段写完（A 23 + B 48 + C 56 + D 49 + E全校 14 + E师范 8 = 198 条）
+  - `supabase/migrations/0005_seed_ecnu_2023.sql` 全段重写 —— 2 track（school + 师范学院 college）+ 30 category（A1-A5/B1-B6/C1-C9/D1-D6/E1-E3 + E4）+ **198 track_requirement**。整片 PL/pgSQL DO 块 + `ON CONFLICT (category_id, code) DO UPDATE` 幂等可重跑。
+  - 实施策略：用户拍板单文件分批 Edit（A 方案）——skeleton + A 段（已有 23 行）+ 5 次 Edit 注入 B/C/D/E全校/E师范，避免一次 Write 几千行卡顿。
+  - 198 个 metadata JSON 全部 `JSON.parse` 通过（D4-6 一处 `"key:value":value` 误写修复）；198 INSERT 段分布精确符合计划。
+  - `supabase/migrations/0005_verify.sql` 扩 8 段 → 15 段全段验证：基本结构（§ 1-5）+ 完整性（§ 6-7）+ 5 个抽样段（A1-10 / B3-1 / C6-6 三档赛事 / C7-2 A 类奖金 / D4-12 重复率两档 / E2-3 计算机分支 / E4 师范全部 8 条）+ § 15 module metadata 分布。
+  - 12 档 kind 分布预期（§ 4 验证用）：program_rule 56 / assessment_rule 37 / status_gate 31 / time_limit 21 / credits 13 / gpa_threshold 11 / score_scheme 11 / warning_threshold 8 / tuition 8 / all_of 2 / count + one_of 0。
+  - 解锁后续：阶段 4 `docs/ecnu_process_rules.md`（prompt 类规则精炼版给 `gradPathAdvisorPrompt` 用）+ 排队 13 AI 顾问真正能从 198 条结构化规则中取数。
 
 - **2026-05-16** — 数据源切 PDF + 旧 md 处置方案 + CLAUDE.md 分流条 + TD-26 入册
   - 用户提供 2 份新 PDF（`docs/华师大规则文件pdf/2025本科生手册.pdf` + `2025本科生学习指南.pdf`），PDF 是 source of truth，旧 34 份 md 仅历史佐证。
