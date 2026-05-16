@@ -175,10 +175,49 @@
 2. ~~**阶段 1**：`docs/track_kind_taxonomy.md` 12 档 canonical kind~~ ✅ 2026-05-16
 3. ~~**阶段 2 SQL**：`0006_extend_requirement_kinds.sql`~~ ✅ 2026-05-16
 4. ~~**阶段 3 前置**：digest A/B/C/D/E v2 全部重写~~ ✅ 2026-05-16 commit `cd6c7f4`
-5. **阶段 3**：`supabase/migrations/0005_seed_ecnu_2023.sql` —— ~227 条 INSERT 按 12 档 canonical kind 分组，每条带 `source_ref` 引新 md §章节 + `metadata` 存细节。**用户拍板师范生入 track（scope_level='college'）/ 微专业单独 track**。
+5. **阶段 3**：`supabase/migrations/0005_seed_ecnu_2023.sql` —— 详见下方 ⏸ 段。
 6. **阶段 4**：`docs/ecnu_process_rules.md` —— 各 digest 末尾「与阶段 4 边界」段列出的 prompt 类规则 + AI 顾问背景知识，精炼版（~500 行内）喂排队 13 `gradPathAdvisorPrompt`。
 7. **旧 md 处置** ✅ 2026-05-16 已 `git mv` 到 `docs/_archive/华师大公示文件_old_md/`（commit `fcc57be`）
 8. **gen types** 不阻塞主线，推到排队 11 一起做。用[[feedback-supabase-gen-types-safe]] 的双步 `.tmp` 安全跑法。
+
+---
+
+### ⏸ 阶段 3 - 0005 seed SQL 进度（试点 A 完毕，B/C/D/E 待续）
+
+**已完成（2026-05-16）**：
+- ✅ `0005_seed_ecnu_2023.sql` 试点 A 段（commit `9e19339`）—— 1 track + 5 category + 23 requirement，PL/pgSQL DO 块，ON CONFLICT 幂等可重跑
+- ✅ `0005_verify.sql` 8 段单行验证（commit `0785c92`）
+- ✅ 用户 Supabase Dashboard 跑通：track=1 / category=5 / requirement=23
+- ✅ 测试残留清理：旧 0002_verify 8 条 NULL source_ref 行已删（DELETE 8）
+- ✅ source_ref 100% 覆盖 / empty_metadata = 0
+
+**待续：B/C/D/E 段共 175 条 INSERT**（条款分析完毕，下次直接照清单写 SQL）：
+
+| 段 | 条数 | track | category 数 | category codes | 主要 kind |
+|---|---|---|---|---|---|
+| B 学业规则 | 48 | school | 6 | B1-B6 | score_scheme / assessment_rule / tuition |
+| C 特殊计划 | 56 | school | 9 | C1-C9 | program_rule（含三张分值表） |
+| D 过程类 | 49 | school | 6 | D1-D6 | program_rule / time_limit / assessment_rule |
+| E 全校通用 | 14 | school | 3 | E1-E3 | credits / all_of |
+| E 师范学院 | 8 | college='师范学院' | 1 | E4 | program_rule / credits |
+| **小计** | **175** | — | **25** | — | — |
+
+**每段去掉 prompt 行（不入 track_requirement）的清单**：
+- **A**: 已录 23 条（A1-1/2/3/5/6/9/10/12/13, A2-1/2, A3-1/2/3/7, A4-2/3/5, A5-2/3/4/5/7）。prompt 条款 A1-4/7/8/11, A2-3/4/5, A3-4/5/6, A4-1/4, A5-1/6 (14 条 prompt，进阶段 4)
+- **B**: 48 条 = B1(6) + B2(14) + B3(5) + B4(6) + B5(7) + B6(10)。prompt 条款 B1-1, B2-14, B3-2, B3-5, B5-2, B5-7, B5-10, B6-2, B6-12 (9 条)
+- **C**: 56 条 = C1(10) + C2(7) + C3(4) + C4(2) + C5(8) + C6(9) + C7(4) + C8(4) + C9(8)。prompt 条款 C2-8, C4-2, C5-3, C5-6, C5-8, C6-9, C7-5, C8-2, C9-6 (9 条)
+- **D**: 49 条 = D1(5) + D2(7) + D3(6) + D4(15) + D5(7) + D6(9)。prompt 条款 D1-1, D2-1, D2-4, D3-7, D4-15, D6-10 (6 条)
+- **E 全校**: 14 条 = E1(2) + E2(8) + E3(4)。prompt 条款 E1-1 (1 条)
+- **E 师范学院**: 8 条 = E4(1-8) 全 track_requirement
+
+**实现策略（下次直接照搬）**：
+- 整文件重写（含 A 段 23 行），`INSERT ... ON CONFLICT (category_id, code) DO UPDATE SET ...` 幂等；A 段的 23 行 ON CONFLICT 命中 UPDATE 无新增，B/C/D/E 175 行新 INSERT
+- 用 `INSERT ... ON CONFLICT ... RETURNING id INTO v_xxx` 模式（比试点 A 的 SELECT 然后 IF NULL 简洁），track 表也用此模式但要先 SELECT（expression UNIQUE INDEX 处理 NULL 略 tricky）
+- 2 个 track（school + 师范学院）、30 个 category 变量、198 行 requirement 一次 INSERT
+- 估文件 ~1500-2000 行 SQL（pilot 365 行 → 全文件 5x 体量）
+- 师范学院 track：`school='华东师范大学'`, `year=2023`, `scope_level='college'`, `college='师范学院'`, `major=NULL`
+
+**接下来一句话开工**：用户说"开 0005 全段"或类似即可启动，AI 直接 Write 重写 0005_seed_ecnu_2023.sql，整文件 idempotent 重跑。
 
 **会话 2026-05-16 状态**：
 - 5 份 digest v2 全部 AI 重写完毕（共 ~3000 行 / 227 条 track_requirement 候选 / 5 张完整保留的分值/奖金 markdown table）。
