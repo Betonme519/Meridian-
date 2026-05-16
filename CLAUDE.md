@@ -28,9 +28,9 @@ Before starting any task:
 unless explicitly requested.
 
 8. 数据源文件分流：以下目录/文件**仅在排队 10 / 13 任务读**，其他任务禁 Grep / Read：
-- `docs/华师大规则文件pdf/`
-- `docs/华师大公示文件/`（待归档到 `_archive/`）
-- `docs/ecnu-digests/`
+- `docs/华师大规则文件pdf/`（source of truth）
+- `docs/ecnu-digests/`（5 份 v2 digest + _archive/ 旧版）
+- `docs/_archive/华师大公示文件_old_md/`（已归档，不再读）
 - `docs/track_kind_taxonomy.md`
 - `docs/ecnu_process_rules.md`
 

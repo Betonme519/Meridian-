@@ -51,11 +51,12 @@
 
 | 路径 | 用途 |
 |---|---|
-| `docs/华师大规则文件pdf/*.pdf` + `*.md` + `*.toc.txt` | **source of truth**（2 份 PDF + 清洗后 md + 目录抽取），AI 读 md，PDF 备份用 |
-| `docs/华师大公示文件/*` | 旧 23 份 md，digest 的原始来源，0005 录完后 `git mv` 到 `docs/_archive/`，**禁止现在 rm** |
-| `docs/ecnu-digests/ecnu_rules_digest_{A,B,C,D}.md` | 4 份 digest，99 条 track_requirement 候选 + 用户审阅修订 + 落地行结构 |
+| `docs/华师大规则文件pdf/*.md` + `*.toc.txt` | **source of truth**（codex 敏感词清洗版本科生手册 + 学习指南 + PDF 目录抽取），AI 读这里；PDF 原件在 .gitignore，仅本地 |
+| `docs/_archive/华师大公示文件_old_md/` | 旧 23 份 md（已归档，digest v1 来源，**保留可回滚但不再 Grep**）|
+| `docs/ecnu-digests/ecnu_rules_digest_{A,B,C,D,E}.md` | **5 份 digest v2**，~227 条 track_requirement 候选 + 6 项设计决策（A 末尾段）|
+| `docs/ecnu-digests/_archive/` | 旧 4 份 digest（v1，已归档，**仅作历史对照**）|
 | `docs/track_kind_taxonomy.md` | D-track-8 归并方案（98 自由 kind → 8 canonical kind，+ 4 现有 = 12 档）+ metadata 形态 |
-| `docs/ecnu_process_rules.md` | 过程类规则精炼版（~500 行内），阶段 4 生成，喂排队 13 的 `gradPathAdvisorPrompt` |
+| `docs/ecnu_process_rules.md` | 过程类规则精炼版（~500 行内），阶段 4 生成，喂排队 13 的 `gradPathAdvisorPrompt`（尚未写）|
 
 ---
 
@@ -145,36 +146,45 @@
 3. ~~**重新 gen types 同步 db.ts**~~ → **推到排队 11**。2026-05-15 用户跑 `> src/types/db.ts` 命中 `Access token not provided` 错误，shell 已 truncate 旧 db.ts → 已用 `git checkout HEAD -- src/types/db.ts` 从 commit `387e5ba` 恢复（471 行，含 0002 之前的 7 表）。**db.ts 暂不含 0003 列（scope_level / college）**，但 src/ 里还没业务代码用 track 表，所以不阻塞 schema 演进；等排队 11 真正写 `courseApi` / 涉及 track 时再用[[feedback-supabase-gen-types-safe]] 安全跑法重生成。
 4. **读规则 md** — 用户已把规则导出到 `docs/华师大公示文件/`（**未读，等用户说『开始』**）。用户明确「先别读，规则比较复杂」。`docs/raw/` 已删除（不再需要图片路径）。
 
-**2026-05-15 状态（AI 一次性读完批 A/B/C/D 共 23 个 md → 4 份 digest 已生成 → 用户陆续修订）：**
+**2026-05-16 状态（v2 重写完毕：5 份 digest 全删旧版从新 md 重写，共 ~227 条 track_requirement 候选）：**
 
-| digest | 文件 | 用户审阅状态 | 剩余 ⚠️ |
-|---|---|---|---|
-| 批 A | `docs/ecnu-digests/ecnu_rules_digest_A.md` | ✅ 用户已补 A1-6 / A1-8 / A2-2（肄业→毕业）。AI 已同步 A2-2 落地行 | 无重大 ⚠️ |
-| 批 B | `docs/ecnu-digests/ecnu_rules_digest_B.md` | ✅ 用户已补 B2-3 / B2-4 / B3-1 / B3-7 / B3-8 (含三条件) / B4-3 (连续两周退学)。AI 已同步 B3-8 落地行 | 无重大 ⚠️ |
-| 批 C | `docs/ecnu-digests/ecnu_rules_digest_C.md` | ✅ 用户已补 C1-3 / C1-8 / C2-1 / C2-2 / C3-3 / C3-6 / C4-3 / C4-4 / C4-5 / C5-2 / C5-3 / C5-4 / C5-9 / C5-13 / C7-2。三张分值表 C6-5 / C6-6 / C6-9 通过桌面图片 OCR 录入完毕。AI 已同步全部落地行去 ⚠️ | C2-4 双学位补入/退出时间窗未抓全 |
-| 批 D | `docs/ecnu-digests/ecnu_rules_digest_D.md` | ✅ 用户已补 D1-2 / D1-8 / D2-3 / D2-4 / D2-11 / D2-13 / D3-1 / D3-3 (1:30) / D3-6 / D4-1 / D4-3 / D4-4 (≥2%) / D4-5 / D4-8 (≤20%) / D4-10 / D4-14 / D4-15 / D5-2 / D5-4 (≤2项/年) / D5-6 (≤20%) / D5-7 / D5-8 (15/20学时)。AI 已同步全部落地行去 ⚠️ | D2-8 因病医药费（小，prompt 类）/ D5-8 教师工作量（不入 track） |
+| digest | 文件 | 条数 | 来源校规数 | 主要 kind 分布 | 备注 |
+|---|---|---|---|---|---|
+| 批 A 毕业资格核心 | `docs/ecnu-digests/ecnu_rules_digest_A.md` | 29 | 5 | time_limit / status_gate / warning_threshold / gpa_threshold | 含 6 项设计决策段，B/C/D/E 沿用 |
+| 批 B 学业规则类 | `docs/ecnu-digests/ecnu_rules_digest_B.md` | 57 | 6 | score_scheme（含附录两张表）/ warning_threshold / assessment_rule / tuition | GPA 公式 / A 等比例 / 退学线 |
+| 批 C 特殊计划 | `docs/ecnu-digests/ecnu_rules_digest_C.md` | 56 | 9 | program_rule（含创新创业三张分值表 + 学科竞赛两张奖金表）| 含 C9 推免段（新增）；C3 强基 ⚠️ 散见 4 条 |
+| 批 D 过程类 | `docs/ecnu-digests/ecnu_rules_digest_D.md` | 60 | 6 | time_limit / assessment_rule / status_gate / score_scheme | 含 D5 毕业论文抽检（独立成段）|
+| 批 E 培养方案与学分构成 | `docs/ecnu-digests/ecnu_rules_digest_E.md` | 25 | — | credits / program_rule | **首次纳入**：本科教育目标 / 公共必修 40 学分 / 通识 8 学分 / 师范生 scope=college |
+
+**重写原因**：用户 2026-05-16 拍板「以新 PDF 清洗 md 为 source of truth，全删旧 digest 重写而非差分修补」。验证通过 —— 旧 OCR 三张表分值数字在新 md 中文本完整呈现（甚至多了 CCF-A/B/C / 中科院一二三区 / SSCI/A&HCI 等细节）。旧 4 份 digest 已归档 `docs/ecnu-digests/_archive/`。
+
+**6 项设计决策（A 段固化，B/C/D/E 沿用，不再逐份重审）**：
+1. 多条款合一条：同一法律条文下子项归并 + metadata 数组表达分支
+2. 跨 digest 重叠规则：先出现段留 cross-link prompt，主负责段升级 track_requirement
+3. `time_limit` 用 `metadata.direction` 表达上下限，控制 12 档 kind 总数
+4. 分支 GPA 阈值用 object 结构 `{ gpa_min: number|null, criterion?: string }`
+5. AI 顾问无关条款（监考标准等）digest 阶段直接删，不进 process_rules
+6. `source_ref` 统一格式：`华东师范大学2025年本科生手册.md §章节 第x条`
+
+**⚠️ 2 处待用户拍板（不阻塞 0005 seed SQL）**：
+1. **C3 强基计划独立办法在新 PDF 中未收录**：仅基于手册 1608/2832/2938 + 指南 1063/1077 散见条款重写 4 条（AI 建议接受现状，等学校发新版补）
+2. **E2 公共必修 40 学分组成求和**：思政 17 + 英语 8 + 计算机 0/3/5（师范 4）+ 体育 4 + 国情 3 + 劳动 2 + 心理 2 = 36-41 浮动；指南给"40 学分左右"，AI 顾问直接引用即可
 
 **下一步**：
-1. ~~**0004_add_source_ref.sql** + verify~~ ✅ 2026-05-16 commit `a2b955f`（含 0003_verify self-cleanup）。
-2. **task #4 在抽 99 条 digest 落地行时撞 schema 冲突**：digest 用 98 个自由 kind 标签，0002 只允许四档。拍板走方案 B（D-track-8），拆 4 阶段：
-   - ~~**阶段 1**：`docs/track_kind_taxonomy.md` —— 归并 98 → 8 个新 canonical kind（+ 4 现有 = 12 档）+ metadata 形态。99 条全覆盖，0 unmapped。~~ ✅ 2026-05-16 用户 5 项拍板项全过。
-   - ~~**阶段 2 SQL**：`0006_extend_requirement_kinds.sql` + `0006_verify.sql` 扩 CHECK 到 12 档 + 加 `metadata jsonb NOT NULL DEFAULT '{}'` + 放宽 threshold CHECK。同步 TRACK_SCHEMA.md §3.3 + 头部 v4。~~ ✅ 2026-05-16 用户已在 Supabase Dashboard 跑通。
-   - **阶段 3 前置（2026-05-16 新增）**：核对 2 份 PDF vs 4 份 digest。**师范生入 track（scope=college）/ 微专业单独 track**（2026-05-16 拍板）。处理三类：一致不动 / PDF 更详则修 digest / PDF 全新则写 digest E（培养方案 + 学分构成 + 师范生 + 微专业 + 卓越学院）。读 PDF 优先级见排队 10 注释。
-   - **阶段 3**：`supabase/migrations/0005_seed_ecnu_2023.sql` —— 99 条 INSERT 按 canonical kind 分 8 段，每条带 `source_ref` 引 digest §章节 + `metadata` 存细节。前置 PDF 核对完成后启动。
-   - **阶段 4**：`docs/ecnu_process_rules.md` —— ~123 条"不入 track_*"的 prompt 类规则精炼版（~500 行内），留排队 13 喂 `gradPathAdvisorPrompt`。
-3. **gen types 不再阻塞当前主线**，推到排队 11 一起做；要重新跑时务必用[[feedback-supabase-gen-types-safe]] 的安全跑法（双步 `.tmp` 文件），不要直接 `> src/types/db.ts`
-4. **旧 md 处置**（决策点）：99 条录完 0005 后一次性 `git mv docs/华师大公示文件/ docs/_archive/华师大公示文件_old_md/`，保留可回滚。**禁止 0005 前删**，digest `source_ref` 还指着旧文件名。
+1. ~~**0004_add_source_ref.sql** + verify~~ ✅ 2026-05-16 commit `a2b955f`
+2. ~~**阶段 1**：`docs/track_kind_taxonomy.md` 12 档 canonical kind~~ ✅ 2026-05-16
+3. ~~**阶段 2 SQL**：`0006_extend_requirement_kinds.sql`~~ ✅ 2026-05-16
+4. ~~**阶段 3 前置**：digest A/B/C/D/E v2 全部重写~~ ✅ 2026-05-16 commit `cd6c7f4`
+5. **阶段 3**：`supabase/migrations/0005_seed_ecnu_2023.sql` —— ~227 条 INSERT 按 12 档 canonical kind 分组，每条带 `source_ref` 引新 md §章节 + `metadata` 存细节。**用户拍板师范生入 track（scope_level='college'）/ 微专业单独 track**。
+6. **阶段 4**：`docs/ecnu_process_rules.md` —— 各 digest 末尾「与阶段 4 边界」段列出的 prompt 类规则 + AI 顾问背景知识，精炼版（~500 行内）喂排队 13 `gradPathAdvisorPrompt`。
+7. **旧 md 处置** ✅ 2026-05-16 已 `git mv` 到 `docs/_archive/华师大公示文件_old_md/`（commit `fcc57be`）
+8. **gen types** 不阻塞主线，推到排队 11 一起做。用[[feedback-supabase-gen-types-safe]] 的双步 `.tmp` 安全跑法。
 
-**用户修改 digest 的工作流（已确认）**：
-- 用户在 IDE 里直接编辑 4 份 `docs/ecnu-digests/ecnu_rules_digest_*.md`，补 ⚠️ 处或修正「规则」行。
-- AI 收到 system-reminder 看到文件被改 → 同步对应的「落地」行去掉 ⚠️ / 写真实结构。
-- chat 里互相确认（typo / 不一致由 AI 主动质询）。
-- 工具 OCR：用户把表格放桌面 `C:\Users\J-R-N\Desktop\` 用文件名 `Cx-y.png` 标记，AI 用 Read 读图。
-
-**会话 2026-05-15 状态：**
-- 4 份 digest 全部用户审阅 + AI 同步落地行完毕。⚠️ 剩余项极少且不影响 track 结构化。
-- Task #1~#3 / #5 / #7 / #8 已 completed。**#4 阻塞解除**（写 0004_add_source_ref.sql + 0005_seed_ecnu_2023.sql + ecnu_process_rules.md）。
-- 工具补强：AI 工具 OCR（用户桌面 `Cx-y.png` 命名 → AI Read 读图 → 录入 markdown table）。批 C 三张表入文（C6-5 / C6-6 / C6-9）。
+**会话 2026-05-16 状态**：
+- 5 份 digest v2 全部 AI 重写完毕（共 ~3000 行 / 227 条 track_requirement 候选 / 5 张完整保留的分值/奖金 markdown table）。
+- 旧 23 份 md + 4 份旧 digest 已归档 `_archive/`。
+- 推免段（旧 batch 跳过）C9 新增；微专业 + 卓越学院进 C8；师范生入 E4 段（scope=college）。
+- **0005 seed SQL 已可启动**：用户审 5 份 digest 后给开工信号。
 
 ---
 
