@@ -47,8 +47,24 @@
 
 #### 排队 10 — 学校种子数据 seed SQL（华师大 2023 级）
 
+**数据源文件清单**（CLAUDE.md 第 8 条禁扫名单，仅本任务 / 排队 13 读）：
+
+| 路径 | 用途 |
+|---|---|
+| `docs/华师大规则文件pdf/*.pdf` + `*.md` + `*.toc.txt` | **source of truth**（2 份 PDF + 清洗后 md + 目录抽取），AI 读 md，PDF 备份用 |
+| `docs/华师大公示文件/*` | 旧 23 份 md，digest 的原始来源，0005 录完后 `git mv` 到 `docs/_archive/`，**禁止现在 rm** |
+| `docs/ecnu-digests/ecnu_rules_digest_{A,B,C,D}.md` | 4 份 digest，99 条 track_requirement 候选 + 用户审阅修订 + 落地行结构 |
+| `docs/track_kind_taxonomy.md` | D-track-8 归并方案（98 自由 kind → 8 canonical kind，+ 4 现有 = 12 档）+ metadata 形态 |
+| `docs/ecnu_process_rules.md` | 过程类规则精炼版（~500 行内），阶段 4 生成，喂排队 13 的 `gradPathAdvisorPrompt` |
+
+---
+
 - 手动 SQL `0005_seed_ecnu_2023.sql` —— 把培养方案录成 ~50-200 行 insert（首条 track 用 `scope_level='school'` 全校通用）。
 - **不做 RAG，不做爬虫**。
+
+**2026-05-16 数据源升级**：旧 34 份 md (`docs/华师大公示文件/`) → 新 2 份 PDF (`docs/华师大规则文件pdf/`)。**PDF 是 source of truth**，md 仅历史佐证。旧 md 处置：99 条录完 0005 后一次性 `git mv` 到 `docs/_archive/华师大公示文件_old_md/`，**禁止现在 rm**（digest 的 `source_ref` 还指着旧文件名 § 章节）。两份 PDF：
+- `华东师范大学2025年本科生手册.pdf`（64 篇规章原文，对应旧 md）
+- `华东师范大学2025年本科生学习指南.pdf`（FAQ + 培养方案 + 学分构成核心数据 + 师范生 + 微专业 + 卓越学院）
 
 **前置子任务（2026-05-15 拍板，分 4 批读 + 双层记录 + schema 加 source_ref）**：
 
@@ -142,10 +158,12 @@
 1. ~~**0004_add_source_ref.sql** + verify~~ ✅ 2026-05-16 commit `a2b955f`（含 0003_verify self-cleanup）。
 2. **task #4 在抽 99 条 digest 落地行时撞 schema 冲突**：digest 用 98 个自由 kind 标签，0002 只允许四档。拍板走方案 B（D-track-8），拆 4 阶段：
    - ~~**阶段 1**：`docs/track_kind_taxonomy.md` —— 归并 98 → 8 个新 canonical kind（+ 4 现有 = 12 档）+ metadata 形态。99 条全覆盖，0 unmapped。~~ ✅ 2026-05-16 用户 5 项拍板项全过。
-   - ~~**阶段 2 SQL**：`0006_extend_requirement_kinds.sql` + `0006_verify.sql` 已写。扩 CHECK 到 12 档 + 加 `metadata jsonb NOT NULL DEFAULT '{}'` + 放宽 threshold CHECK（threshold 或 metadata 二选一）。同步 TRACK_SCHEMA.md §3.3 + 头部 v4。~~ ✅ 2026-05-16。**用户侧待操作**：Supabase Dashboard 跑 `0006_extend_requirement_kinds.sql` → 跑 `0006_verify.sql` 逐段验证。
-   - **阶段 3（待启动）**：`supabase/migrations/0005_seed_ecnu_2023.sql` —— 99 条 INSERT 按 canonical kind 分 8 段，每条带 `source_ref` 引 digest §章节 + `metadata` 存细节。等 0006 跑通后启动。
+   - ~~**阶段 2 SQL**：`0006_extend_requirement_kinds.sql` + `0006_verify.sql` 扩 CHECK 到 12 档 + 加 `metadata jsonb NOT NULL DEFAULT '{}'` + 放宽 threshold CHECK。同步 TRACK_SCHEMA.md §3.3 + 头部 v4。~~ ✅ 2026-05-16 用户已在 Supabase Dashboard 跑通。
+   - **阶段 3 前置（2026-05-16 新增）**：核对 2 份 PDF vs 4 份 digest。**师范生入 track（scope=college）/ 微专业单独 track**（2026-05-16 拍板）。处理三类：一致不动 / PDF 更详则修 digest / PDF 全新则写 digest E（培养方案 + 学分构成 + 师范生 + 微专业 + 卓越学院）。读 PDF 优先级见排队 10 注释。
+   - **阶段 3**：`supabase/migrations/0005_seed_ecnu_2023.sql` —— 99 条 INSERT 按 canonical kind 分 8 段，每条带 `source_ref` 引 digest §章节 + `metadata` 存细节。前置 PDF 核对完成后启动。
    - **阶段 4**：`docs/ecnu_process_rules.md` —— ~123 条"不入 track_*"的 prompt 类规则精炼版（~500 行内），留排队 13 喂 `gradPathAdvisorPrompt`。
 3. **gen types 不再阻塞当前主线**，推到排队 11 一起做；要重新跑时务必用[[feedback-supabase-gen-types-safe]] 的安全跑法（双步 `.tmp` 文件），不要直接 `> src/types/db.ts`
+4. **旧 md 处置**（决策点）：99 条录完 0005 后一次性 `git mv docs/华师大公示文件/ docs/_archive/华师大公示文件_old_md/`，保留可回滚。**禁止 0005 前删**，digest `source_ref` 还指着旧文件名。
 
 **用户修改 digest 的工作流（已确认）**：
 - 用户在 IDE 里直接编辑 4 份 `docs/ecnu-digests/ecnu_rules_digest_*.md`，补 ⚠️ 处或修正「规则」行。
@@ -187,6 +205,14 @@
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
 > 早于 2026-05-14 的里程碑（排队 5 / 2 / 4b / 4a / profiles / DATA_MODEL）已挪到 `docs/AI_MEMORY.md` § 9。
+
+- **2026-05-16** — 数据源切 PDF + 旧 md 处置方案 + CLAUDE.md 分流条 + TD-26 入册
+  - 用户提供 2 份新 PDF（`docs/华师大规则文件pdf/2025本科生手册.pdf` + `2025本科生学习指南.pdf`），PDF 是 source of truth，旧 34 份 md 仅历史佐证。
+  - 全局 CLAUDE.md 加「数据源文件分流」条：规则源文件只在排队 10 / 13 读，其他任务禁 Grep。
+  - 旧 md 处置：99 条录完 0005 后一次性 `git mv` 到 `docs/_archive/`，禁止现在 rm（digest `source_ref` 链）。
+  - 两本 PDF 目录已盘点：手册 64 篇（21 已 digest 覆盖 / 5 跳过 / 14 新内容 / 15 奖励处分多半 prompt / 14 学习生活多半跳）；学习指南 P0 核心数据在 二.03/04/05（培养方案 + 公共必修 + 通识学分构成）。
+  - 师范生入 track（scope=college）/ 微专业单独 track（2026-05-16 拍板）。
+  - 新增 TD-26：PDF 内联预览 + source_ref 精确到页码，推到排队 14 UI 重设计统一做。
 
 - **2026-05-16** — TD-25 修 — `/schedule` 闪屏（"先一个界面，~1s 后跳到另一个"）
   - 入口溯源：导航「Rule Graph · 规则透明与来源」`menu.ts:55-62` → `/schedule`，**不是落地页 Transparency 锚点**（TECH_DEBT 原描述指错了）。
