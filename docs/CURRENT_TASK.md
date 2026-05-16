@@ -139,7 +139,7 @@
 
 ## 当前阻塞
 
-**排队 10 输入收集中。状态盘点：**
+**无。阶段 3 已落库 (2026-05-16)，下一步起阶段 4 ecnu_process_rules.md。状态盘点：**
 
 1. ~~**0002 SQL 跑通**~~ ✅ 2026-05-15 用户回报全 OK
 2. ~~**0003_relax_track_scope SQL 跑通**~~ ✅ 2026-05-15 用户回报「没问题了」
@@ -182,20 +182,21 @@
 
 ---
 
-### ⏸ 阶段 3 - 0005 seed SQL 全段写完，待用户在 Supabase Dashboard 跑通
+### ✅ 阶段 3 - 0005 seed SQL 已落库（2026-05-16 用户 Supabase Dashboard 跑通）
 
-**全段已完成（2026-05-16）**：
-- ✅ `0005_seed_ecnu_2023.sql` 全段写入 —— 2 track + 30 category + **198 requirement**，整片 PL/pgSQL DO 块 + ON CONFLICT 幂等可重跑
+**全段写入 + 跑通（2026-05-16）**：
+- ✅ `0005_seed_ecnu_2023.sql` 全段 —— 2 track + 30 category + **198 requirement**，整片 PL/pgSQL DO 块 + ON CONFLICT 幂等可重跑
   - 单文件分批 Edit 注入：A(已有, 23) + B(48) + C(56) + D(49) + E全校(14) + E师范(8)
   - 198 个 metadata JSON 全部 `JSON.parse` 通过（修了 D4-6 一处 `"key:value":value` 误写）
   - 段分布与计划完全对齐：A1=9 / A2=2 / A3=4 / A4=3 / A5=5 / B1=6 / B2=14 / B3=5 / B4=6 / B5=7 / B6=10 / C1=10 / C2=7 / C3=4 / C4=2 / C5=8 / C6=9 / C7=4 / C8=4 / C9=8 / D1=5 / D2=7 / D3=6 / D4=15 / D5=7 / D6=9 / E1=2 / E2=8 / E3=4 / E4=8
 - ✅ `0005_verify.sql` 扩 8 段 → 15 段全段验证（含 5 个抽样 + module 分布 + 师范学院 track 单查）
+- ✅ **用户 Supabase Dashboard 跑通**（2026-05-16）：seed + verify 两份 SQL 均 OK，198 条 requirement 落库, 15 段验证全 pass
 
-**两 track 颗粒度（用户拍板）**：
+**两 track 颗粒度（已落库）**：
 - `track[school='华东师范大学', year=2023, scope_level='school', college=NULL, major=NULL]` → 挂 29 category (A1-A5/B1-B6/C1-C9/D1-D6/E1-E3) + 190 requirement
 - `track[..., scope_level='college', college='师范学院', major=NULL]` → 挂 1 category (E4) + 8 requirement
 
-**12 档 kind 分布（期望，§ 4 验证用）**：
+**12 档 kind 分布（已验证）**：
 | kind | n | 主要来源 |
 |---|---|---|
 | program_rule | 56 | C 项目级 + D 项目级 + E4 师范段 |
@@ -210,13 +211,8 @@
 | all_of | 2 | E2-1 思政 6 门 / E2-5 国情教育 2 门 |
 | count / one_of | 0 | 留给排队 11 课程列表 |
 
-**用户下一步**：
-1. Supabase Dashboard SQL Editor 整片粘 `0005_seed_ecnu_2023.sql` → Run
-2. 跑 `0005_verify.sql` 15 段单独验证（§ 3 应 school=190 college=8 / § 4 共 198 / § 6-7 应 0 / § 14 应 8 行）
-3. 报回结果 → AI 看是否还需修
-
-**下一步（用户跑通后）**：
-1. ~~阶段 3 0005 seed SQL~~ ✅ AI 完成 / 待用户 Dashboard 跑
+**下一步**：
+1. ~~阶段 3 0005 seed SQL~~ ✅ AI 写完 + 用户 Dashboard 跑通（2026-05-16）
 2. **阶段 4** `docs/ecnu_process_rules.md` —— 各 digest 末尾「与阶段 4 边界」段的 prompt 类规则 + AI 顾问背景知识，精炼版（~500 行内）喂排队 13 `gradPathAdvisorPrompt`
 3. **gen types** 推到排队 11 一起做，用 [[feedback-supabase-gen-types-safe]] 安全跑法
 
@@ -255,12 +251,14 @@
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
 > 早于 2026-05-14 的里程碑（排队 5 / 2 / 4b / 4a / profiles / DATA_MODEL）已挪到 `docs/AI_MEMORY.md` § 9。
 
-- **2026-05-16** — 阶段 3 — 0005 seed SQL 全段写完（A 23 + B 48 + C 56 + D 49 + E全校 14 + E师范 8 = 198 条）
-  - `supabase/migrations/0005_seed_ecnu_2023.sql` 全段重写 —— 2 track（school + 师范学院 college）+ 30 category（A1-A5/B1-B6/C1-C9/D1-D6/E1-E3 + E4）+ **198 track_requirement**。整片 PL/pgSQL DO 块 + `ON CONFLICT (category_id, code) DO UPDATE` 幂等可重跑。
+- **2026-05-16** — 阶段 3 — 0005 seed SQL ✅ 落库（198 条 requirement / 用户 Supabase Dashboard 跑通）
+  - `supabase/migrations/0005_seed_ecnu_2023.sql` 全段 —— 2 track（school + 师范学院 college）+ 30 category（A1-A5/B1-B6/C1-C9/D1-D6/E1-E3 + E4）+ **198 track_requirement**。整片 PL/pgSQL DO 块 + `ON CONFLICT (category_id, code) DO UPDATE` 幂等可重跑。
+  - 段分布：A 23 + B 48 + C 56 + D 49 + E全校 14 + E师范 8 = 198。
   - 实施策略：用户拍板单文件分批 Edit（A 方案）——skeleton + A 段（已有 23 行）+ 5 次 Edit 注入 B/C/D/E全校/E师范，避免一次 Write 几千行卡顿。
   - 198 个 metadata JSON 全部 `JSON.parse` 通过（D4-6 一处 `"key:value":value` 误写修复）；198 INSERT 段分布精确符合计划。
   - `supabase/migrations/0005_verify.sql` 扩 8 段 → 15 段全段验证：基本结构（§ 1-5）+ 完整性（§ 6-7）+ 5 个抽样段（A1-10 / B3-1 / C6-6 三档赛事 / C7-2 A 类奖金 / D4-12 重复率两档 / E2-3 计算机分支 / E4 师范全部 8 条）+ § 15 module metadata 分布。
-  - 12 档 kind 分布预期（§ 4 验证用）：program_rule 56 / assessment_rule 37 / status_gate 31 / time_limit 21 / credits 13 / gpa_threshold 11 / score_scheme 11 / warning_threshold 8 / tuition 8 / all_of 2 / count + one_of 0。
+  - 12 档 kind 分布（已验证）：program_rule 56 / assessment_rule 37 / status_gate 31 / time_limit 21 / credits 13 / gpa_threshold 11 / score_scheme 11 / warning_threshold 8 / tuition 8 / all_of 2 / count + one_of 0。
+  - **用户 Supabase Dashboard 跑通**（2026-05-16）：seed + verify 两份均 OK，零反馈修复，落库零错。
   - 解锁后续：阶段 4 `docs/ecnu_process_rules.md`（prompt 类规则精炼版给 `gradPathAdvisorPrompt` 用）+ 排队 13 AI 顾问真正能从 198 条结构化规则中取数。
 
 - **2026-05-16** — 数据源切 PDF + 旧 md 处置方案 + CLAUDE.md 分流条 + TD-26 入册
