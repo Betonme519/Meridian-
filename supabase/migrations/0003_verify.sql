@@ -49,7 +49,11 @@ ORDER BY indexname;
 
 -- ──────────────────────────────────────────────────────────────────────
 -- 验证 4  插入合法数据: 全校通用 track
+--   前置 cleanup: 上一次 verify (0003 / 0004) 若没收尾, 这里先清干净,
+--   避免重跑撞 idx_track_scope_unique. CASCADE 自动清下游.
 -- ──────────────────────────────────────────────────────────────────────
+DELETE FROM track WHERE school = '__TEST__';
+
 INSERT INTO track (school, year, name, scope_level)
 VALUES ('__TEST__', 2099, '__全校通用 test__', 'school')
 RETURNING id, school, year, scope_level, college, major;

@@ -4,10 +4,10 @@
 > `rule` 是用户主观偏好与零散知识（"我想保研"、"体育课压分"），track 是学校官方规则。
 > 决策依据见 [project memory: track schema pivot 2026-05-14]。
 >
-> Last updated: **2026-05-15**（v2 — scope 三档演进）
+> Last updated: **2026-05-16**（v3 — requirement / option 加 source_ref）
 > Related: `docs/DATA_MODEL.md`（前 7 张表）/ `docs/CURRENT_TASK.md` 排队 8–13 / `docs/AI_MEMORY.md`
 >
-> 本文档不是最终落地 SQL —— 字段定型后由排队 9 写 `0002_add_track_schema.sql`。
+> 落地 migration：`0002_add_track_schema.sql`（建表）/ `0003_relax_track_scope.sql`（scope 三档）/ `0004_add_source_ref.sql`（来源追溯）。Seed 由 `0005_seed_ecnu_2023.sql` 注入。
 
 ---
 
@@ -173,6 +173,7 @@ idx_track_category_track_order  (track_id, order_index)
 | `kind` | text | ✅ | `'count'` | CHECK IN (`'count'`,`'credits'`,`'one_of'`,`'all_of'`)。语义见下 |
 | `threshold` | numeric(5,1) | ❌ | `null` | kind=count → 门数；kind=credits → 学分；one_of → `1`；all_of → `null` |
 | `description` | text | ❌ | `null` | |
+| `source_ref` | text | ❌ | `null` | 0004 加。原始规则来源，自由字符串，典型 `"文件名 §章节"`（如 `"ecnu_rules_digest_A.md §A1-6"`）。AI citations / UI hover 用 |
 | `created_at` | timestamptz | ✅ | `now()` | |
 | `updated_at` | timestamptz | ✅ | `now()` | trigger 维护 |
 
@@ -216,6 +217,7 @@ idx_track_requirement_category  (category_id, order_index)
 | `semester_hint` | text | ❌ | `null` | 建议修读学期（如 `'大一上'` / `'2024-Fall'`） |
 | `prerequisites` | text[] | ❌ | `'{}'::text[]` | 先修课代码数组（D-track-7 弱实现），如 `ARRAY['MATH 101']`；复杂逻辑留 schema v2 |
 | `description` | text | ❌ | `null` | 课程说明 / 抵学分条件描述 |
+| `source_ref` | text | ❌ | `null` | 0004 加。原始规则来源，自由字符串。通常与所属 requirement.source_ref 相同，允许 option 级更精确（某门课对应分值表中具体一行）|
 | `created_at` | timestamptz | ✅ | `now()` | |
 | `updated_at` | timestamptz | ✅ | `now()` | trigger 维护 |
 
@@ -373,11 +375,22 @@ INSERT INTO track (school, year, scope_level, name) VALUES (...);
 3. 5 张表都接 `set_updated_at` trigger（沿用 DATA_MODEL.md § 5.1）
 4. **不写 seed**：seed 留排队 10。
 
+**插入 — `0003_relax_track_scope.sql`（2026-05-15）：**
+1. track 表 scope 三档演进：`(school, major, year)` UNIQUE → `scope_level` + `college` 三档自洽 CHECK + 表达式 UNIQUE INDEX
+2. major 改 nullable；新增 partial index `idx_track_school_college`
+3. 详见本文档 §3.1 字段表 + D-track-2 v2 标注
+
+**插入 — `0004_add_source_ref.sql`（2026-05-16）：**
+1. `track_requirement.source_ref text` + `track_option.source_ref text`，均可空
+2. 自由字符串存"文件名 §章节"；AI 引 citations，UI hover 显示
+3. 0005 录入 INSERT 时每条带 source_ref；不需要新索引（不参与 join / where）
+
 **排队 10 — 学校种子数据：**
-1. 用户提供原始培养方案（PDF / 网页 / 手抄列表）
-2. 我手工转 SQL：`INSERT INTO track ...`、`INSERT INTO track_category ...`、`INSERT INTO track_requirement ...`、`INSERT INTO track_option ...`
-3. 文件命名：`supabase/migrations/0003_seed_<school>_<major>_<year>.sql`
+1. 用户已把华师大 2023 培养方案 + 教务规则导出到 `docs/华师大公示文件/`（34 个 md），AI 已读完 23 个相关项 → 4 份 digest（`docs/ecnu_rules_digest_{A,B,C,D}.md`）
+2. 我把 digest 里可结构化条目转 SQL：`INSERT INTO track ...`、`INSERT INTO track_category ...`、`INSERT INTO track_requirement ...`、`INSERT INTO track_option ...`；每条带 `source_ref` 引 digest §章节
+3. 文件命名：`supabase/migrations/0005_seed_ecnu_2023.sql`
 4. 在 Supabase SQL Editor 跑（service_role 自动 bypass RLS）
+5. 过程类规则（选课退课流程、转专业流程、考勤等）单独出 `docs/ecnu_process_rules.md` 精炼版，留排队 13 喂 prompt 用
 
 **排队 11 — `course` 表接 UI**（注意区别）：
 - `course` 表（DATA_MODEL.md § 3.2）= 用户「已修过的课」**自由记录**，与 `track_option` 解耦
