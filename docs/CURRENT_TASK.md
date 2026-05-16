@@ -3,7 +3,7 @@
 > 短期工作内存。**AI 接手优先读这份**，再按需查 `AI_MEMORY.md` / `TECH_DEBT.md`。
 > 铁律：只做下方「排队」里的事，做完停下汇报。「不要修改」当只读。
 
-> Last updated: **2026-05-15**
+> Last updated: **2026-05-16**
 
 ---
 
@@ -183,6 +183,14 @@
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
 > 早于 2026-05-14 的里程碑（排队 5 / 2 / 4b / 4a / profiles / DATA_MODEL）已挪到 `docs/AI_MEMORY.md` § 9。
 
+- **2026-05-16** — TD-25 修 — `/schedule` 闪屏（"先一个界面，~1s 后跳到另一个"）
+  - 入口溯源：导航「Rule Graph · 规则透明与来源」`menu.ts:55-62` → `/schedule`，**不是落地页 Transparency 锚点**（TECH_DEBT 原描述指错了）。
+  - 根因：`SchedulePage` 的状态分支 `isGuest = !authLoading && !user` / `isEmpty = !loading && ...` 把 loading 期判成 false → 第一帧渲染空 Trust 列 + 空树 → 等 auth+hook（约 800ms-1s）落地后才切到 SEED 或真实数据。两段跳变 = 用户感知的"闪屏"。
+  - 修：`src/pages/Schedule/index.tsx:63-70` 引入 `isResolving = authLoading || loading`，并入 `showSeed = isResolving || isGuest || isEmpty`。第一帧直接显示 SEED；访客 / 登录空态全程 SEED 无跳变；登录有数据 → SEED → 真实数据一次切换（预期，不算 bug）。
+  - `canEdit = !isGuest && !authLoading` 保持原样 → loading 期 SEED 上不出 CRUD 按钮，避免点了未鉴权按钮。
+  - `tsc --noEmit`：仅 CardSwap 历史遗留错（允许）。零新增类型错误。
+  - TECH_DEBT.md TD-25 段标 ✅ 2026-05-16 已修并写明修法 / 副作用。
+
 - **2026-05-15** — 排队 10 前置 — 华师大 23 个 md → 4 份 ECNU 规则 digest 录入完毕
   - **AI 一次性读完 23 个 md（剔除硕博/二学位等不相关 11 个）→ 写 4 份 digest**：
     - `docs/ecnu_rules_digest_A.md` 毕业资格核心（学籍管理 / 毕业资格 / 学士学位 / 成绩学分认定 / 课程考核）
@@ -217,13 +225,4 @@
   - 关键设计：track 按 (school, major, year) UNIQUE；category / requirement / option 都用 `order_index` 排序 + `code` 机器名 + `title` 展示名；requirement.kind 四档（count / credits / one_of / all_of）+ threshold；option.kind 三档（course / alt / project）；user_progress.status 五档（planned / enrolled / done / waived / dropped）+ UNIQUE (user_id, option_id)。
   - 不写 SQL（留排队 9）；不写 seed（留排队 10，等用户提供原始培养方案）。
   - 完成标准：与 DATA_MODEL.md 同款 markdown 格式 + 表格风格；与 `rule` 表（D7=a 用户私有）分工清晰：rule = 主观偏好，track = 客观规则。
-
-- **2026-05-15** — 排队 7 — `rule` + `rule_conflict` 表接 `/schedule`（TD-24 收尾，第一阶段「无关基础」完成）
-  - 新建 `src/api/ruleApi.ts`：`listRules(userId)` / `createRule({...})` / `updateRule(id, patch)` / `deleteRule(id)`；Rule 走 typed client 派生 + 窄 `trust: TrustLevel` 枚举；从 `TRUST_LEVELS as const` 数组派生 union。
-  - 新建 `src/api/ruleConflictApi.ts`：`listConflicts(userId)` / `createConflict({...})` / `updateConflict(id, patch)` / `deleteConflict(id)`；插入前 `sortRulePair` 强制 (a, b) 字典序满足 CHECK (a < b)；同 id 自检；`confidence` / `resolved_by` 都派生 const 数组；CONFIDENCE_LEVELS / RESOLVED_BY_VALUES 公开导出。
-  - 新建 `src/hooks/useRules.ts`：同款 race 守卫（requestIdRef + loadedUserIdRef + auth-loading 短路）；`Promise.all` 并发拉两表；CRUD 乐观写本地 + 失败 revert；`removeRule` 同步清掉本地引用该 rule 的 conflicts（DB 上靠 ON DELETE CASCADE）；派生 view `rulesByBranch` / `rulesByTrust` / `ruleMap` 走 useMemo。
-  - 新建 `src/pages/Schedule/scheduleSeed.ts`：12 条 SEED_RULES（DB Rule shape 对齐 + 合成 `seed-rule-*` id）+ 2 条 SEED_CONFLICTS（满足 CHECK a<b）+ 4 条 SEED_POLICIES（学校特殊政策本轮不入库，登录用户 + 访客共用）+ TRUST_META（lucide icon / 配色 / 中文短称三档元数据）。
-  - Schedule 页改造：删 4 段 hardcode → 接 useRules + useAuth；访客模式（!authLoading && !user）= 全 SEED 只读预览 + 横幅；登录用户空态也 fallback SEED + 「以下为示例…立即新建」amber 横幅；error 横幅含「重试」走 refresh()；rule 树 hover 显示删除 ✕；trust 列项 hover 显示「⇄ 调档」（点 cycle high→med→low）+ 删除 ✕；conflict 卡片 join `ruleMap` 显示 A/B title + source；`resolved_by` 端高亮（emerald）；新建规则 inline 表单（分组/可信度/标题/详情/来源/页码 6 字段）；新建冲突 inline 表单（A/B 下拉 + 标题 + 判断 + 置信度，rule 数 < 2 时按钮禁用）；删除走 window.confirm。
-  - 工程细节：rule_conflict CHECK (a < b) 由 API 层强制 sort，UI 不暴露顺序概念；SEED_RULES 用合成 string id（不是 UUID）但不入 DB 所以不会触发 PK 校验；trust 切档用 `as const` 数组取 `(idx + 1) % 3`，类型安全循环。
-  - 完成标准：`tsc --noEmit` 干净（仅 CardSwap 历史）；`vite build` 通过；schedule bundle 54.62 kB；UI 增删改跑通；访客 / 空账号见 SEED；冲突区按 resolved_by 高亮。
 

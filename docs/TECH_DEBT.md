@@ -126,8 +126,8 @@
 - **原因**：4c 短期只能接通骨架（按 branch 分组 + trust 三档着色 + 冲突独立），但 `rule` 表内容来自 `rag_source` 解析 pipeline；TD-2 没跑通前 `rule` 永远是手工测试数据，"接通"价值有限。本期优先做排队 2（AI provider 抽象），TD-2 解析 pipeline 推进后再回头做 4c
 - **建议**：TD-2 跑通 → 4c 一起做，此时 `rule` 表已有真实内容，前端接通才有展示价值
 
-### TD-25 · 落地页「规则透明与来源」section 点击后 ~1s 闪到另一界面
-- **现象**：用户 2026-05-15 反馈 —— 从导航/落地页点「规则透明与来源」（推测对应 `src/pages/Home/Transparency.tsx` 或 menu.ts 里挂的 section anchor）进入后，先渲染一个界面，~1 秒后又跳到另一个界面
-- **怀疑点**：(1) 路由 redirect / beforeLoad 异步触发；(2) Home section 的 IntersectionObserver / scroll-to-anchor 抖动；(3) 某个 effect 把状态 setState 触发重渲染换 UI；(4) menu.ts 里目标 anchor 与组件 id 不一致
-- **风险**：用户体验断裂；落地页是访客第一印象
-- **建议**：复现 → 看 Network/Console → 定位是路由跳还是组件内 effect → 修；不阻塞主线，排到 UI 重设计（排队 14）前单独修，或顺手在改 Transparency 时修
+### ~~TD-25~~ ✅ 2026-05-16 已修 · 落地页「规则透明与来源」点击后 ~1s 闪屏
+- 入口实际是 `Rule Graph → /schedule`（不是 Transparency 锚点）
+- 根因：`SchedulePage` 的 `isGuest = !authLoading && !user` / `isEmpty = !loading && ...` 把 loading 期判成 false → 第一帧渲染空表 → auth+hook 落地后切到 SEED，造成「空白 → SEED」两段跳变
+- 修：`src/pages/Schedule/index.tsx:63-70` 引入 `isResolving = authLoading || loading`，并入 `showSeed`，第一帧直接显示 SEED
+- 副作用：`canEdit` 不变（loading 期不出 CRUD 按钮）；登录有数据时仍有 `SEED → 真实数据` 一次切换，是预期不是 bug

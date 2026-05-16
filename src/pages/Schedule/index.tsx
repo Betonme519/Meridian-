@@ -60,10 +60,15 @@ export default function SchedulePage() {
     refresh,
   } = useRules();
 
+  const isResolving = authLoading || loading;
   const isGuest = !authLoading && !user;
-  const isEmpty = !loading && !isGuest && rules.length === 0 && conflicts.length === 0;
-  /** 访客或登录用户空态都展示 SEED，写态时退回真实 DB 数据 */
-  const showSeed = isGuest || isEmpty;
+  const isEmpty = !isResolving && !isGuest && rules.length === 0 && conflicts.length === 0;
+  /**
+   * 访客 / 登录空态 / 仍在解析（auth + hook）→ 全部展示 SEED。
+   * 把 isResolving 并进来是为了消除 TD-25 闪屏：第一帧直接 SEED，
+   * 而不是「空表 → SEED」或「空表 → 真实数据」的两段跳变。
+   */
+  const showSeed = isResolving || isGuest || isEmpty;
 
   const displayRules = showSeed ? SEED_RULES : rules;
   const displayConflicts = showSeed ? SEED_CONFLICTS : conflicts;
