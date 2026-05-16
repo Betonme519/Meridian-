@@ -139,8 +139,13 @@
 | 批 D | `docs/ecnu_rules_digest_D.md` | ✅ 用户已补 D1-2 / D1-8 / D2-3 / D2-4 / D2-11 / D2-13 / D3-1 / D3-3 (1:30) / D3-6 / D4-1 / D4-3 / D4-4 (≥2%) / D4-5 / D4-8 (≤20%) / D4-10 / D4-14 / D4-15 / D5-2 / D5-4 (≤2项/年) / D5-6 (≤20%) / D5-7 / D5-8 (15/20学时)。AI 已同步全部落地行去 ⚠️ | D2-8 因病医药费（小，prompt 类）/ D5-8 教师工作量（不入 track） |
 
 **下一步**：
-1. **4 份 digest 全部拍板完毕** → task #4 unblocked，可启动：写 `0004_add_source_ref.sql`（schema 加 source_ref 列） + `0005_seed_ecnu_2023.sql`（按 4 份 digest 把可结构化规则录成 INSERT）+ `docs/ecnu_process_rules.md`（过程类精炼版给 AI prompt 用）。
-2. **gen types 不再阻塞当前主线**，推到排队 11 一起做；要重新跑时务必用[[feedback-supabase-gen-types-safe]] 的安全跑法（双步 `.tmp` 文件），不要直接 `> src/types/db.ts`
+1. ~~**0004_add_source_ref.sql** + verify~~ ✅ 2026-05-16 commit `a2b955f`（含 0003_verify self-cleanup）。
+2. **task #4 在抽 99 条 digest 落地行时撞 schema 冲突**：digest 用 98 个自由 kind 标签，0002 只允许四档。拍板走方案 B（D-track-8），拆 4 阶段：
+   - ~~**阶段 1**：`docs/track_kind_taxonomy.md` —— 归并 98 → 8 个新 canonical kind（+ 4 现有 = 12 档）+ metadata 形态。99 条全覆盖，0 unmapped。~~ ✅ 2026-05-16 用户 5 项拍板项全过。
+   - ~~**阶段 2 SQL**：`0006_extend_requirement_kinds.sql` + `0006_verify.sql` 已写。扩 CHECK 到 12 档 + 加 `metadata jsonb NOT NULL DEFAULT '{}'` + 放宽 threshold CHECK（threshold 或 metadata 二选一）。同步 TRACK_SCHEMA.md §3.3 + 头部 v4。~~ ✅ 2026-05-16。**用户侧待操作**：Supabase Dashboard 跑 `0006_extend_requirement_kinds.sql` → 跑 `0006_verify.sql` 逐段验证。
+   - **阶段 3（待启动）**：`supabase/migrations/0005_seed_ecnu_2023.sql` —— 99 条 INSERT 按 canonical kind 分 8 段，每条带 `source_ref` 引 digest §章节 + `metadata` 存细节。等 0006 跑通后启动。
+   - **阶段 4**：`docs/ecnu_process_rules.md` —— ~123 条"不入 track_*"的 prompt 类规则精炼版（~500 行内），留排队 13 喂 `gradPathAdvisorPrompt`。
+3. **gen types 不再阻塞当前主线**，推到排队 11 一起做；要重新跑时务必用[[feedback-supabase-gen-types-safe]] 的安全跑法（双步 `.tmp` 文件），不要直接 `> src/types/db.ts`
 
 **用户修改 digest 的工作流（已确认）**：
 - 用户在 IDE 里直接编辑 4 份 `ecnu_rules_digest_*.md`，补 ⚠️ 处或修正「规则」行。

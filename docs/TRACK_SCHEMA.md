@@ -4,10 +4,10 @@
 > `rule` 是用户主观偏好与零散知识（"我想保研"、"体育课压分"），track 是学校官方规则。
 > 决策依据见 [project memory: track schema pivot 2026-05-14]。
 >
-> Last updated: **2026-05-16**（v3 — requirement / option 加 source_ref）
-> Related: `docs/DATA_MODEL.md`（前 7 张表）/ `docs/CURRENT_TASK.md` 排队 8–13 / `docs/AI_MEMORY.md`
+> Last updated: **2026-05-16**（v4 — requirement.kind 扩 12 档 + metadata jsonb）
+> Related: `docs/DATA_MODEL.md`（前 7 张表）/ `docs/CURRENT_TASK.md` 排队 8–13 / `docs/AI_MEMORY.md` / `docs/track_kind_taxonomy.md`
 >
-> 落地 migration：`0002_add_track_schema.sql`（建表）/ `0003_relax_track_scope.sql`（scope 三档）/ `0004_add_source_ref.sql`（来源追溯）。Seed 由 `0005_seed_ecnu_2023.sql` 注入。
+> 落地 migration：`0002_add_track_schema.sql`（建表）/ `0003_relax_track_scope.sql`（scope 三档）/ `0004_add_source_ref.sql`（来源追溯）/ `0006_extend_requirement_kinds.sql`（kind 扩 12 档 + metadata jsonb）。Seed 由 `0005_seed_ecnu_2023.sql` 注入。
 
 ---
 
@@ -23,7 +23,7 @@
 
 ---
 
-## 1. 决策点（已于 2026-05-15 用户确认）
+## 1. 决策点（D-track-1~7 于 2026-05-15 确认；D-track-8 于 2026-05-16 追加）
 
 | ID | 题 | 选定 | 理由 |
 |---|---|---|---|
@@ -34,8 +34,9 @@
 | **D-track-5** | user_progress 粒度？ | ✅ **option 级** | 状态由数据推导（修了哪几个 option → requirement 满足度计算），最细可信 |
 | **D-track-6** | AI 怎么读 track？ | ✅ **整 track JSON 一次性喂 prompt** | 学校 schema 约几千 token，Claude 4 完全吃得下。RAG 留 TD-2 |
 | **D-track-7** | prerequisite 怎么表达？ | ✅ **option 加 `prerequisites text[]`** | 弱实现，存先修课代码数组；复杂逻辑（AND/OR、成绩门槛）留 schema v2 升级独立表 |
+| **D-track-8** | requirement.kind 四档不够装真实学校规则，怎么处理？ | ✅ **扩 kind 枚举到 ~12 档 + 加 `metadata jsonb`**（2026-05-16）| 跑 0005 时发现 4 份 ECNU digest 共 99 条 track_requirement 候选用了 98 个自由 kind 标签（`time_limit / gpa_threshold / overage_credit_fee / resit_blocked_states / ...`），与 0002 的 `count\|credits\|one_of\|all_of` 四档全部不兼容。比较 4 选 1：A 缩范围（弃 80% 数据）/ B 扩 kind + metadata jsonb（保 95%）/ C 拆新表 track_school_policy（双表 RLS 翻倍）/ D 全塞 description（丢结构化）。选 B：归并 98 标签到 ~10-12 个 canonical kind + metadata 存细节。落地走 `0006_extend_requirement_kinds.sql`（先 `docs/track_kind_taxonomy.md` 归并方案）|
 
-**回头要改的成本：** D-track-1/2/3/5 改动伤筋动骨（要数据迁移 + UI 重写）；D-track-4/6/7 改动局部（D-track-4 加 kind 值、D-track-6 改 prompt、D-track-7 独立 prerequisite 表）。所以核心四个先稳定。
+**回头要改的成本：** D-track-1/2/3/5 改动伤筋动骨（要数据迁移 + UI 重写）；D-track-4/6/7/8 改动局部（D-track-4 加 kind 值、D-track-6 改 prompt、D-track-7 独立 prerequisite 表、D-track-8 扩枚举 + 加 jsonb 列）。所以核心四个先稳定。
 
 ---
 
@@ -170,26 +171,42 @@ idx_track_category_track_order  (track_id, order_index)
 | `code` | text | ✅ | — | 机器名（如 `'math-foundation'`），同 category 内唯一 |
 | `title` | text | ✅ | — | 中文展示名（如 `'数学基础'`） |
 | `order_index` | smallint | ✅ | `0` | 同 category 内排序 |
-| `kind` | text | ✅ | `'count'` | CHECK IN (`'count'`,`'credits'`,`'one_of'`,`'all_of'`)。语义见下 |
-| `threshold` | numeric(5,1) | ❌ | `null` | kind=count → 门数；kind=credits → 学分；one_of → `1`；all_of → `null` |
+| `kind` | text | ✅ | `'count'` | 0006 扩到 12 档（4 现有「修课要求」+ 8 新「学校规则」）。语义见下 |
+| `threshold` | numeric(5,1) | ❌ | `null` | 单一阈值数值。复杂规则留 `null` 全靠 `metadata` |
+| `metadata` | jsonb | ✅ | `'{}'::jsonb` | 0006 加。规则细节，自由形态 JSON。典型 keys 见 `docs/track_kind_taxonomy.md`。应用层（排队 13 zod）守 schema，DB 不加 CHECK |
 | `description` | text | ❌ | `null` | |
 | `source_ref` | text | ❌ | `null` | 0004 加。原始规则来源，自由字符串，典型 `"文件名 §章节"`（如 `"ecnu_rules_digest_A.md §A1-6"`）。AI citations / UI hover 用 |
 | `created_at` | timestamptz | ✅ | `now()` | |
 | `updated_at` | timestamptz | ✅ | `now()` | trigger 维护 |
 
-**`kind` 语义**
+**`kind` 语义**（12 档；详细归并见 `docs/track_kind_taxonomy.md`）
 
+*0002 现有 4 档 — "修课要求"语义*：
 - `count`：从下属 option 里至少修 `threshold` 门（如「四选二」）
 - `credits`：从下属 option 累计至少 `threshold` 学分
 - `one_of`：必选 1 门（`threshold=1`）
 - `all_of`：下属 option 全部必修（`threshold=null`）
 
+*0006 新加 8 档 — "学校规则"语义*：
+- `time_limit`：时间约束（年限 / 期限 / 时点）；metadata `{unit, direction}`
+- `gpa_threshold`：GPA / 体测 / 论文分数门槛；metadata `{scope, scale}`
+- `status_gate`：学籍 / 学位 / 项目状态门槛（多档枚举或布尔判定）；metadata `{tiers:[...]}`
+- `warning_threshold`：学业预警 / 试读 / 退学线；metadata `{trigger, action}`
+- `assessment_rule`：考核 / 考勤 / 补考 / 答辩；metadata `{check, ...}`
+- `score_scheme`：五级 / P/F / 百分制映射 / 加权公式；metadata `{mapping}` 或 `{formula}`
+- `tuition`：学费 / 超额 / 中途结算；metadata `{normal, international, free_credits, ...}`
+- `program_rule`：项目级规则（辅修/双学位/强基/CTP/论文/实习/转专业等），靠 metadata.module 区分；metadata `{module, ...}`
+
 **约束**
 
 ```
 UNIQUE (category_id, code)
-CHECK (kind IN ('count','credits','one_of','all_of'))
-CHECK (kind = 'all_of' OR threshold IS NOT NULL)
+CHECK (kind IN (
+  'count','credits','one_of','all_of',                              -- 0002
+  'time_limit','gpa_threshold','status_gate','warning_threshold',
+  'assessment_rule','score_scheme','tuition','program_rule'         -- 0006
+))
+CHECK (kind = 'all_of' OR threshold IS NOT NULL OR metadata <> '{}'::jsonb)   -- 0006 放宽：threshold 或 metadata 二选一
 ```
 
 **索引**
@@ -384,6 +401,12 @@ INSERT INTO track (school, year, scope_level, name) VALUES (...);
 1. `track_requirement.source_ref text` + `track_option.source_ref text`，均可空
 2. 自由字符串存"文件名 §章节"；AI 引 citations，UI hover 显示
 3. 0005 录入 INSERT 时每条带 source_ref；不需要新索引（不参与 join / where）
+
+**插入 — `0006_extend_requirement_kinds.sql`（2026-05-16）：**
+1. `track_requirement.kind` CHECK 从 4 档扩到 12 档（4 现有 + 8 新 canonical kind，详见上方 §3.3 kind 语义段 + `docs/track_kind_taxonomy.md`）
+2. 新增 `track_requirement.metadata jsonb NOT NULL DEFAULT '{}'::jsonb` 存细节，应用层 zod 守 schema
+3. 放宽 threshold CHECK：`threshold IS NOT NULL OR metadata <> '{}'::jsonb` 二选一
+4. 触发动机：跑排队 10 task #4 时撞结构性墙（99 条 digest 落地行用 98 个自由 kind 标签）。决策 D-track-8
 
 **排队 10 — 学校种子数据：**
 1. 用户已把华师大 2023 培养方案 + 教务规则导出到 `docs/华师大公示文件/`（34 个 md），AI 已读完 23 个相关项 → 4 份 digest（`docs/ecnu_rules_digest_{A,B,C,D}.md`）

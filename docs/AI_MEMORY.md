@@ -191,6 +191,17 @@ HTML5 规范禁止 button 内含 interactive content。React 不报错但 a11y /
 
 ## 9. 项目时间线（按 commit 倒序，5-15 行/里程碑）
 
+### 2026-05-16 · 架构决策 D-track-8 — requirement.kind 扩档 + metadata jsonb（排队 10 task #4 阶段 0）
+- **起因**：跑 0005_seed_ecnu_2023 时抽 4 份 ECNU digest 落地行，发现 99 条 track_requirement 候选用了 **98 个不同的 kind 标签**（`time_limit / graduation_status / certificate_threshold / gpa_threshold / credit_recognition_cap / attendance_threshold / pf_credit_cap / score_mapping / overage_credit_fee / fitness_grad_threshold / thesis_resit / ...`），与 0002 schema 的 `count\|credits\|one_of\|all_of` CHECK 四档**全部不兼容**。digest 当时（2026-05-15）用户审阅期，kind 字段被当成"语义标签"自由写，没考虑 schema 兼容。
+- **4 选 1**：A 缩范围（弃 80% 结构化数据，仅 ~15 条进 track_*）/ **B 扩 kind 枚举到 ~10-12 档 + 加 `metadata jsonb`**（保 95%）/ C 拆新表 track_school_policy（双表 RLS + AI prompt 翻倍）/ D 全塞 description（丢结构化）。
+- **选 B**：理由 — (1) 98 标签语义重叠重（学费类 ~4 个 / 补考类 ~3 个 / 时间约束类 ~3 个），归并到 10-12 档自然；(2) D-track-3 已留口子（"AI 整 JSON 喂 prompt"），metadata jsonb 是延伸；(3) track_* 表为空（0002/0003 后无 seed），CHECK 改不踩老数据；(4) C 拆表代价 ≈ 0002 重做一半；(5) A 损失太大，排队 13 AI 没法 join `user_progress` 做"用户当前是否触发阈值"判断。
+- **落地路径**：
+  - 阶段 1（先）：`docs/track_kind_taxonomy.md` 归并 98 → ~10-12 canonical kind，含语义 + 典型 metadata 形态
+  - 阶段 2：`0006_extend_requirement_kinds.sql` 扩 CHECK 枚举 + 加 `metadata jsonb NOT NULL DEFAULT '{}'` + 改 threshold CHECK（`threshold IS NOT NULL OR metadata <> '{}'::jsonb` 二选一）+ `0006_verify.sql` + TRACK_SCHEMA.md §3.3 同步
+  - 阶段 3：`0005_seed_ecnu_2023.sql` 按归并 kind 写 99 条 INSERT，每条带 source_ref + metadata
+  - 阶段 4：`docs/ecnu_process_rules.md` 把 ~123 条 prompt 类规则精炼到 ~500 行，留排队 13 喂 gradPathAdvisorPrompt
+- **决策记录在**：`TRACK_SCHEMA.md` §1 D-track-8 / `CURRENT_TASK.md` 排队 10 task #4 子任务展开 / `MEMORY.md` project_track_kind_extend.md。
+
 ### 2026-05-14 · `supabase gen types` typed client 切换（排队 5，TD-3 收尾）
 - 跑 `supabase gen types typescript --project-id tukdczwcygcgpxmdhobl --schema public > src/types/db.ts`（471 行，7 表自动派生）
 - `src/lib/supabase.ts` 从 `createClient(...)` 升级到 `createClient<Database>(...)`，`supabase.from("xxx")` 自动推断列类型
