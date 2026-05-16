@@ -26,6 +26,9 @@ dist-ssr
 # Supabase CLI cache（cli-latest 版本探测 / linked-project.json）
 supabase/.temp/
 
+# ECNU 规则源 PDF（md 清洗版 + toc 已入库，PDF 仅本地备份用，避免 15MB 进 git 历史）
+docs/华师大规则文件pdf/*.pdf
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
