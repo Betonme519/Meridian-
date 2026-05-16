@@ -59,7 +59,7 @@
    - 批 D · 过程类（5 个）：注册 / 休学复学 / 实习 / 毕业论文 / 创新训练
    - 跳过：研究生免试 / 师范生教育教学考核 / 第二学士学位 / 少数民族预科 / 境外联合培养 / 学籍学历电子注册 / 学生证 / 学分制收费(老版) / 本科论文抽检
 2. **两层记录**：
-   - 人读层 `docs/ecnu_rules_digest_{A,B,C,D}.md` —— 每条规则 4 字段：规则中文 / 原文片段 / 来源(文件名 §章节) / 落地(入 track_requirement / 入 prompt / 不入)
+   - 人读层 `docs/ecnu-digests/ecnu_rules_digest_{A,B,C,D}.md` —— 每条规则 4 字段：规则中文 / 原文片段 / 来源(文件名 §章节) / 落地(入 track_requirement / 入 prompt / 不入)
    - 机读层 `supabase/migrations/0005_seed_ecnu_2023.sql` —— 可结构化的入 track_requirement / track_option，每行 INSERT 带 `-- source:` 注释
 3. **schema 加 source_ref（在 seed 之前）** — 新建 `supabase/migrations/0004_add_source_ref.sql`：
    - `track_requirement.source_ref text` 可空
@@ -133,10 +133,10 @@
 
 | digest | 文件 | 用户审阅状态 | 剩余 ⚠️ |
 |---|---|---|---|
-| 批 A | `docs/ecnu_rules_digest_A.md` | ✅ 用户已补 A1-6 / A1-8 / A2-2（肄业→毕业）。AI 已同步 A2-2 落地行 | 无重大 ⚠️ |
-| 批 B | `docs/ecnu_rules_digest_B.md` | ✅ 用户已补 B2-3 / B2-4 / B3-1 / B3-7 / B3-8 (含三条件) / B4-3 (连续两周退学)。AI 已同步 B3-8 落地行 | 无重大 ⚠️ |
-| 批 C | `docs/ecnu_rules_digest_C.md` | ✅ 用户已补 C1-3 / C1-8 / C2-1 / C2-2 / C3-3 / C3-6 / C4-3 / C4-4 / C4-5 / C5-2 / C5-3 / C5-4 / C5-9 / C5-13 / C7-2。三张分值表 C6-5 / C6-6 / C6-9 通过桌面图片 OCR 录入完毕。AI 已同步全部落地行去 ⚠️ | C2-4 双学位补入/退出时间窗未抓全 |
-| 批 D | `docs/ecnu_rules_digest_D.md` | ✅ 用户已补 D1-2 / D1-8 / D2-3 / D2-4 / D2-11 / D2-13 / D3-1 / D3-3 (1:30) / D3-6 / D4-1 / D4-3 / D4-4 (≥2%) / D4-5 / D4-8 (≤20%) / D4-10 / D4-14 / D4-15 / D5-2 / D5-4 (≤2项/年) / D5-6 (≤20%) / D5-7 / D5-8 (15/20学时)。AI 已同步全部落地行去 ⚠️ | D2-8 因病医药费（小，prompt 类）/ D5-8 教师工作量（不入 track） |
+| 批 A | `docs/ecnu-digests/ecnu_rules_digest_A.md` | ✅ 用户已补 A1-6 / A1-8 / A2-2（肄业→毕业）。AI 已同步 A2-2 落地行 | 无重大 ⚠️ |
+| 批 B | `docs/ecnu-digests/ecnu_rules_digest_B.md` | ✅ 用户已补 B2-3 / B2-4 / B3-1 / B3-7 / B3-8 (含三条件) / B4-3 (连续两周退学)。AI 已同步 B3-8 落地行 | 无重大 ⚠️ |
+| 批 C | `docs/ecnu-digests/ecnu_rules_digest_C.md` | ✅ 用户已补 C1-3 / C1-8 / C2-1 / C2-2 / C3-3 / C3-6 / C4-3 / C4-4 / C4-5 / C5-2 / C5-3 / C5-4 / C5-9 / C5-13 / C7-2。三张分值表 C6-5 / C6-6 / C6-9 通过桌面图片 OCR 录入完毕。AI 已同步全部落地行去 ⚠️ | C2-4 双学位补入/退出时间窗未抓全 |
+| 批 D | `docs/ecnu-digests/ecnu_rules_digest_D.md` | ✅ 用户已补 D1-2 / D1-8 / D2-3 / D2-4 / D2-11 / D2-13 / D3-1 / D3-3 (1:30) / D3-6 / D4-1 / D4-3 / D4-4 (≥2%) / D4-5 / D4-8 (≤20%) / D4-10 / D4-14 / D4-15 / D5-2 / D5-4 (≤2项/年) / D5-6 (≤20%) / D5-7 / D5-8 (15/20学时)。AI 已同步全部落地行去 ⚠️ | D2-8 因病医药费（小，prompt 类）/ D5-8 教师工作量（不入 track） |
 
 **下一步**：
 1. ~~**0004_add_source_ref.sql** + verify~~ ✅ 2026-05-16 commit `a2b955f`（含 0003_verify self-cleanup）。
@@ -148,7 +148,7 @@
 3. **gen types 不再阻塞当前主线**，推到排队 11 一起做；要重新跑时务必用[[feedback-supabase-gen-types-safe]] 的安全跑法（双步 `.tmp` 文件），不要直接 `> src/types/db.ts`
 
 **用户修改 digest 的工作流（已确认）**：
-- 用户在 IDE 里直接编辑 4 份 `ecnu_rules_digest_*.md`，补 ⚠️ 处或修正「规则」行。
+- 用户在 IDE 里直接编辑 4 份 `docs/ecnu-digests/ecnu_rules_digest_*.md`，补 ⚠️ 处或修正「规则」行。
 - AI 收到 system-reminder 看到文件被改 → 同步对应的「落地」行去掉 ⚠️ / 写真实结构。
 - chat 里互相确认（typo / 不一致由 AI 主动质询）。
 - 工具 OCR：用户把表格放桌面 `C:\Users\J-R-N\Desktop\` 用文件名 `Cx-y.png` 标记，AI 用 Read 读图。
@@ -198,10 +198,10 @@
 
 - **2026-05-15** — 排队 10 前置 — 华师大 23 个 md → 4 份 ECNU 规则 digest 录入完毕
   - **AI 一次性读完 23 个 md（剔除硕博/二学位等不相关 11 个）→ 写 4 份 digest**：
-    - `docs/ecnu_rules_digest_A.md` 毕业资格核心（学籍管理 / 毕业资格 / 学士学位 / 成绩学分认定 / 课程考核）
-    - `docs/ecnu_rules_digest_B.md` 学业规则（选课退课 / 成绩管理 / 学业预警 / 考勤 / 体质健康 / 学分制收费）
-    - `docs/ecnu_rules_digest_C.md` 特殊计划（辅修 / 双学位 / 强基 / 个性化 / 转专业 / 创新创业学分 / 学科竞赛）
-    - `docs/ecnu_rules_digest_D.md` 过程类（注册 / 休学复学 / 实习 / 毕业论文 / 创新训练）
+    - `docs/ecnu-digests/ecnu_rules_digest_A.md` 毕业资格核心（学籍管理 / 毕业资格 / 学士学位 / 成绩学分认定 / 课程考核）
+    - `docs/ecnu-digests/ecnu_rules_digest_B.md` 学业规则（选课退课 / 成绩管理 / 学业预警 / 考勤 / 体质健康 / 学分制收费）
+    - `docs/ecnu-digests/ecnu_rules_digest_C.md` 特殊计划（辅修 / 双学位 / 强基 / 个性化 / 转专业 / 创新创业学分 / 学科竞赛）
+    - `docs/ecnu-digests/ecnu_rules_digest_D.md` 过程类（注册 / 休学复学 / 实习 / 毕业论文 / 创新训练）
   - **每条规则强制 4 字段**：规则中文 / 原文片段 / 来源(§条款) / 落地(track_requirement 或 prompt)。结构稳定，下游 seed SQL 可机器扫描。
   - **用户审阅工作流**：用户在 IDE 直接改 4 份 md 补 ⚠️ / 修正规则行 → AI 收 system-reminder 同步「落地」行去 ⚠️ / 升级到 track_requirement 结构 → chat 互验 typo（A2-2 肄业 → 毕业 这种被 AI 主动质询）。
   - **工具补强：AI OCR**：用户把表格放桌面 `C:\Users\J-R-N\Desktop\Cx-y.png` 命名 → AI Read 读图 → 录入 markdown 表 + 落地行结构。批 C 三张表（C6-5 项目 / C6-6 竞赛 / C6-9 论文专利著作）就是这样录入。

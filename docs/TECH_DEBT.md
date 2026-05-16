@@ -131,3 +131,10 @@
 - 根因：`SchedulePage` 的 `isGuest = !authLoading && !user` / `isEmpty = !loading && ...` 把 loading 期判成 false → 第一帧渲染空表 → auth+hook 落地后切到 SEED，造成「空白 → SEED」两段跳变
 - 修：`src/pages/Schedule/index.tsx:63-70` 引入 `isResolving = authLoading || loading`，并入 `showSeed`，第一帧直接显示 SEED
 - 副作用：`canEdit` 不变（loading 期不出 CRUD 按钮）；登录有数据时仍有 `SEED → 真实数据` 一次切换，是预期不是 bug
+
+### TD-26 · PDF 内联预览 + source_ref 精确到页码
+- **想法**：用户 2026-05-16 提议 —— 把规则源 PDF（如培养方案、教务办法）放进网站，AI 输出 citations 时 source_ref 能定位到 PDF 具体页码 / 段落，UI 点开直接跳页高亮
+- **可行性**：技术成熟（PDF.js + URL `#page=N` fragment + Supabase Storage 已有上传管道）。难点不在前端，在数据层 —— digest § 章节标记 → PDF 页码的反向映射需要人工标 or PDF outline 抽取
+- **风险**：(1) PDF 全文上传到 Storage（10-50MB/份）走 storage_object 表，需评估存储成本；(2) source_ref 字段当前是自由字符串 `"ecnu_rules_digest_A.md §A1-6"`，要扩到 `"pdf-key.pdf#page=12&hl=最长学习年限"` 这种结构，UI 解析层要 case 分流
+- **建议**：推迟到**排队 14 UI 重设计阶段**统一处理。原因：(a) 排队 13 AI 输出 citations 才开始用 source_ref；(b) 排队 14 重做 /schedule 视觉时一起加 PDF.js 组件，避免做两遍
+- **不阻塞主线**：当前 source_ref 字段已支持自由字符串，将来扩格式不需要 migration

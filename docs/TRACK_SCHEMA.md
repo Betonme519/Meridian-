@@ -409,7 +409,7 @@ INSERT INTO track (school, year, scope_level, name) VALUES (...);
 4. 触发动机：跑排队 10 task #4 时撞结构性墙（99 条 digest 落地行用 98 个自由 kind 标签）。决策 D-track-8
 
 **排队 10 — 学校种子数据：**
-1. 用户已把华师大 2023 培养方案 + 教务规则导出到 `docs/华师大公示文件/`（34 个 md），AI 已读完 23 个相关项 → 4 份 digest（`docs/ecnu_rules_digest_{A,B,C,D}.md`）
+1. 用户已把华师大 2023 培养方案 + 教务规则导出到 `docs/华师大公示文件/`（34 个 md），AI 已读完 23 个相关项 → 4 份 digest（`docs/ecnu-digests/ecnu_rules_digest_{A,B,C,D}.md`）
 2. 我把 digest 里可结构化条目转 SQL：`INSERT INTO track ...`、`INSERT INTO track_category ...`、`INSERT INTO track_requirement ...`、`INSERT INTO track_option ...`；每条带 `source_ref` 引 digest §章节
 3. 文件命名：`supabase/migrations/0005_seed_ecnu_2023.sql`
 4. 在 Supabase SQL Editor 跑（service_role 自动 bypass RLS）
