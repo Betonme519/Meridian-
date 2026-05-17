@@ -677,3 +677,133 @@ CREATE INDEX idx_rag_user_status ON rag_source (user_id, parsed_status);
 ```
 
 > **依赖顺序**：`rag_source` 在 `rule` 之前建（rule 有 FK 引用），其余无依赖。
+
+---
+
+## 10. Migration 演进规约
+
+> 6 张用户私有表 + 5 张公共 track 表的演进规则。新写 migration 之前**必读**。
+> 2026-05-17 起生效，从 `0007` 开始。
+
+### 10.0 现状盘点
+
+| Migration | 引入 |
+|---|---|
+| `0001_init_schema` | 7 张用户表 + RLS + `set_updated_at` trigger |
+| `0002_add_track_schema` | 5 张公共 track 表 |
+| `0003_relax_track_scope` | track 加 `scope_level` 列 |
+| `0004_add_source_ref` | track_requirement 加 `source_ref` 列 |
+| `0005_seed_ecnu_2023` | 华师大 2023 级 198 条 seed |
+| `0006_extend_requirement_kinds` | requirement.kind 从 4 档扩到 12 档 |
+
+**每条都配套 `_verify.sql`** 同名兄弟文件。
+
+### 10.1 UP 段必须幂等
+
+所有 migration 都要能跑两遍而不报错：
+
+```sql
+DROP TRIGGER IF EXISTS trg_x ON public.tbl;
+CREATE TRIGGER trg_x ...;
+
+DROP POLICY IF EXISTS x_owner_select ON public.tbl;
+CREATE POLICY x_owner_select ...;
+
+CREATE TABLE IF NOT EXISTS public.x ( ... );
+CREATE INDEX IF NOT EXISTS idx_x ON public.x( ... );
+
+ALTER TABLE public.x DROP CONSTRAINT IF EXISTS x_kind_check;
+ALTER TABLE public.x ADD CONSTRAINT x_kind_check CHECK ( ... );
+```
+
+**幂等的好处**：跑到一半失败 → 修正 → 重跑，不需要回滚。
+
+### 10.2 必须配 verify 文件
+
+每个 `000N_<name>.sql` 必须有同名兄弟 `000N_verify.sql`：
+- 逐段独立可粘（单段 SELECT，可单独跑出结果 —— 不要嵌 BEGIN/END，Supabase Dashboard SQL Editor 不友好）
+- 至少包含：表数 / RLS 启用 / Policy 数 / Trigger 数 / 关键 CHECK 字面量验证
+- 示例参考：`0002_verify.sql` 9 段
+
+### 10.3 必须配文件末尾 DOWN 注释段
+
+```sql
+-- ============================================================
+-- DOWN  (manual, DO NOT EXEC)
+-- ============================================================
+--
+-- DROP TRIGGER ... ;
+-- DROP POLICY  ... ;
+-- DROP INDEX   ... ;
+-- DROP TABLE   ... ;
+```
+
+**为什么必填**：误跑 / 回退分支 / 切学校 seed 时，需要知道"怎么手工拆掉"。
+**为什么注释而非执行**：Supabase migrations 单向无 down 概念；DOWN 段给"人"看，不进生产管道。
+
+### 10.4 跑 migration 流程
+
+1. 本地 `bun run dev` 验证类型未变（或预期变 → 先 regen `types/db.ts` 再 dev）
+2. Supabase Dashboard → SQL Editor → 粘整段 UP → Run
+3. 同 Editor 粘 `_verify.sql` **逐段单独跑**
+4. 在 `docs/CURRENT_TASK.md` 「最近完成」段写一行进度
+5. **必须**重 gen `types/db.ts`（用 memory `feedback_supabase_gen_types_safe` 两步重定向跑法）
+
+### 10.5 命名
+
+`000N_<verb>_<noun>.sql`：
+
+| 动词 | 用途 |
+|---|---|
+| `add_X_schema` | 建表 / 加列 / 加索引 / 加 RLS |
+| `relax_X_scope` | 放宽约束 |
+| `extend_X_kinds` | 枚举字面量扩档 |
+| `seed_X_data` | 插入 seed 数据 |
+| `backfill_X` | 补历史数据 |
+| `rename_X_to_Y` | 列 / 表改名（慎用 — 前端跟随成本高） |
+
+### 10.6 修改已存在 CHECK 约束
+
+```sql
+-- ✅ 正确：DROP 再 ADD（命名约束名）
+ALTER TABLE public.x DROP CONSTRAINT IF EXISTS x_kind_check;
+ALTER TABLE public.x ADD  CONSTRAINT x_kind_check
+    CHECK (kind IN ('a', 'b', 'c'));
+
+-- ❌ 错误：ALTER 不能直接改 CHECK
+```
+
+修改后**必须同步** `src/types/trackEnums.ts`（或对应 api 模块里的 `as const` 数组），否则前端 TS 仍按旧字面量做窄类型。
+
+### 10.7 加新 jsonb 字段
+
+```sql
+ALTER TABLE public.x ADD COLUMN IF NOT EXISTS metadata jsonb DEFAULT '{}'::jsonb;
+```
+
+业务层 narrowing 在 `src/api/xApi.ts`：
+
+```ts
+export interface XMetadata {
+  field1?: string;
+  [key: string]: unknown;   // 允许扩展，老数据读出仍兼容
+}
+export type X = Omit<XRow, "metadata"> & { metadata: XMetadata };
+```
+
+### 10.8 已有 6 个 migration 不回填 DOWN
+
+历史 migration（0001–0006）**不**回头加 DOWN 注释段。理由：
+- 0005 已 seed 198 行真数据，DOWN 会冲掉，反而危险
+- 0001–0004 跑过的人都还在团队里，知道怎么回滚
+- 新规约从 0007 起生效
+
+### 10.9 模板
+
+复制 `supabase/migrations/_template.sql` 改名为 `000N_<verb>_<noun>.sql` 开始写。
+verify 文件参考 `0002_verify.sql` 风格。
+
+### 10.10 与 trackEnums.ts 的关系
+
+`src/types/trackEnums.ts` 是 DB CHECK 字面量在前端的镜像（track 5 表的 kind / scope_level / status 等）。
+db.ts 漂移期间，**它是前端唯一可信的字面量来源**；db.ts 重 gen 后可改为从 `Database` 类型推断。

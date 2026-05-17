@@ -1,104 +1,72 @@
 # Meridian 架构审计报告
 
-> 审计时间：2026-05-09（覆盖 2026-05-07 旧版）
-> 审计范围：`src/` 全量 + `routes/`、`config/`、`docs/`、`wrangler.jsonc`
-> 审计目标：识别技术债、未来必爆点、不合理抽象、重复逻辑
-> 输出原则：只描述、不动代码；按"炸药当量"排序
+> 合并版 = 2026-05-09 + 2026-05-16 两轮审计。已修条目剪除，未解决条目保留并配落地方案。
+> 审计目标：识别技术债 / 未来必爆点 / 不合理抽象 / 重复逻辑
+> 输出原则：只描述、不动业务代码；按"炸药当量"排序
 
 ---
 
 ## 0. 一句话结论
 
-**前端骨架成熟（Tailwind + shadcn + TanStack Router 文件式 + GSAP 动效齐全），但所有"业务接入面"——AI、数据、鉴权、状态——是一层只有形状没有契约的脚手架。** 现在加任何真实功能，第一个动手的人都得在 page 内现场发明协议；越往后接，规格越无法统一。本次审计把 12 处"幽灵抽象 / 死文件 / 隐性双轨"摆出来，让用户先做 4–5 个关键决策，再动代码。
+**架构骨架健康，但正处在一个危险的过渡期。** 三件事同时悬空：(a) Track schema 仍在剧烈演进（6 个 migration / 5 个月内 4 次破坏性变更）；(b) AI provider 是 stub，但前端流式 UI 已经接到 hook；(c) Cloudflare Worker BFF 路线在 wrangler 里写明意图但 `src/server/` 不存在。**任何一件先动都会让另两件被迫连带动**。需要先排序、再落地，不要并行。
+
+同时：**项目文档已经与代码漂移**——`PROJECT_OVERVIEW.md` / `ARCHITECTURE.md` 还在写 `services/`、`useCourses` 等 5-09 之前的状态。**文档漂移本身就是一级技术债**，因为新接手的 AI 会被旧文档带歪。
 
 ---
 
-## 1. 审计快照（与 2026-05-07 旧版对比）
+## 1. 已修完成度时间线
 
-| 项 | 2026-05-07 状态 | 2026-05-09 现状 |
-|---|---|---|
-| `MENU_ITEMS` 双份 | 🔴 Navbar / DashboardLayout 各写一份 | ✅ 抽到 `src/config/menu.ts` 单一真理 |
-| 旧 `components/Navbar/` `Sidebar/` 残骸 | 💀 还在 | ✅ 已删除 |
-| 功能页是否包 DashboardLayout | 🟡 page 内手动 import | ✅ `routes/_app.tsx` pathless layout 自动包 |
-| `AuthProvider` 挂载 | ❌ `__root.tsx` 只有 `<Outlet/>` | ✅ 已挂（mock 实现）|
-| `useAuth` ⇄ `AuthContext` 接通 | ❌ hook 返回硬值 | ✅ `useAuth` re-export `useAuthContext` |
-| Mock 鉴权 | ❌ 无 | ✅ `localStorage` 实现，刷新保持登录 |
-| `pages/Insights` `pages/GPASimulator` | （旧版幻觉，实际不存在） | n/a |
+下表是历史摘要——**只列已修**，未修的下面 §3 起单独详写。
 
-旧版审计的"L1 / L2 双 MENU_ITEMS"已经修了。**剩下的问题在下面，全部是现状。**
+| 时间 | 已修 |
+|---|---|
+| **2026-05-07** 之前 → 5-09 | `MENU_ITEMS` 抽到 `config/menu.ts` 单一真理；删除旧 `components/Navbar/` `Sidebar/` 残骸；功能页改由 `_app.tsx` pathless layout 自动包；`AuthProvider` 挂到 `__root.tsx`；`useAuth` 接通 `AuthContext`；mock 鉴权（localStorage） |
+| **5-09 → 5-16** | **R1**：`_app.tsx` beforeLoad 三层守卫（SSR / 未配置 / guest）；**真 Supabase auth + guestMode** 替换 mock；**TD-3**：`types/db.ts` typed client 落地（**但已再次漂移**，见 §10）；**TD-8**：beforeLoad context；**12 个死文件**全清（`PageShell` / `MainLayout` / `ChatPanel` / `CourseCard` / `GPAChart` / `UploadBox` / `common/` / `Profile` / `Courses` / `CourseAnalyzer` / `UserContext` / `mockCourses`）；`useCourses` `usePlanner` 假 hook 删除，换成 7 个真接 Supabase 的 hooks；`aiApi/courseApi/plannerApi` stub 删除，换成 7 个薄壳 api；`services/` 整目录删；4 个功能页（AIAdvisor / Planner / Schedule / Upload）接通 hooks；**TD-1 余尾**：`src/ai/{stream,schema,prompts,providers/{mock,anthropic}}` 骨架完成 |
+
+**上轮审计 80% 的红黄项已修**。本轮重点是 **新债**（schema pivot 留下）+ **文档漂移** + **仍冻结未动的旧债**。
 
 ---
 
-## 2. 文件结构（现状 + 死文件清单）
+## 2. 当前现状速览（仅作上下文）
 
 ```
 src/
-├─ pages/        10 个目录：Home(✅) Login(✅) Register(✅)
-│                 Dashboard / AIAdvisor / Planner / Schedule / Upload(均挂 _app，含静态 demo 数据)
-│                 CourseAnalyzer / Courses / Profile（💀 无 route）
-├─ routes/       8 个 route：__root + _app + index + login + register
-│                 + _app/{ai-advisor,course-planner,dashboard,import,schedule}
-├─ components/
-│  ├─ layout/    Navbar(✅) Footer(✅) UserMenu(✅)
-│  │            PageShell(💀 0 引用)
-│  ├─ effects/   EmbeddedLaptop / GridMotion / SplitText / TiltedCard / CardSwap(✅ 在用)
-│  │            LaptopFrame.{tsx,css}（💀 自己引自己，0 外部引用）
-│  │            LiquidEther.css（💀 css 孤儿，无 .tsx）
-│  ├─ ui/        shadcn 46 个 primitives（✅）
-│  ├─ common/    💀 仅 .gitkeep
-│  ├─ ChatPanel / CourseCard / GPAChart / UploadBox/  💀 4 个目录，0 引用
-├─ layouts/      DashboardLayout(✅ _app 调用)
-│                MainLayout(💀 0 引用，几乎空函数)
-├─ context/      AuthContext(✅ 已挂)  UserContext(💀 仅 createContext，无 Provider 无消费者)
-├─ hooks/        useAuth(✅ re-export)  use-mobile(✅)
-│                useCourses / usePlanner（🟡 硬编码 [] / null，不读 context 不调 API）
-├─ api/          authApi(✅ mock)  aiApi / courseApi / plannerApi（🟡 全部 async return null/[]）
-├─ services/     gpaService / ragService / recommendationService（🟡 全部 stub）
-├─ data/         mockCourses（空数组）userProfile（mock，OK）
-├─ utils/        calculateGPA(✅ 真实现)  format(🟡 一行 stub)
-├─ styles/       globals + variables + animations（✅）
-├─ assets/       3 个空目录 + .gitkeep
-├─ router.tsx    createRouter + 默认 ErrorComponent（✅）
-└─ routeTree.gen.ts  自动生成
+├─ pages/        8 个目录（无死页）
+├─ routes/       10 个 route（公共 + _app 子组）
+├─ components/   layout(3) · effects(5) · ui(46 shadcn)
+├─ layouts/      DashboardLayout（仅此 1 个）
+├─ context/      AuthContext · ProfileContext
+├─ hooks/        useAuth · useProfile · useUserProfile · useRagSources
+│                · useRules · usePlans · useChatMessages · use-mobile
+├─ api/          authApi · profileApi · ragSourceApi · ruleApi · ruleConflictApi
+│                · planApi · chatMessageApi
+├─ ai/           index · stream · schema · prompts · providers/{mock,anthropic}
+├─ lib/          supabase · guestMode · utils
+├─ config/       menu.ts
+├─ types/        db.ts（typed client，已漂移）
+├─ styles/       globals · variables · animations
+├─ router.tsx · routeTree.gen.ts
+└─ data/ · utils/ · assets/   （存在但内容已极少）
+supabase/migrations/  6 个（0001 init / 0002 track / 0003 relax / 0004 source_ref / 0005 seed / 0006 extend kinds）
 ```
-
-**死文件汇总（一次性可清，但请用户确认再动）：**
-
-| # | 路径 | 性质 | 备注 |
-|---|---|---|---|
-| 1 | `src/layouts/MainLayout.tsx` | 死代码 | 0 引用，函数体几乎空 |
-| 2 | `src/components/layout/PageShell.tsx` | 死抽象 | 0 引用，Home 拒绝用、功能页用 DashboardLayout |
-| 3 | `src/components/effects/LaptopFrame.tsx` + `.css` | 死代码 | 仅自身互相 import |
-| 4 | `src/components/effects/LiquidEther.css` | 孤儿 css | 无对应 .tsx |
-| 5 | `src/components/{ChatPanel,CourseCard,GPAChart,UploadBox}/` | 4 个空 stub 目录 | 0 引用 |
-| 6 | `src/components/common/` | 占位空目录 | 仅 .gitkeep |
-| 7 | `src/pages/Profile/index.tsx` | `<div>Profile</div>` | 无 route |
-| 8 | `src/pages/Courses/index.tsx` | `<div>Courses</div>` | 无 route |
-| 9 | `src/pages/CourseAnalyzer/{index,UploadPanel,AnalysisResult}.tsx` | 完整写好的页 | 无 route，无入口 |
-| 10 | `src/pages/Home/Trust.tsx` | 注释明示 "kept unmounted" | 复用意图未兑现 |
-| 11 | `src/context/UserContext.tsx` | 仅 createContext | 无 Provider，无消费者 |
-| 12 | `src/data/mockCourses.ts` | 空数组导出 | 留壳无意义，等真数据再加 |
-
-**单独看每一个都"想保留"，合起来就是 12 个房间没人打扫。**
 
 ---
 
 ## 3. Router 架构
 
-### 现状（已比 5-07 进步）
-
-- TanStack Router 文件式 + `_app.tsx` pathless layout：`/dashboard /ai-advisor /course-planner /import /schedule` 自动套 `DashboardLayout`，page 内 0 import。
-- `__root.tsx` 已加 `<Providers>` 壳（目前只挂 `AuthProvider`，注释列出 5 个未来挂点）。
-- `routeTree.gen.ts` 自动生成、不手改。
-- 有默认 `defaultErrorComponent` 和 `notFoundComponent`，已比骨架项目好。
+### 现状
+- TanStack 文件式 + `_app.tsx` pathless layout，扩页成本最低
+- `_app.tsx` beforeLoad 三层守卫已上：SSR / Supabase 未配置 / guestMode → fail-soft；其余 → `getSession()` 强制鉴权重定向 `/login`
+- `router.tsx`：`getRouter()` 注入 `defaultErrorComponent` / `defaultPreloadStaleTime: 0` / 空 `context: {}`
 
 ### 仍存在的问题
 
 | # | 严重度 | 问题 |
 |---|---|---|
-| R1 | 🔴 高 | **没有 `beforeLoad` 鉴权门禁**。`grep beforeLoad src/routes` 0 命中。`/_app/dashboard` 等"功能页"未登录可直达；mock 鉴权阶段无所谓，真用户进来即裸奔。建议在 `_app.tsx` 加 `beforeLoad: () => isAuthenticated 否则 throw redirect("/login")`。CLAUDE.md 把 `_app.tsx` 列为"不要修改"——所以这个动作必须由用户显式授权。 |
-| R2 | 🟡 中 | **`router.tsx` 的 `context: {}` 空对象**。等鉴权 / queryClient 接入时，要么把 `auth`、`queryClient` 注入 router context，要么靠 `useAuth` 在 page 内调——两种范式现在都没决定。 |
-| R3 | 🟢 低 | `defaultPreloadStaleTime: 0` 关掉了路由 preload 缓存；功能页静态 demo 阶段无影响，真接 API 时记得重看。 |
+| R1 | 🟡 中 | **`context: {}` 仍是空对象**。等 `queryClient` / `aiClient` / `auth` 需要在 route loader 里读取时，没接口位。一旦排队 11/13 开始写 loader-driven 数据，重构面会扩散到所有 `_app/*` 文件。 |
+| R2 | 🟢 低 | `defaultPreloadStaleTime: 0` 关掉 preload 缓存；真接 API 后会引发不必要重复 fetch。 |
+| R3 | 🟢 低 | **路由 kebab vs 页目录 Pascal 不统一**：`/course-planner` ↔ `pages/Planner/`、`/import` ↔ `pages/Upload/`、`/ai-advisor` ↔ `pages/AIAdvisor/`。接手 AI 在 grep 时双查易蒙圈。 |
+| R4 | 🟢 低 | `pages/Login` 与 `pages/Register` 无 `_auth` layout 分组。未来加 SSO / 忘记密码 / 邮箱确认就会冗余。 |
 
 ---
 
@@ -106,23 +74,23 @@ src/
 
 ### 现状
 
-| 名称 | 路径 | 用途 | 状态 |
+| 名称 | 路径 | 调用方 | 状态 |
 |---|---|---|---|
-| `Navbar` | `components/layout/Navbar.tsx` | Home 顶栏（自适应透明↔白） | ✅ 真实现 |
-| `Footer` | `components/layout/Footer.tsx` | Home 页脚 | ✅ 真实现 |
-| `UserMenu` | `components/layout/UserMenu.tsx` | Navbar + DashboardLayout 共用 | ✅ 真实现 |
-| `PageShell` | `components/layout/PageShell.tsx` | "标准 Navbar+Footer 页"封装 | 💀 **0 引用** |
-| `DashboardLayout` | `layouts/DashboardLayout.tsx` | 5 个功能页外壳（rail + drawer + breadcrumb） | ✅ 由 `_app.tsx` 唯一调用 |
-| `MainLayout` | `layouts/MainLayout.tsx` | 历史遗留 | 💀 **0 引用** |
+| `Navbar` | `components/layout/Navbar.tsx` | Home inline | ✅ |
+| `Footer` | `components/layout/Footer.tsx` | Home | ✅ |
+| `UserMenu` | `components/layout/UserMenu.tsx` | Navbar + DashboardLayout 共用 | ✅ |
+| `DashboardLayout` | `layouts/DashboardLayout.tsx` | `_app.tsx` 唯一调用 | ✅ |
 
-### 问题
+旧 `PageShell` / `MainLayout` 已删 ✅。
+
+### 仍存在的问题
 
 | # | 严重度 | 问题 |
 |---|---|---|
-| L1 | 🟡 中 | **Drawer 三件套（open state + scroll-lock + Esc）在 `Navbar.tsx` 和 `DashboardLayout.tsx` 各写一份**。`MENU_ITEMS` 已经 DRY 了，drawer 行为没有。一个 `useDrawer()` hook 就能收掉。 |
-| L2 | 🟡 中 | **三种 layout 范式并存**：(a) Home 在 page 内 inline `<Navbar/>...<Footer/>`；(b) 功能页通过 `_app` 包 `DashboardLayout`；(c) `PageShell` 是第三种"我以为我们要做但没人做"的范式。第三种应当删除——抽象不被使用就是噪声。 |
-| L3 | 🟡 中 | **`layouts/` vs `components/layout/` 双目录共存**。`layouts/` 只有 1 个 真实成员（DashboardLayout）+ 1 个死文件（MainLayout）。要么把 DashboardLayout 移进 `components/layout/` 收成一处，要么删 `layouts/`。两个名字相近的目录长期并存是误导。 |
-| L4 | 🟢 低 | DashboardLayout 的 icon-rail 仅 `lg+` 显示——CLAUDE.md 写明"Mobile responsive required"，移动端只剩 hamburger，可接受但需视觉测试。 |
+| L1 | 🟡 中 | **Drawer 三件套（open + scroll-lock + Esc + close-on-route）在 Navbar.tsx 和 DashboardLayout.tsx 各写一份**。证据：Navbar.tsx line 20–47 与 DashboardLayout.tsx line 23–48 几乎一致。被 CLAUDE.md "不要修改"清单冻结，需要用户显式授权才能动 Navbar / DashboardLayout。 |
+| L2 | 🟡 中 | **`src/layouts/` vs `src/components/layout/` 双目录共存**。前者 1 个文件，后者 3 个。两个名字相近的目录长期并存是误导。 |
+| L3 | 🟢 低 | DashboardLayout 的 icon-rail 仅 `lg+` 显示；移动端只剩 hamburger。 |
+| L4 | 🟢 低 | Home / Login / Register 无共用 layout 壳；加 SSO / 重置密码后会冗余。 |
 
 ---
 
@@ -131,168 +99,155 @@ src/
 ### 现状
 
 ```
-AuthContext       ✅ 已挂、能 login/logout、mock 后端
-UserContext       💀 createContext({profile:null})，无 Provider
-useAuth           ✅ re-export useAuthContext
-useCourses        🟡 return { courses: [], loading: false }   ← 不读 context、不调 API
-usePlanner        🟡 return { plan: null, loading: false }    ← 同上
-@tanstack/
-react-query       🟡 已装，全项目 0 useQuery/0 QueryClient
+AuthContext       ✅ 已挂、真 Supabase、onAuthChange 订阅、loading 完整
+ProfileContext    ✅ 已挂、嵌入 AuthProvider 内、updateProfile 走 profileApi
+useAuth           ✅ re-export AuthContext
+useProfile        ✅ re-export ProfileContext
+useRagSources useRules usePlans useChatMessages useUserProfile
+                  ✅ 页面级，各自调 api 模块
+@tanstack/react-query  ❌ 已于 5-09 移除
+zustand / jotai / valtio  ❌ 未引入
 ```
 
-### 问题
+### 仍存在的问题
 
 | # | 严重度 | 问题 |
 |---|---|---|
-| S1 | 🔴 高 | **`useCourses` `usePlanner` 是"形状障眼法"**。它们的返回类型让调用者以为"我接 API 后这里就有数据了"——其实没接 API 时也返回这个形状，page 不会报错，于是没人记得它们其实没接。建议要么连接（react-query 或 fetch），要么删除并让 page 直接 hardcode（让"没数据"显式）。 |
-| S2 | 🔴 高 | **`react-query` 装了不用 = 包体白付费**。要么 1 周内接，要么从 deps 删；目前是最坏状态——又装又不用。 |
-| S3 | 🟡 中 | **`UserContext` 与 `AuthContext` 概念分裂未兑现**。原始意图大概是"AuthContext 管登录态，UserContext 管偏好/profile"，但 UserContext 一行没写。建议：要么折叠进 AuthContext，要么标 TODO 并先删，等真有 profile 字段再建。 |
-| S4 | 🟡 中 | **5 个功能页全部把数据写在文件顶部 `const xxx = [...]`**（AIAdvisor 7 modes、Schedule rule tree、Upload fileSlots、Dashboard 数组、Planner 数组）。真接 AI/数据时每个 page 都要重写顶部。这是"跳过 model 层"的症状。 |
+| S1 | 🟡 中 | **`useProfile` 与 `useUserProfile` 同名相邻**。两份 hook 名字差别仅一个词，读 grep 易把"用户基本资料"和"profile 表"混淆。 |
+| S2 | 🟡 中 | **2 Context + 5 页面级 hook 已经接近 React Context 心智天花板**。Planner / Schedule 跨页跳转（点 rule → 打开 Workspace 节点）就会触发跨页共享需求，到那时考虑升 Zustand。 |
+| S3 | 🟢 低 | 7 个 api 全是 imperative fetch，没有缓存 / 去重 / refocus 失活机制。短期 OK；接 BFF / 多页同读相同表 时会暴露。 |
+| S4 | 🟡 中 | **URL state 范式不一致**：Planner 用 `useSearch` 把状态写进 URL，Schedule / AIAdvisor 没同款。"数据态可分享"在不同页处理范式不一致 = 一种"重复但分歧"。 |
 
 ---
 
 ## 6. 组件复用
 
-### 现状（已修）
-
-- shadcn `ui/` 46 primitives 齐全。
-- `MENU_ITEMS` 单一真理。
-- `UserMenu` 共享。
+### 现状
+- shadcn `ui/` 46 primitives 齐全，但**功能页仍在写裸 Tailwind**（TD-9 旧债仍在）
+- `MENU_ITEMS` / `UserMenu` 单一真理 ✅
 
 ### 仍存在的重复
 
-| 重复点 | 出现位置 | 建议落点 |
-|---|---|---|
-| Drawer open + scroll-lock + Esc | `Navbar.tsx` + `DashboardLayout.tsx` | `src/hooks/useDrawer.ts` |
-| Page hero（H1 + 描述 + `mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10`）| AIAdvisor / Dashboard / Schedule / Upload / Planner | `<PageHeader>` 组件 |
-| 卡片基线 `rounded-xl border border-slate-200 bg-white p-5` | 所有功能页 | shadcn `<Card>`（已存在却没用） |
-| CTA `rounded-full bg-black ... transition-colors` | 所有页面 | shadcn `<Button variant>` |
-| Mode/Goal/Risk metric 卡（icon + title + meta + bar）| AIAdvisor / Dashboard | `<MetricCard>` |
-
-**关键观察：shadcn `Button` `Card` 装好了没人用——大家在写裸 Tailwind 类名。**
+| # | 重复点 | 出现位置 | 建议落点 |
+|---|---|---|---|
+| C1 | Drawer 三件套 | Navbar.tsx · DashboardLayout.tsx | `src/hooks/useDrawer.ts` |
+| C2 | Page hero（H1 + 描述 + `mx-auto max-w-7xl px-5 py-8 ...`） | 5 个功能页 | `<PageHeader>` |
+| C3 | 卡片基线（`rounded-xl border border-slate-200 bg-white p-5`） | 所有功能页 | shadcn `<Card>`（已存在却没用） |
+| C4 | CTA（`rounded-full bg-black ... transition-colors`） | 所有页 | shadcn `<Button>` |
+| C5 | "guest / loading / empty / data" 状态机（`isResolving / isGuest / showSeed`） | Schedule line 79–86，Planner / Upload 推测同款 | `useGuestAwareData()` hook |
+| C6 | Trust / status / tone 颜色映射 | Schedule(TRUST_META) · Upload(STATUS_CLS) · Dashboard(toneClass) | 集中或加 lint 规则 |
+| C7 | ISO 日期 → `YYYY-MM-DD` slice | Upload `formatDate` | `lib/format.ts`，Schedule / Dashboard 也会用 |
 
 ---
 
 ## 7. 页面职责
 
-| Page | Route | Layout | 数据 | 状态 |
+| Page | Route | Layout | 数据 | 接 hook? |
 |---|---|---|---|---|
-| Home | `/` | inline | sections | ✅ 完成 |
-| Login | `/login` | 无（独立壳） | useState + useAuth | ✅ 通 mock auth |
-| Register | `/register` | 无 | （未读，应同 Login） | 🟡 推断 OK |
-| Dashboard | `/dashboard` | `_app` | 写死 const | 🟡 静态 demo |
-| AIAdvisor | `/ai-advisor` | `_app` | 写死 const + useState 切换 mode | 🟡 静态 demo |
-| Planner | `/course-planner` | `_app` | 写死 const | 🟡 静态 demo |
-| Schedule | `/schedule` | `_app` | 写死 ruleTree 数组 | 🟡 静态 demo |
-| Upload | `/import` | `_app` | 写死 fileSlots/connectors/dataRecords | 🟡 静态 demo |
-| **CourseAnalyzer** | ❌ 无 route | none | UploadPanel + AnalysisResult | 💀 死页 |
-| **Courses** | ❌ 无 route | none | `<div>Courses</div>` | 💀 stub |
-| **Profile** | ❌ 无 route | none | `<div>Profile</div>` | 💀 stub |
+| Home | `/` | inline | section const | useAuth |
+| Login | `/login` | inline | useAuth | ✅ |
+| Register | `/register` | inline | useAuth | ✅ |
+| **Dashboard** | `/dashboard` | `_app` | **写死 5 张卡 const** + useProfile（只读） | **半接** |
+| AIAdvisor | `/ai-advisor` | `_app` | useProfile · useChatMessages · GOAL_MODES | ✅ |
+| Planner | `/course-planner` | `_app` | useAuth · usePlans · SEED_MERIDIAN_NODES（视觉占位） | ✅ |
+| Schedule | `/schedule` | `_app` | useAuth · useRules · SEED_RULES（访客/空态用） | ✅ |
+| Upload | `/import` | `_app` | useProfile · useRagSources | ✅ |
 
-**问题：3 个页面目录无 route、无入口、无 Menu 引用，纯遗留——CourseAnalyzer 还有完整 200 行实现。决定它的归宿（接到某个 route 上 / 或删）。**
+### 仍存在的问题
+
+| # | 严重度 | 问题 |
+|---|---|---|
+| P1 | 🔴 高 | **Dashboard 是 5 功能页里唯一仍 100% 写死的页**。`importShortcuts` / `decisionCards`（5 张卡 line 80–124）全是占位文案 + 假数字。**未来必爆**：用户第一次登录第一眼看 Dashboard，与其他 4 页接真数据的体验差异巨大；新接手 AI 不知 5 张卡该接哪些表。 |
+| P2 | 🟡 中 | **Schedule 跨表语义已在 page 硬写**：注释明示"学校特殊政策：暂走 SEED，不入库（属 track_* 范畴）"。track schema 第二次 pivot 后 Schedule 还得跟随。 |
+| P3 | 🟡 中 | **Planner 用 SEED_MERIDIAN_NODES 占位**——排队 12（画布改造）启动时要替换。 |
+| P4 | 🟢 低 | 图标自由组合，没有"概念 → 图标"映射规范。 |
 
 ---
 
 ## 8. 可扩展性
 
-| 任务 | 今天的成本 | 备注 |
+| 任务 | 成本 | 备注 |
 |---|---|---|
-| 加一个新功能页 | 🟢 低 | 只需 `pages/X/index.tsx` + `routes/_app/x.tsx`（3 行 shell）+ `MENU_ITEMS` 加一项 |
-| 加一个独立鉴权页（forgot-password 等） | 🟢 低 | 仿照 `routes/login.tsx` |
-| 加 Toast | 🟢 低 | sonner 已装，在 `Providers` 里挂一个 `<Toaster />` |
-| 加 Theme | 🟡 中 | tokens 是 oklch + `@theme inline`，dark mode 需要手动建 token alias |
-| 接真鉴权 | 🟢 低 | `authApi.ts` 4 个函数体替换即可，AuthContext / Login 0 修改 |
-| 接 AI 流式 | 🔴 高 | 见 §9 |
-| 接路由级鉴权 | 🟡 中 | 加 `beforeLoad` 即可，但需先决定 router context 注入 vs hook 调用 |
-| 接真数据 | 🔴 高 | `useCourses` / `usePlanner` / `services/*` / `api/*` 4 层都得现场发明契约 |
+| 加新功能页 | 🟢 低 | pages/X + routes/_app/x.tsx + MENU_ITEMS 一行 |
+| 加独立鉴权页（forgot-password 等） | 🟢 低 | 仿照 `routes/login.tsx` |
+| 加 Toast | 🟢 低 | sonner 已装，在 Providers 挂 `<Toaster />` |
+| 加 Theme | 🟡 中 | tokens 是 oklch + `@theme inline`，dark mode 需手建 token alias |
+| 加新表 | 🟡 中 | migration → gen types → api → hook → page，6 步手动 |
+| 接真鉴权 | ✅ 完成 | |
+| 接 AI 流式 | 🔴 高 | 见 §9：BFF 路径 + Token union 未决 |
+| 接路由级鉴权 | ✅ 完成 | |
+| 接真数据 | 🟡 中 | 已有 7 张表骨架，但 schema 还在 pivot |
+
+### 阻碍可扩展性的点
+
+| # | 严重度 | 问题 |
+|---|---|---|
+| X1 | 🔴 高 | **`src/types/db.ts` 与 schema 已漂移**。CURRENT_TASK 阶段 3 明示"db.ts 暂不含 0003 列（scope_level / college）"，0005 已 seed，0006 又扩 kinds。写 `track.scope_level` 必 TS 报错。 |
+| X2 | 🟡 中 | **migration 单向、无 down**。6 个文件，没有任何 rollback 脚本。 |
+| X3 | 🟡 中 | **track schema 演进密度过高**：5 个月 4 次破坏性变更。schema 没稳定前**任何跨表 AI 推理代码都不应写死表名/列名**。 |
+| X4 | 🟡 中 | **`docs/` 已 14+ 份 markdown**。新接手 AI 必读列表已超出其上下文窗口预算。 |
 
 ---
 
 ## 9. AI API 接入预留
 
-### 现状
+### 现状（已显著进步）
+- ✅ `src/ai/{index, stream, schema, prompts, providers/{mock, anthropic}}` 骨架完成
+- ✅ `Chat = (opts) => AsyncIterable<Token>` 协议清晰，AbortController 已通过 `signal` 暴露
+- ✅ Provider 通过 `VITE_AI_PROVIDER` env 选择，默认 mock
+- ✅ `collect(stream)` 非流式收集，方便单测
+- ✅ `recommendModePrompt()` 输出格式契约固定（mock + 真 provider 共用同一份解析正则）
+- ✅ `anthropic.ts` stub 写明上线前必做的 5 件事
 
-```ts
-// src/api/aiApi.ts —— 全部内容
-export async function chat(_message: string) { return null; }
-export async function recommend(_userContext: unknown) { return []; }
-```
+**这一段在所有审计维度里是最干净的**。
 
-```ts
-// src/services/ragService.ts
-export async function ragQuery(_question: string) {
-  return { answer: "", sources: [] };
-}
-```
-
-### 未来必爆问题
+### 仍存在的问题
 
 | # | 严重度 | 问题 |
 |---|---|---|
-| AI1 | 🔴 高 | **没有 provider 抽象**。Anthropic / OpenAI / DeepSeek / Cloudflare AI / 校内模型——切换点在哪？没有人决定。 |
-| AI2 | 🔴 高 | **流式协议未定义**。`chat()` 是 `Promise<null>`，真接入是 SSE / `ReadableStream` / WebSocket？前端 hook 要 `onToken / onDone / onError / onAbort`？今天 0 影。 |
-| AI3 | 🔴 高 | **没有 prompt template registry**。AIAdvisor 的 7 种 mode 各自带一段"系统逻辑描述"——它们将来必然变 system prompt——现在散在 page 文件顶部 `const modes = [...]` 里，无法复用，无法 A/B。 |
-| AI4 | 🟡 中 | **Server vs Client 不分**。`api/` 是浏览器代码，`wrangler.jsonc` 指向 TanStack Start server-entry 但项目内 0 个 Worker handler。API key 归属、CORS、限流策略 都没有住址。建议预留 `src/server/` 与 `src/api/` 的边界。 |
-| AI5 | 🟡 中 | **`AbortController` / 取消 / 超时 / 重试** 0 模板。用户切 mode 时上一个请求要不要取消？切页时呢？ |
-| AI6 | 🟡 中 | **RAG 完全无骨架**。向量库（Cloudflare Vectorize / pgvector / 第三方？）+ chunking 策略 + embedding model + reranker——`AI_MEMORY.md` 一字未提。 |
-| AI7 | 🟢 低 | `recommend(_userContext: unknown)` 返回 `unknown[]`——zod schema 缺席。建议 `Recommendation` 先用 zod 定下来。 |
-
-### 推荐最小预留（仅参考、不要现在改）
-
-```
-src/ai/
-├─ providers/   anthropic.ts | openai.ts | mock.ts   ← strategy
-├─ prompts/     mode.ts | rag.ts | system.ts          ← AIAdvisor 的 modes 搬来
-├─ stream.ts    SSE 解析 + AbortController 模板
-├─ schema.ts    zod: Recommendation / ChatMessage / RagAnswer
-└─ index.ts     export const aiClient: AiClient
-```
-
-`api/aiApi.ts` 退化为薄 wrapper：`aiClient.chat(...)`。
+| AI1 | 🔴 高 | **API key 放哪没有落地点**。`anthropic.ts` 注释正确指出"key 不能放 VITE_*"，但 `src/server/` 不存在，`wrangler.jsonc` 又明确写"不要在这里加 vars"。**先决策 §10 BFF 路线**才能动 TD-1 余尾。 |
+| AI2 | 🟡 中 | **`Token = string` 当前只覆盖纯文本流**。Anthropic SSE 还有 `content_block_*` / `message_delta` / `tool_use_delta` / `citation_block` 等事件。RAG 上线后引用块（citation）必须能传出来；那时 `Token` 升级 union，所有 page 端 `for await` 消费代码要重写。 |
+| AI3 | 🟡 中 | **prompts 目前只有 1 个**（recommendModePrompt）。等 RAG / 课程排序 / GPA 模拟接上，prompts/ 会迅速膨胀到 10+。当前 `prompts.ts` 单文件 + `schema.ts` 单文件的扁平结构顶不住第 3 个 use-case。 |
+| AI4 | 🟢 低 | **mock provider 的启发式正则**（`recommendMode`）与 prompt 模板**重复维护两份关键词**。"双份真理"雏形。 |
 
 ---
 
 ## 10. Supabase 接入合理性
 
 ### 现状
+- `lib/supabase.ts` 单例 + typed client + fail-soft，写得干净
+- `api/*.ts` 7 份薄壳，全部走 `supabase.from("table")...`
+- 7 张用户私有表 + 5 张公共 track 表，**RLS 全部到位**
+- 三层鉴权（Supabase auth + guestMode + SSR 守卫）路径清晰
 
-- 后端方向**未决**：`wrangler.jsonc` 表明意图用 Cloudflare Workers + TanStack Start server-entry；但 `src/server/` 不存在，`api/` 是纯 browser code。
-- `AuthContext` + `authApi.ts` 是 localStorage mock，**故意写成可以"4 个函数体替换"切换真后端**的形状——这是好的预留。
-
-### 三条路线对比
+### 三条路线对比（5-09 写过，仍有效）
 
 | 路线 | 优 | 劣 |
 |---|---|---|
-| **Supabase 全栈**（auth + Postgres + Storage + Realtime） | 上线最快；auth + RLS + 文件 + 实时 4 件套即开即用；前端零后端代码 | 与 Cloudflare Workers 部署互斥（Supabase Edge Functions ≠ Worker）；Vendor lock-in；RAG 向量库要么用 Supabase pgvector（需付费 Pro 等级）要么外挂 |
-| **CF Workers BFF**（自建） | 与 wrangler.jsonc 一致；冷启动快；可接 D1 + Vectorize + R2 + KV 一站式；TanStack Start SSR 原生支持 | Auth / Realtime 全要自己写；交付速度慢 |
-| **混合**（CF 前端 + Supabase 数据层） | 保持 CF SSR + 拿 Supabase 数据福利 | 两份 vendor 关系；Realtime 走 Supabase 还是 Worker DO？决策点更多 |
+| **Supabase 全栈**（auth + Postgres + Storage + Realtime + Edge Function） | 上线最快；auth + RLS + 文件 + 实时即开即用；AI key 走 Edge Function 自然 | 与 Cloudflare Workers 部署互斥（Edge Function ≠ Worker）；Vendor lock-in 更深；RAG pgvector 需 Pro 等级 |
+| **CF Workers BFF**（自建 `src/server/`） | 与 wrangler.jsonc 一致；冷启动快；TanStack Start SSR 原生支持；可一并接 D1 / Vectorize / R2 / KV | AI / proxy / 限流全要自己写；交付速度慢 |
+| **混合**（CF 前端 + Supabase 数据层 + CF 上一层 BFF 转发 AI） | 保持 CF SSR + 拿 Supabase 数据福利 | 两份 vendor 关系；决策点更多 |
 
-### 接入风险（无论哪条路线）
+### 仍存在的问题
 
 | # | 严重度 | 问题 |
 |---|---|---|
-| SB1 | 🔴 高 | **`api/` 4 个文件直接 fetch 第三方 = 客户端泄密**。所有 secret 必须经 Worker / Supabase Edge Function 中转，但项目中无中转层。 |
-| SB2 | 🟡 中 | **AuthContext 已经预留好替换路径**（注释明示），这是少数做得对的地方。Supabase 落地时 `authApi.ts` 体内换 `supabase.auth.signInWithPassword(...)` 即可。 |
-| SB3 | 🟡 中 | **数据库 schema 不存在**。`Course / Plan / User Profile / RAG Source` 的字段一字没写，Supabase 接入第一天要写 7 张表的 schema。先在 `docs/` 起一份 `DATA_MODEL.md` 草稿。 |
-| SB4 | 🟢 低 | RLS 策略与"Mock 鉴权 = 任何 ≥6 位密码即通过"互斥——上线前必须把测试账号关掉，否则 RLS 全部白绕。 |
-
-### 推荐前置决策
-
-1. **CF Workers vs Supabase vs 混合：本周内定**。这一项决定 `src/api/`、`src/server/`、AI provider 三个边界全部走向。
-2. **数据 schema：另起 `docs/DATA_MODEL.md`**，先写 5 张表（user / course / plan / rule / chat_message）的字段。比写代码便宜 10 倍。
-3. **AI key 归属：BFF 或 Edge Function，绝不允许浏览器侧持有**。
+| SB1 | 🔴 高 | **types/db.ts 漂移**（同 X1） |
+| SB2 | 🔴 高 | **AI proxy server-side endpoint 不存在**（同 AI1） |
+| SB3 | 🟡 中 | **service_role 写公共表手动跑 SQL**。0005 seed 走 Dashboard SQL Editor，没自动化 pipeline。换学校时这条路径要重复，易错。 |
+| SB4 | 🟡 中 | **API 错误不暴露 UI**（TD-4 旧债）。profile / rag_source / 未来 AI 调用失败用户只看空态，不知是 RLS 还是网络。 |
+| SB5 | 🟡 中 | **`chat_message` 表与 AI provider Message 类型**是否完全契合还要看 `messages` JSON 是否同时兼容"用户原话 / AI 流式拼接 / 引用块"三态。 |
+| SB6 | 🟢 低 | **Realtime / 多 tab 同步缺失**（TD-6）。Phase 1 不阻塞。 |
 
 ---
 
-## 11. 重复逻辑清单（可立即抽离）
+## 11. 重复逻辑清单（同 §6，可立即抽离）
 
-| 重复点 | 出现位置 | 建议落点 | 优先级 |
-|---|---|---|---|
-| Drawer 三件套 | `Navbar.tsx` + `DashboardLayout.tsx` | `src/hooks/useDrawer.ts` | 🟡 |
-| Page hero (`mx-auto max-w-7xl px-5 py-8 ...` + H1) | 5 个功能页 | `<PageHeader>` | 🟡 |
-| 卡片 (`rounded-xl border border-slate-200 bg-white p-5`) | 所有功能页 | shadcn `<Card>` | 🟡 |
-| CTA (`rounded-full bg-black + transition-colors`) | 所有页面 | shadcn `<Button>` | 🟢 |
-| Metric 卡（icon + title + meta + bar） | AIAdvisor / Dashboard | `<MetricCard>` | 🟢 |
+1. **Drawer hook** — Navbar + DashboardLayout（C1）
+2. **状态四态机** — guest / loading / empty / data（C5）
+3. **Page hero / Card / CTA / Metric** — shadcn 已装却没用（C2-C4）
+4. **色彩 token 映射**（tone / trust / status） — 3 页各一份（C6）
+5. **ISO 日期切片**（C7）
 
 ---
 
@@ -300,71 +255,284 @@ src/ai/
 
 | # | 抽象 | 状态 | 处置 |
 |---|---|---|---|
-| A1 | `PageShell` | 死抽象，0 引用 | **删** |
-| A2 | `MainLayout` | 死抽象，0 引用 | **删** |
-| A3 | `components/common/` | 空目录占位 | **删 .gitkeep，等有 1 个 common 组件再建** |
-| A4 | `UserContext` | 仅 createContext，无 Provider | **折叠进 AuthContext 或删** |
-| A5 | `useCourses` `usePlanner` | "形状障眼法" hook | **要么接通要么删 stub** |
-| A6 | `services/gpaService.ts:projectGPA` vs `utils/calculateGPA.ts` | 同域两套，一假一真 | **决定单一住址** |
-| A7 | `data/mockCourses.ts` 导出空数组 | 形状导出无内容 | **删，或填真 mock** |
-| A8 | `effects/LaptopFrame.{tsx,css}` | CLAUDE.md 标"留 fallback"但 0 引用 | **删（fallback 不是不用的理由）** |
-| A9 | `effects/LiquidEther.css` | CSS 孤儿 | **删** |
-| A10 | `components/{ChatPanel,CourseCard,GPAChart,UploadBox}/` | 4 个空 stub 目录 | **删** |
-| A11 | `pages/{Profile,Courses,CourseAnalyzer}/` | 无 route、无入口 | **接 route 或删** |
-| A12 | `pages/Home/Trust.tsx` "kept unmounted" | 复用承诺未兑现 | **真要复用就抽到 effects 或 common；不复用就删** |
-
-**A1–A12 是同一种病：**"我先把房间盖好，等业务搬进来。"——业务始终没搬进来，房间累积成噪声。
+| A1 | `src/layouts/` 单文件目录 | 半死目录 | 并入 `components/layout/` 或显式定义其唯一用途 |
+| A2 | `src/data/` 空目录 | 死目录 | 删；真有 seed 时再建 |
+| A3 | `useProfile` vs `useUserProfile` 命名 | 命名病 | 合并或重命名 |
+| A4 | Drawer 三件套 | 重复未抽 | 抽 `useDrawer()` |
+| A5 | Schedule 页"跨表占位"（rule + track 临时同壳） | 临时抽象 | track schema 稳后归位 |
+| A6 | Dashboard 5 张静态卡片 | "我先把房间盖好" | 决策 5 张卡片数据契约 |
+| A7 | `ai/prompts.ts` 单文件 | 早期合理 | 第 3 个 prompt 前改成 `prompts/<use-case>.ts` |
+| A8 | mock keyword vs prompt keyword | 双份真理雏形 | 抽 `goalModeKeywords.ts` |
 
 ---
 
-## 13. 技术债总评（按炸药当量排）
+## 13. 技术债总评 + 落地方案
 
-### 💣 一级（业务一接入立刻爆）
+> **一级 = 接下一条主线前必须解决；二级 = 业务接入半年内会爆**。
+> 每条带 ✅ 解决方案：动哪个文件 / 谁来做 / 验证方式。
 
-- **AI1–AI3**：provider 抽象 / 流式协议 / prompt registry 三件套全部 0 设计
-- **R1**：路由级鉴权门禁缺失
-- **SB1**：`api/` 直接 fetch 第三方 = 客户端泄密风险
+---
 
-### 💥 二级（半年内爆）
+### 💣 一级炸药（接下一条主线前必修）
 
-- **S1 + S2**：useCourses / usePlanner 假 hook + react-query 装了不用
-- **A4 + A6**：UserContext 与 gpaService 双轨
-- **L1**：drawer 行为重复
-- **SB2 / SB3**：数据 schema 缺席
+#### 🔴 SB1 / X1 — `types/db.ts` 与 schema 漂移
 
-### 🔥 三级（2 个月内累计影响）
+**影响**：写 `track.scope_level` / 新 kind metadata 必 TS 报错；阻塞排队 11（course API + UI）。
 
-- **死文件 12 处**（A1–A3, A7–A12）
-- **重复 Tailwind 类（卡片 / hero / CTA）** 跟 shadcn 双轨
+✅ **解决方案**（用户跑，Claude 不能）
+1. 项目根放 `.env.local`，含 `SUPABASE_ACCESS_TOKEN=...`（在 https://supabase.com/dashboard/account/tokens 拿）
+2. 用 memory 中 `feedback_supabase_gen_types_safe` 的**两步重定向**安全跑法：
+   ```bash
+   bunx supabase gen types typescript \
+     --project-id <your-project-id> --schema public \
+     > src/types/db.ts.tmp && mv src/types/db.ts.tmp src/types/db.ts
+   ```
+   **不要**直接 `> src/types/db.ts` —— 若命令失败 shell 会先把 db.ts truncate 成空，之前发生过（commit `387e5ba` 恢复）
+3. 验证：
+   ```bash
+   grep -E "scope_level|college" src/types/db.ts   # 应有命中
+   bunx tsc --noEmit                                # 应 0 报错
+   ```
+4. 提交：`chore: regen db.ts after 0006 extend_requirement_kinds`
+
+**优先级**：排队 11 启动前必修。
+
+---
+
+#### 🔴 SB2 / AI1 — AI proxy server-side endpoint 不存在
+
+**影响**：阻塞 TD-1 余尾（接真 Anthropic）+ TD-2 解析 pipeline。
+
+✅ **解决方案**（**用户必须先决策路线**）
+
+**Step 1：拍板路线**（用户做，无法代决）
+
+| 选 | 落点 | 理由 |
+|---|---|---|
+| **A. TanStack Start server-routes（推荐）** | `src/routes/api/ai.chat.ts` server-only `createFileRoute` + server fn | 与 `wrangler.jsonc` 既有部署一致；SSR + server fn 同一 entry；CF Worker 内置 secret 注入 |
+| B. Supabase Edge Function | `supabase/functions/ai-chat/index.ts` | 与 RLS 同源；但与 CF 部署互斥 |
+| C. 自建 CF Worker（另起项目） | 独立 wrangler 项目 | 隔离度最高；但维护两份部署 |
+
+**Step 2：路线 A 的具体动作**（推荐路径；Claude 可写骨架）
+1. 在 `wrangler.jsonc` 添加 `vars`（**非 `VITE_*`**）：`ANTHROPIC_API_KEY` → `wrangler secret put`
+2. 新建 `src/routes/api/ai.chat.ts` —— TanStack server route，body 接前端 messages，proxy 到 Anthropic Messages API，SSE 流式回写
+3. 改 `src/ai/providers/anthropic.ts`：fetch 本地 `/api/ai.chat`（**不直连 Anthropic**），消费 SSE 把 `content_block_delta` → `Token` yield 出去
+4. 验证：`.env.local` 切 `VITE_AI_PROVIDER=anthropic`，AIAdvisor 页面流式输出真 Anthropic 回答
+5. CI/CD：build 前 `wrangler secret put ANTHROPIC_API_KEY` 灌 Worker 环境，**不写进 bundle**
+
+**优先级**：TD-1 余尾启动前必修。
+
+---
+
+#### 🔴 P1 — Dashboard 仍 100% 写死 const
+
+**影响**：用户登录第一眼即看到的页面与其他 4 页脱节；新接手 AI 不知 5 张卡接哪些表。
+
+✅ **解决方案**（**用户必须先拍板数据契约**，然后 Claude 实施）
+
+**Step 1：决策 5 张卡片数据源**（用户做，建议提案）
+
+| 卡片 | 当前写死 | 建议数据源 |
+|---|---|---|
+| 当前目标 | "高 GPA 模式 · 保研路线" | `profile.goal_mode` + `profile.target_gpa` + `profile.goal_weights` |
+| AI 最近一次推荐 | 假课程名 | `chat_message` 表最新一条 `role=assistant`（截前 N 字） |
+| 最近风险变化 | "压分风险 ↓ 12%" | **新建 schema**：`risk_snapshot(user_id, computed_at, risk_score, delta)`，由 AI provider 定期写 |
+| 卡住的 requirement | "第二课堂 还差 2 分" | `user_progress` ⨝ `track_requirement` ⨝ `track_category`，过滤 `kind in (count, credits)` 且 cumulative < threshold |
+| 下一步建议 | "拖动 CS 241 看连锁影响" | 短期：固定文案；长期：AI provider 输出 |
+
+**Step 2：Claude 写 `docs/DASHBOARD_DATA_CONTRACT.md` 草稿**（拿到决策后做）
+
+**Step 3：分两阶段实施**
+- 短期（排队 11 后即可）：卡 1 / 卡 2 / 卡 4 接通，卡 3 / 卡 5 留 SEED 提示"暂未生成"
+- 长期（排队 13 真 AI 接入后）：卡 3 / 卡 5 自动化
+
+**优先级**：排队 13 之前必须做完短期方案，否则 demo 给用户看就是穿帮。
+
+---
+
+#### 🔴 文档漂移 — `PROJECT_OVERVIEW.md` / `ARCHITECTURE.md`
+
+**影响**：新接手 AI 读旧文档会被带歪 —— `services/` 早删但还在画，`useCourses` 早删但还在文档里。
+
+✅ **解决方案**（Claude 立刻可做，本轮已执行）
+
+1. `docs/PROJECT_OVERVIEW.md` "数据" 段：
+   - 删 "业务逻辑：src/services/"、"mock 数据：src/data/"
+   - 改为 "数据访问：src/api（薄壳，调 supabase-js）+ src/hooks（页面级状态）"
+2. `docs/ARCHITECTURE.md` §3 数据流图：
+   - 删 "services/（GPA 计算 / 推荐打分 / RAG 检索）" 一层
+   - 改为 `UI → hooks → context（全局态）` + `UI → hooks → api → Supabase` 两条线
+3. `docs/AI_MEMORY.md`：检查是否还有 `services/` 字眼
+
+---
+
+### 💥 二级炸药（业务接入半年内会爆）
+
+#### 🟡 L1 / C1 — Drawer 三件套抽 hook
+
+✅ **解决方案**（**需要用户授权**，因为 Navbar / DashboardLayout 在"不要修改"清单）
+
+1. Claude 写 `src/hooks/useDrawer.ts`（**无需授权，新建文件**）：
+   ```ts
+   export function useDrawer(opts?: { closeOnRouteChange?: boolean }) {
+     const [open, setOpen] = useState(false);
+     useEffect(() => { document.body.style.overflow = open ? "hidden" : ""; return () => { document.body.style.overflow = ""; }; }, [open]);
+     useEffect(() => { if (!open) return; const fn = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false); window.addEventListener("keydown", fn); return () => window.removeEventListener("keydown", fn); }, [open]);
+     useRouterState({ select: s => s.location.pathname, ... }) // close on route change if opt set
+     return { open, setOpen, toggle: () => setOpen(v => !v), close: () => setOpen(false) };
+   }
+   ```
+2. **用户授权后**：在 Navbar.tsx 与 DashboardLayout.tsx 各删 30 行 drawer 状态，import `useDrawer` 替换
+3. 验证：手测两处 drawer 行为不变（开 / Esc / 路由切换 / scroll lock）
+
+---
+
+#### 🟡 X3 — track schema 写死风险
+
+**影响**：track schema 5 个月 4 次 pivot，前端若写死 `track_requirement.kind === "count"` 等字面量，下一次 0007/0008 会连环 break。
+
+✅ **解决方案**（Claude 立刻可做）
+
+1. 新建 `src/types/trackEnums.ts`：
+   ```ts
+   import type { Database } from "./db";
+   type Req = Database["public"]["Tables"]["track_requirement"]["Row"];
+   export type RequirementKind = Req["kind"];      // 由 DB CHECK 推断
+   export const REQUIREMENT_KIND_META: Record<RequirementKind, { label: string; ... }> = { ... };
+   ```
+2. 前端任何用 `kind === "xxx"` 的地方走 `REQUIREMENT_KIND_META[r.kind]`
+3. 验证：`bunx tsc --noEmit` —— `kind` 字面量集合由 db.ts 自动同步，schema pivot 后只需 regen + 补 meta 一行
+
+---
+
+#### 🟡 X2 — migration 无 down
+
+**影响**：误跑回滚只能人工 SQL；0003 / 0004 / 0006 都改了 CHECK 约束或字段。
+
+✅ **解决方案**（Claude 立刻可做）
+
+1. 新建 `supabase/migrations/_template.sql` —— 模板含：UP 段 + 末尾注释段 "-- DOWN (manual, do not exec)" 写逆向 SQL
+2. 在 `docs/DATA_MODEL.md` §10 加 "Migration 演进规约"：约定"新 migration 必须配 DOWN 注释段，已有 6 个不回填"
+3. 验证：下一条 0007 / 0008 跑前先看 _template.sql
+
+---
+
+#### 🟡 SB4 / TD-4 — API 错误不暴露 UI
+
+**影响**：profile / rag_source / 未来 AI 调用失败，用户只看空态。
+
+✅ **解决方案**（Claude 立刻可做，**需用户授权改 7 个 api 文件 + 1 个 root**）
+
+1. Claude 新建 `src/lib/errorBus.ts`（sonner 已装）：
+   ```ts
+   import { toast } from "sonner";
+   export function reportApiError(scope: string, err: unknown) {
+     const msg = err instanceof Error ? err.message : String(err);
+     console.error(`[${scope}]`, err);
+     toast.error(`${scope}：${msg}`);
+   }
+   ```
+2. Claude 在 `routes/__root.tsx` `Providers` 内挂 `<Toaster richColors />`（注释列表里已留挂点）
+3. **用户授权后**：7 个 `api/*Api.ts` 把 `throw new Error(...)` 之前先 `reportApiError(scope, err)`，或在 hooks 层 catch 时统一调用
+4. 验证：手动断网，profile 拉取应弹出 toast
+
+---
+
+#### 🟡 AI2 — `Token = string` 没留 union 扩展位
+
+**影响**：RAG 上线后引用块必须能传出来；那时所有 page 端 `for await` 消费代码要重写。
+
+✅ **解决方案**（Claude 立刻可做，**前向兼容性改动**）
+
+1. 改 `src/ai/stream.ts`：
+   ```ts
+   export type TextDelta = { type: "text"; value: string };
+   export type Token = TextDelta;            // 当前 union 只 1 个 case
+   // 未来：export type Token = TextDelta | CitationBlock | ToolUseDelta;
+   ```
+2. 改 `mockChat` / `anthropicChat`：yield `{ type: "text", value: char }` 而非裸 string
+3. 改 `collect()`：`out += t.type === "text" ? t.value : ""`
+4. 改 AIAdvisor 消费方：取 `t.value` 而非 `t`
+5. 验证：mock 流式输出视觉无差异，TS 0 报错
+
+**何时做**：当前调用面小（mock + 1 个消费方），改起来不痛；越晚改面越大。
+
+---
+
+#### 🟡 R1 — Router context `{}` 空对象
+
+**影响**：排队 11/13 写 loader-driven 数据时再重构 → 涉及所有 `_app/*` 文件。
+
+✅ **解决方案**（**用户决策时机**，本轮先标记）
+
+- 不立刻改。但**在排队 11 启动会议**时回头评估：是否注入 `{ supabase, queryClient?, auth }` 进 router context？
+- 替代方案：保留 `context: {}`，loader 内通过 `import { supabase }` 静态调 —— 也可行，但对 SSR + 用户隔离不友好
+- 标 TODO：`router.tsx` line 60 `context: {}` 加注释 "排队 11/13 启动前决策"
+
+---
+
+### 🔥 三级（累计影响 / 当下不阻塞）
+
+- **F1 / A1**：双 layout 目录
+- **F2 / A2**：`src/data/` 空目录
+- **S1 / A3**：`useProfile` vs `useUserProfile` 命名病
+- **AI3 / A7**：prompts 单文件 —— 第 3 个 prompt 前改 `prompts/<use-case>.ts`
+- **AI4 / A8**：mock 关键词与 prompt 关键词双源 —— 抽 `goalModeKeywords.ts`
+- **C2–C7**：状态机 / 色彩 / 日期 / Page hero / Card / CTA 重复（多数依赖排队 14 UI 重设计）
+- **P2**：Schedule 跨表占位（track schema 稳后归位）
+- **P3**：Planner SEED 占位（排队 12 会解）
+- **SB3**：service_role 写公共表自动化 pipeline（落 `scripts/seed.ts`）
+- **TD-9**：shadcn primitives 在功能页 0 引用（依赖排队 14）
 
 ### 💨 四级（小烦恼）
 
-- `assets/` 3 个空目录、`format.ts` stub、`router.tsx` 的 `defaultPreloadStaleTime: 0`
+- **R2**：preload 缓存关闭
+- **R3**：路由 kebab vs 页 Pascal
+- **R4 / L4**：Login/Register 共用 layout
+- **L3**：DashboardLayout 移动端 rail 隐藏
+- **S2 / S3**：Context vs Zustand / react-query 升级时机
+- **S4**：URL state 范式不一致
+- **P4**：图标自由组合
+- **SB6 / TD-6**：多 tab 同步缺失
 
 ---
 
-## 14. 推荐决策顺序（先决策、再动代码）
+## 14. 推荐决策顺序
 
-1. **后端方向（Supabase / CF Workers / 混合）** —— 决定 `api/` 重构形态、AI key 归属、数据库 schema 起点。
-2. **AI 供应商 + 流式协议** —— 即使先用 mock，先把 `chat()` 签名改成 `({ messages, signal }) => AsyncIterable<Token>`，让 7 个 caller 不再各自发明。
-3. **路由级鉴权（`_app.tsx beforeLoad`）** —— 加一个 redirect，全局收敛。
-4. **react-query 进 / 退** —— 二选一，避免装而不用。
-5. **死文件清扫一刀切**（A1–A3 + A7–A11） —— 一个 PR 全删，留下 A4 / A6 / A12 等需"决定"的，单独跟。
-6. **GPA 单一住址（utils 还是 services）** —— 决定后再做 §11 的 metric 卡复用。
+**立刻**（本轮 Claude 已做 / 可立即做）：
+1. ✅ 修文档漂移（PROJECT_OVERVIEW / ARCHITECTURE / AI_MEMORY）
+2. ✅ 写 `src/types/trackEnums.ts`（X3 解决方案）
+3. ✅ 写 `src/hooks/useDrawer.ts`（L1 文件部分；动 Navbar/DashboardLayout 仍待授权）
+4. ✅ 写 `src/lib/errorBus.ts` + 挂 `<Toaster />`（SB4 一半；改 api/* 仍待授权）
+5. ✅ 改 `src/ai/stream.ts` Token union（AI2）
 
-**前 3 项不做完，下一轮"接 AI"或"接真数据"会出现 5–7 处 page 内现场发明——回头修起来比现在多花 3–5 倍。**
+**用户决策**（拍板后 Claude 实施）：
+6. 🔴 重 gen `types/db.ts`（SB1） — 用户跑命令
+7. 🔴 选 AI BFF 路线（A / B / C） — 用户拍板，Claude 写骨架
+8. 🔴 Dashboard 5 张卡片数据契约 — 用户拍板，Claude 写 `DASHBOARD_DATA_CONTRACT.md`
+
+**排队 11 启动前回头评估**：
+9. 🟡 Router context 形状（R1）
+
+**只在用户授权后做**（动"不要修改"清单内文件）：
+10. 🟡 Navbar / DashboardLayout 接 useDrawer
+11. 🟡 7 个 api/*.ts 接 errorBus
 
 ---
 
 ## 15. 项目优势（保留勿动）
 
-- TanStack Router 文件式 + `_app.tsx` pathless layout 是当前 React 路由最佳实践
-- `MENU_ITEMS` 单一真理 + 共享 UserMenu 是上一轮干得最好的事
-- shadcn/ui 46 primitives + Tailwind 4 oklch tokens：UI 工具链成熟
-- AuthContext 的"4 函数体替换即切真后端"形状，是少数做对的预留
-- Home 落地页的 GSAP / SplitText / TiltedCard / CardSwap 视觉系统（CLAUDE.md 标"不要修改"，认同）
-- `__root.tsx` 已留 5 个 Provider 挂点 + 错误页 + 404 页
+- **TanStack 文件式 route + pathless `_app`**：扩页成本最低
+- **`MENU_ITEMS` 单一真理**：5-07 修过的债到今天仍干净
+- **`_app.tsx` 三层 beforeLoad 守卫**：SSR / 配置 / guest fallback 写得到位
+- **Supabase fail-soft 单例**：env 缺失不影响 Home / Login 启动
+- **AI 抽象骨架 + `AsyncIterable<Token>` 协议**：在 mock / 真 provider / 单测三处共用 1 个接口
+- **`GOAL_MODES` `TRUST_LEVELS` 等枚举从 api 模块导出**：前端枚举与 DB CHECK 同源（最佳实践）
+- **migrations 全部幂等**：DROP IF EXISTS + CREATE IF NOT EXISTS，失败回滚重跑
+- **CLAUDE.md 数据源分流**：明确"哪些目录禁 Grep"，节省 AI 上下文
+- **`AuthContext` "4 函数体替换即切真后端"形状**：少数做对的预留
+- **Home GSAP / SplitText / TiltedCard / CardSwap 视觉系统**
 
 ---
 
-> 报告止于此。**任何代码修改请用户先回应"按 §14 哪条走"，再开新 task。**
+> **本文件 = 合并版**（2026-05-09 + 2026-05-16）。下一次审计应在：(a) 排队 11 完成后做"接 API 后"快照；(b) 排队 13（AI 接 track）后做"AI 真接入后"快照。

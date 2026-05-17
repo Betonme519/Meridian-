@@ -93,10 +93,12 @@
 - 自定义 CSS keyframes：`src/styles/animations.css`
 
 ### 数据
-- 状态：**React Context**（`src/context/`）
-- 前端 API 调用层：`src/api/`
-- 业务逻辑：`src/services/`
-- mock 数据：`src/data/`
+- 后端：**Supabase**（Postgres + Auth + Storage + RLS）
+- 客户端单例：`src/lib/supabase.ts`（typed client，泛型 `<Database>` 由 `src/types/db.ts` 提供）
+- 数据访问薄壳：`src/api/`（一表一文件，仅做 `supabase.from(...)` 转译，**不放业务逻辑**）
+- 状态：`src/context/`（全局：Auth / Profile）+ `src/hooks/`（页面级：Rules / Plans / RagSources / ChatMessages / UserProfile）
+- 鉴权与守卫：`_app.tsx beforeLoad` 三层（SSR / 未配置 / guest mode → fail-soft；其余 → Supabase session）
+- **不再有 `src/services/` 层**（5-09 已删，业务计算合进 hooks 或 api 薄壳）；`src/data/` 仅作未来 seed 占位
 
 ### AI 能力（待实现）
 | 能力 | 实现 |
@@ -124,16 +126,20 @@
 
 ---
 
-## 当前进度（截至 2026-05）
+## 当前进度（截至 2026-05-16）
 
 - ✅ 落地页 9 个 section（Hero / 笔记本展示 / Flow / Explain / GpaMath / Honesty / Control / Feedback / FinalCTA）
-- ✅ 笔记本滚动动画（CSS 3D 伪笔记本 + hover 上抬）
-- ✅ 首页 SplitText 字符级动画
-- ✅ 自适应 Nav（dark Hero 透明 / 白底 sections 反色）
-- ✅ 项目结构按多 agent 协作整理（每 section 一文件）
-- 🚧 CourseAnalyzer / Dashboard 页面骨架
-- 🚧 Cloudflare Worker 后端接入
-- 🚧 学校手册解析 pipeline
+- ✅ 笔记本滚动动画（CSS 3D + hover 上抬） · SplitText 字符级动画 · 自适应 Nav
+- ✅ 5 个功能页（Dashboard / AIAdvisor / Planner / Schedule / Upload）+ Login / Register
+- ✅ Supabase 真鉴权 + guestMode + `_app.tsx` 三层 beforeLoad 守卫
+- ✅ 6 张用户私有表（profile / rag_source / rule / rule_conflict / plan / chat_message）+ 5 张公共 track 表 RLS 完整
+- ✅ AI 抽象骨架（`src/ai/{stream, schema, prompts, providers/{mock, anthropic}}`） + mock provider 流式 UI
+- ✅ 0005 华师大 2023 级培养方案 seed 落库（198 条 track_requirement）
+- 🚧 接真 Anthropic provider（需先决策 AI BFF 路线）
+- 🚧 排队 11：`course` 表 + UI 入口（先 regen `types/db.ts`）
+- 🚧 Dashboard 数据契约（5 张卡片仍写死 const，唯一未接通页）
+- 🚧 排队 12：画布改造（思维导图体验）
+- 🚧 排队 13：AI 接 track + user_progress + course（schema 锁逻辑）
 
 ---
 
@@ -162,11 +168,15 @@
 
 ```
 docs/
-├─ CURRENT_TASK.md   ★★★ 本会话边界，最先读
-├─ AI_MEMORY.md      ★★  长期状态 + 踩过的坑 + TBD
-├─ PROJECT_OVERVIEW.md  ← 你正在看
-├─ ARCHITECTURE.md   文件结构 / 数据流 / API
-└─ DESIGN_SYSTEM.md  颜色 / 字体 / 动画，写 UI 前必读
+├─ CURRENT_TASK.md         ★★★ 本会话边界，最先读
+├─ AI_MEMORY.md            ★★  长期状态 + 踩过的坑 + TBD
+├─ PROJECT_OVERVIEW.md     ← 你正在看
+├─ ARCHITECTURE.md         文件结构 / 数据流 / API
+├─ ARCHITECTURE_AUDIT.md   已知技术债 + 落地方案（合并版 5-09 + 5-16）
+├─ DATA_MODEL.md           7 张 user-owned 表的 schema 契约
+├─ TRACK_SCHEMA.md         5 张公共 track 表的 schema 契约
+├─ TECH_DEBT.md            TD-1..26 列表（与 AUDIT 互补，AUDIT 看现状 / TECH_DEBT 看历史）
+└─ DESIGN_SYSTEM.md        颜色 / 字体 / 动画，写 UI 前必读
 ```
 
 - `CURRENT_TASK.md` 每会话更新
