@@ -132,6 +132,7 @@ export default function UploadPage() {
   const [school, setSchool] = useState(schoolOptions[0]);
   const [grade, setGrade] = useState("");
   const [major, setMajor] = useState("");
+  const [name, setName] = useState("");
   const [dragHover, setDragHover] = useState<number | null>(null);
 
   // profile 加载/变化时同步到本地草稿（包括首次加载和多 tab 同步场景）
@@ -140,7 +141,8 @@ export default function UploadPage() {
     setSchool(profile.school ?? schoolOptions[0]);
     setGrade(profile.grade != null ? String(profile.grade) : "");
     setMajor(profile.major ?? "");
-  }, [profile?.school, profile?.grade, profile?.major]);
+    setName(profile.name ?? "");
+  }, [profile?.school, profile?.grade, profile?.major, profile?.name]);
 
   // school 是 select，change 即 commit
   const handleSchoolChange = (v: string) => {
@@ -160,7 +162,12 @@ export default function UploadPage() {
       return;
     }
     const n = Number(trimmed);
-    if (!Number.isFinite(n) || !Number.isInteger(n)) return; // 无效值不写
+    if (!Number.isFinite(n) || !Number.isInteger(n)) {
+      // TD-16 修复：无效值不写 DB，但本地 state 也要 reset，否则 UI 仍显示"abc"
+      // 让用户以为已保存。reset 回 profile 当前值（null → 空字符串）。
+      setGrade(profile?.grade != null ? String(profile.grade) : "");
+      return;
+    }
     void updateProfile({ grade: n }).catch((e) =>
       console.warn("[Upload] 保存入学年份失败:", e),
     );
@@ -173,18 +180,59 @@ export default function UploadPage() {
     );
   };
 
+  const handleNameBlur = () => {
+    const trimmed = name.trim();
+    void updateProfile({ name: trimmed === "" ? null : trimmed }).catch((e) =>
+      console.warn("[Upload] 保存显示名失败:", e),
+    );
+  };
+
   const connected = school !== schoolOptions[0];
 
   /**
+   * 校验 file 是否匹配 slot 的 accept 字符串。
+   *
+   * TD-15-4 修复：原 drop 路径不校验文件类型（用户拖 .exe 也照传到 Storage）。
+   * input click 走 accept 浏览器自然过滤；drop 不过滤，需要手动校验。
+   *
+   * accept 格式："*.pdf,.doc,image/*,application/pdf" — 三类元素：
+   *   - 扩展名（.pdf）
+   *   - mime 通配（image/*）
+   *   - mime 精确（application/pdf）
+   */
+  const matchesAccept = (file: File, accept: string): boolean => {
+    const tokens = accept.split(",").map((t) => t.trim().toLowerCase());
+    const fname = file.name.toLowerCase();
+    const fmime = (file.type || "").toLowerCase();
+    return tokens.some((tok) => {
+      if (!tok) return false;
+      if (tok.startsWith(".")) return fname.endsWith(tok);                // 扩展名
+      if (tok.endsWith("/*")) return fmime.startsWith(tok.slice(0, -1));  // image/* → image/
+      return fmime === tok;                                                // 精确 mime
+    });
+  };
+
+  /**
    * 拖入或选中文件 → 顺序上传。允许多文件，每个独立调用 API。
-   * upload 内部已有 race / error 处理；这里只负责拆 FileList。
+   * 单个文件失败 try/catch 包住不中断后续（错误已经经过 errorBus toast 暴露）。
    */
   const handleFiles = async (slotIdx: number, files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const kind = fileSlots[slotIdx].kind;
+    const slot = fileSlots[slotIdx];
     // 顺序处理：浏览器并行上传多文件容易撞 Storage rate limit，串行更稳
     for (const file of Array.from(files)) {
-      await upload(file, kind);
+      // TD-15-4：drop 路径手动校验文件类型（input click 已经走浏览器 accept 过滤）
+      if (!matchesAccept(file, slot.accept)) {
+        console.warn(
+          `[Upload] 跳过 "${file.name}"：类型不匹配 slot 的 accept（${slot.accept}）`,
+        );
+        continue;
+      }
+      try {
+        await upload(file, slot.kind);
+      } catch {
+        // 错误已 toast + setError，单个失败不中断后续文件
+      }
     }
   };
 
@@ -339,6 +387,15 @@ export default function UploadPage() {
             <h2 className="font-semibold tracking-tight">个人设置</h2>
           </div>
           <div className="mt-5 space-y-3">
+            <Field label="显示名">
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onBlur={handleNameBlur}
+                placeholder="留空则用邮箱前缀"
+                className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm transition-colors hover:border-slate-400 focus:border-slate-950 focus:outline-none"
+              />
+            </Field>
             <Field label="入学年份">
               <input
                 value={grade}

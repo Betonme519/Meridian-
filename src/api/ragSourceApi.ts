@@ -17,6 +17,7 @@
  */
 
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { failApiCall } from "@/lib/errorBus";
 import type { Database } from "@/types/db";
 
 export type RagSourceKind =
@@ -52,7 +53,12 @@ export type RagSource = Omit<RagSourceRow, "kind" | "parsed_status"> & {
   parsed_status: ParsedStatus;
 };
 
-const BUCKET = "rag_sources";
+// Bucket 名走 env，默认 "rag_sources"。多环境（dev / staging / prod）部署时可分名。
+// TD-21 修复：从硬编码改成 env-driven。Vite 把 `import.meta.env.VITE_*` 在构建时
+// 内联成字面量，所以 default 值 fallback 在 SSR / 客户端两端一致。
+const BUCKET =
+  (import.meta.env.VITE_SUPABASE_RAG_BUCKET as string | undefined) ||
+  "rag_sources";
 
 const NOT_CONFIGURED_MSG =
   "Supabase 未配置：请在 .env.local 设置 VITE_SUPABASE_URL 和 VITE_SUPABASE_ANON_KEY 后重启 dev server。";
@@ -72,13 +78,13 @@ function getExt(filename: string): string {
  * RLS 已限制 user_id = auth.uid()，但 .eq("user_id", userId) 显式写出更清楚。
  */
 export async function listRagSources(userId: string): Promise<RagSource[]> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("ragSource.list", NOT_CONFIGURED_MSG);
   const { data, error } = await supabase
     .from("rag_source")
     .select("*")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
+  if (error) failApiCall("ragSource.list", error.message);
   return (data ?? []) as RagSource[];
 }
 
@@ -102,7 +108,7 @@ export interface UploadRagSourceInput {
 export async function uploadRagSource(
   input: UploadRagSourceInput,
 ): Promise<RagSource> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("ragSource.upload", NOT_CONFIGURED_MSG);
   const { userId, file, kind, displayName } = input;
 
   // 1) 预生成行 id（用 crypto.randomUUID；浏览器全平台支持）
@@ -121,7 +127,7 @@ export async function uploadRagSource(
     upsert: false,
   });
   if (upload.error) {
-    throw new Error(`上传文件失败：${upload.error.message}`);
+    failApiCall("ragSource.upload", `上传文件失败：${upload.error.message}`);
   }
 
   // 3) 写 rag_source 行
@@ -143,14 +149,10 @@ export async function uploadRagSource(
     .single();
 
   if (error || !data) {
-    // 4) 兜底：行写失败 → 清理已传 Storage 对象，避免孤儿文件
-    void supabase.storage
-      .from(BUCKET)
-      .remove([storagePath])
-      .catch(() => {
-        /* 兜底清理失败就吞掉；不要遮盖原始错误 */
-      });
-    throw new Error(`保存导入记录失败：${error?.message ?? "未知错误"}`);
+    // 4) 兜底：行写失败 → 清理已传 Storage 对象，避免孤儿文件。
+    //    supabase.storage.remove() 返回 { data, error } 而非 throw，所以 fire-and-forget OK。
+    void supabase.storage.from(BUCKET).remove([storagePath]);
+    failApiCall("ragSource.upload", `保存导入记录失败：${error?.message ?? "未知错误"}`);
   }
 
   return data as RagSource;
@@ -162,7 +164,7 @@ export async function uploadRagSource(
  *  - 表删失败直接抛错（调用方决定是否 revert UI）
  */
 export async function deleteRagSource(source: RagSource): Promise<void> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("ragSource.delete", NOT_CONFIGURED_MSG);
 
   const storageRes = await supabase.storage
     .from(BUCKET)
@@ -177,5 +179,5 @@ export async function deleteRagSource(source: RagSource): Promise<void> {
     .from("rag_source")
     .delete()
     .eq("id", source.id);
-  if (error) throw new Error(`删除导入记录失败：${error.message}`);
+  if (error) failApiCall("ragSource.delete", `删除导入记录失败：${error.message}`);
 }

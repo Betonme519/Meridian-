@@ -21,6 +21,7 @@
  */
 
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { failApiCall } from "@/lib/errorBus";
 import type { Database, Json } from "@/types/db";
 import type { GoalMode } from "@/api/profileApi";
 
@@ -89,7 +90,7 @@ export async function listConversations(
   userId: string,
   messageRowLimit: number = 100,
 ): Promise<ConversationSummary[]> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("chat.listConversations", NOT_CONFIGURED_MSG);
 
   const { data, error } = await supabase
     .from("chat_message")
@@ -97,7 +98,7 @@ export async function listConversations(
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(messageRowLimit);
-  if (error) throw new Error(error.message);
+  if (error) failApiCall("chat.listConversations", error.message);
 
   const rows = (data ?? []) as ChatMessageRow[];
   if (rows.length === 0) return [];
@@ -160,14 +161,14 @@ export async function listConversations(
 export async function listConversationMessages(
   conversationId: string,
 ): Promise<ChatMessage[]> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("chat.listMessages", NOT_CONFIGURED_MSG);
 
   const { data, error } = await supabase
     .from("chat_message")
     .select("*")
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: true });
-  if (error) throw new Error(error.message);
+  if (error) failApiCall("chat.listMessages", error.message);
 
   return (data ?? []) as unknown as ChatMessage[];
 }
@@ -190,7 +191,7 @@ export interface InsertChatMessageInput {
 export async function insertChatMessage(
   input: InsertChatMessageInput,
 ): Promise<ChatMessage> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("chat.insert", NOT_CONFIGURED_MSG);
 
   const row: ChatMessageInsert = {
     user_id: input.userId,
@@ -207,7 +208,7 @@ export async function insertChatMessage(
     .select()
     .single();
   if (error || !data) {
-    throw new Error(`保存对话消息失败：${error?.message ?? "未知错误"}`);
+    failApiCall("chat.insert", `保存对话消息失败：${error?.message ?? "未知错误"}`);
   }
   return data as unknown as ChatMessage;
 }
@@ -219,12 +220,12 @@ export async function deleteConversation(
   userId: string,
   conversationId: string,
 ): Promise<void> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("chat.deleteConversation", NOT_CONFIGURED_MSG);
 
   const { error } = await supabase
     .from("chat_message")
     .delete()
     .eq("user_id", userId)
     .eq("conversation_id", conversationId);
-  if (error) throw new Error(`删除对话失败：${error.message}`);
+  if (error) failApiCall("chat.deleteConversation", `删除对话失败：${error.message}`);
 }

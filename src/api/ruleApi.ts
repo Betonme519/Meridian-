@@ -19,6 +19,7 @@
  */
 
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { failApiCall } from "@/lib/errorBus";
 import type { Database } from "@/types/db";
 
 // trust 三档 —— 与 DB CHECK 约束对齐
@@ -49,14 +50,14 @@ const NOT_CONFIGURED_MSG =
  * 分组 / trust 过滤都在 hook / UI 层做（DB 一次拉全，简化逻辑）。
  */
 export async function listRules(userId: string): Promise<Rule[]> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("rule.list", NOT_CONFIGURED_MSG);
   const { data, error } = await supabase
     .from("rule")
     .select("*")
     .eq("user_id", userId)
     .order("branch", { ascending: true })
     .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
+  if (error) failApiCall("rule.list", error.message);
   return (data ?? []) as Rule[];
 }
 
@@ -75,7 +76,7 @@ export interface CreateRuleInput {
  * 新建一条 rule。trust 缺省走表默认 'med'。
  */
 export async function createRule(input: CreateRuleInput): Promise<Rule> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("rule.create", NOT_CONFIGURED_MSG);
 
   const row: RuleInsert = {
     user_id: input.userId,
@@ -94,7 +95,7 @@ export async function createRule(input: CreateRuleInput): Promise<Rule> {
     .select()
     .single();
   if (error || !data) {
-    throw new Error(`新建规则失败：${error?.message ?? "未知错误"}`);
+    failApiCall("rule.create", `新建规则失败：${error?.message ?? "未知错误"}`);
   }
   return data as Rule;
 }
@@ -107,7 +108,7 @@ export type RulePatch = Partial<
  * 部分字段更新。`updated_at` 由 trigger 维护，前端不要 set。
  */
 export async function updateRule(id: string, patch: RulePatch): Promise<Rule> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("rule.update", NOT_CONFIGURED_MSG);
 
   const update: RuleUpdate = { ...patch };
   const { data, error } = await supabase
@@ -117,7 +118,7 @@ export async function updateRule(id: string, patch: RulePatch): Promise<Rule> {
     .select()
     .single();
   if (error || !data) {
-    throw new Error(`更新规则失败：${error?.message ?? "未知错误"}`);
+    failApiCall("rule.update", `更新规则失败：${error?.message ?? "未知错误"}`);
   }
   return data as Rule;
 }
@@ -128,7 +129,7 @@ export async function updateRule(id: string, patch: RulePatch): Promise<Rule> {
  * RLS 限定 user_id = auth.uid()，跨账号删不到。
  */
 export async function deleteRule(id: string): Promise<void> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("rule.delete", NOT_CONFIGURED_MSG);
   const { error } = await supabase.from("rule").delete().eq("id", id);
-  if (error) throw new Error(`删除规则失败：${error.message}`);
+  if (error) failApiCall("rule.delete", `删除规则失败：${error.message}`);
 }

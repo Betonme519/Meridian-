@@ -1,7 +1,9 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { MENU_ITEMS } from "@/config/menu";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
+import { useDrawer } from "@/hooks/useDrawer";
 import { UserMenu } from "@/components/layout/UserMenu";
 import logoBlack from "@/assets/logos/logo黑.png";
 import {
@@ -20,33 +22,14 @@ import {
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const currentPath = useRouterState({ select: (state) => state.location.pathname });
-  const [open, setOpen] = useState(false);
+  // Drawer 三件套（open + scroll-lock + Esc + close-on-route-change）走 useDrawer。
+  // 功能页跳页时 drawer 自动关，避免 menu item onClick 漏写 close()。
+  const { open, toggle, close } = useDrawer({ closeOnRouteChange: true });
   const { user, isAuthenticated } = useAuth();
-  const initial = (user?.name || user?.email || "?").trim().charAt(0).toUpperCase();
-
-  // Body scroll lock while drawer is open
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    document.body.style.overflow = open ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
-
-  // Esc to close
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
-
-  // Close drawer when route changes
-  useEffect(() => {
-    setOpen(false);
-  }, [currentPath]);
+  const { profile } = useProfile();
+  // 优先用 profile.name（用户可改），其次 auth.user.name，最后 email
+  const displayName = profile?.name || user?.name || user?.email || "?";
+  const initial = displayName.trim().charAt(0).toUpperCase();
 
   const currentItem = MENU_ITEMS.find((i) => i.to === currentPath);
   const CurrentIcon = currentItem?.icon;
@@ -96,7 +79,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           type="button"
           aria-label={open ? "关闭菜单" : "打开菜单"}
           aria-expanded={open}
-          onClick={() => setOpen((v) => !v)}
+          onClick={toggle}
           title="菜单"
           className="mt-auto inline-flex h-10 w-10 items-center justify-center rounded-lg"
           style={{
@@ -147,7 +130,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               type="button"
               aria-label={open ? "关闭菜单" : "打开菜单"}
               aria-expanded={open}
-              onClick={() => setOpen((v) => !v)}
+              onClick={toggle}
               className="inline-flex h-10 w-10 items-center justify-center rounded-full lg:hidden"
               style={{
                 background: open ? "rgba(0,0,0,0.06)" : "transparent",
@@ -247,7 +230,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   <button
                     type="button"
                     aria-label="个人菜单"
-                    title={user?.name ?? "个人菜单"}
+                    title={profile?.name || user?.name || "个人菜单"}
                     className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-950 text-sm font-semibold text-white transition-opacity hover:opacity-85 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
                   >
                     {initial}
@@ -279,7 +262,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <button
           type="button"
           aria-label="关闭菜单"
-          onClick={() => setOpen(false)}
+          onClick={close}
           className="absolute inset-0 cursor-default"
           style={{
             background: open ? "rgba(0,0,0,0.18)" : "rgba(0,0,0,0)",
@@ -310,7 +293,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   <li key={item.to}>
                     <Link
                       to={item.to}
-                      onClick={() => setOpen(false)}
+                      onClick={close}
                       aria-current={active ? "page" : undefined}
                       className="group flex items-center gap-4 py-4 border-b border-gray-100"
                       style={{

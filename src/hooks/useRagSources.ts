@@ -23,12 +23,23 @@ import { useAuth } from "@/hooks/useAuth";
  *   refresh    强制重拉
  */
 
+/** 文件大小上限 = 50 MB；Supabase 免费版 Storage 单文件上限就是 50 MB。
+ *  TD-11 修复：前端先校验，避免传到一半被服务端拒绝浪费带宽。 */
+export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
 interface UseRagSourcesValue {
   sources: RagSource[];
   loading: boolean;
   error: string | null;
   uploading: number;
-  upload: (file: File, kind: RagSourceKind) => Promise<RagSource | null>;
+  /**
+   * 上传 1 个文件。
+   * - 成功：返回 saved RagSource
+   * - 失败：抛 Error（调用方批量处理时 try/catch 包住即可不中断后续）
+   *   错误已经经过 errorBus toast + 本 hook 的 setError 双重暴露
+   * TD-15-2 修复：原来返 null 让调用方收不到具体错误；改成抛错让 try/catch 能区分。
+   */
+  upload: (file: File, kind: RagSourceKind) => Promise<RagSource>;
   remove: (source: RagSource) => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -88,11 +99,21 @@ export function useRagSources(): UseRagSourcesValue {
   }, [user, load]);
 
   const upload = useCallback(
-    async (file: File, kind: RagSourceKind): Promise<RagSource | null> => {
+    async (file: File, kind: RagSourceKind): Promise<RagSource> => {
       if (!user) {
-        setError("请先登录后再上传文件");
-        return null;
+        const msg = "请先登录后再上传文件";
+        setError(msg);
+        throw new Error(msg);
       }
+      // TD-11：大小预检，避免传到一半被服务端拒绝
+      if (file.size > MAX_UPLOAD_BYTES) {
+        const mb = (file.size / 1024 / 1024).toFixed(1);
+        const msg = `文件 ${file.name} 太大（${mb} MB，上限 50 MB）`;
+        setError(msg);
+        throw new Error(msg);
+      }
+      // TD-12：snapshot 当前 reqId，写回 state 前确认账号没切
+      const reqId = requestIdRef.current;
       setUploading((n) => n + 1);
       setError(null);
       try {
@@ -101,13 +122,17 @@ export function useRagSources(): UseRagSourcesValue {
           file,
           kind,
         });
+        if (reqId !== requestIdRef.current) {
+          // 已被 logout / 切账号取消 —— 返结果但不写当前账号的列表
+          return saved;
+        }
         // 乐观插入：新行排最前（与 listRagSources 的 desc 排序一致）
         setSources((prev) => [saved, ...prev]);
         return saved;
       } catch (e) {
         const msg = e instanceof Error ? e.message : "上传失败";
         setError(msg);
-        return null;
+        throw e; // TD-15-2：抛错让批量调用方能区分单个文件失败
       } finally {
         setUploading((n) => n - 1);
       }
@@ -115,11 +140,16 @@ export function useRagSources(): UseRagSourcesValue {
     [user],
   );
 
+  // TD-15-3：原来 useCallback deps 是 `[sources]`，函数引用随 sources 每次变。
+  // 改成在 setSources 回调里同步记 prev，dep 只剩稳定的 user。
   const remove = useCallback(
     async (source: RagSource) => {
       // 乐观删除：UI 立刻消失；失败再 revert
-      const prev = sources;
-      setSources((curr) => curr.filter((s) => s.id !== source.id));
+      let prev: RagSource[] = [];
+      setSources((curr) => {
+        prev = curr;
+        return curr.filter((s) => s.id !== source.id);
+      });
       setError(null);
       try {
         await ragApi.deleteRagSource(source);
@@ -130,7 +160,7 @@ export function useRagSources(): UseRagSourcesValue {
         throw e;
       }
     },
-    [sources],
+    [],
   );
 
   return { sources, loading, error, uploading, upload, remove, refresh };

@@ -19,7 +19,7 @@ import type { LucideIcon } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { useChatMessages } from "@/hooks/useChatMessages";
 import { GOAL_MODES, type GoalMode } from "@/api/profileApi";
-import { chat, recommendModePrompt } from "@/ai";
+import { chat, recommendModePrompt, tokenText } from "@/ai";
 
 type Mode = {
   title: GoalMode;
@@ -186,7 +186,9 @@ export default function AIAdvisorPage() {
         messages: recommendModePrompt(snapshotUserText),
         signal: ctrl.signal,
       })) {
-        acc += tok;
+        // Token 是 discriminated union（AI2 修复）；用 tokenText 取可显示文本
+        // 未来 provider 加 citation / tool_use case 时这里不变。
+        acc += tokenText(tok);
         setParsedNote(acc);
       }
     } catch (e) {

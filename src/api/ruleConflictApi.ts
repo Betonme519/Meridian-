@@ -20,6 +20,7 @@
  */
 
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { failApiCall } from "@/lib/errorBus";
 import type { Database } from "@/types/db";
 
 // 与 DB CHECK 约束对齐
@@ -59,13 +60,13 @@ function sortRulePair(aId: string, bId: string): [string, string] {
  * 命中索引：idx_rule_conflict_user (user_id)。
  */
 export async function listConflicts(userId: string): Promise<RuleConflict[]> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("ruleConflict.list", NOT_CONFIGURED_MSG);
   const { data, error } = await supabase
     .from("rule_conflict")
     .select("*")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
+  if (error) failApiCall("ruleConflict.list", error.message);
   return (data ?? []) as RuleConflict[];
 }
 
@@ -89,10 +90,10 @@ export interface CreateConflictInput {
 export async function createConflict(
   input: CreateConflictInput,
 ): Promise<RuleConflict> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("ruleConflict.create", NOT_CONFIGURED_MSG);
 
   if (input.ruleAId === input.ruleBId) {
-    throw new Error("不能把同一条规则与自己设为冲突。");
+    failApiCall("ruleConflict.create", "不能把同一条规则与自己设为冲突。");
   }
   const [aId, bId] = sortRulePair(input.ruleAId, input.ruleBId);
 
@@ -112,7 +113,7 @@ export async function createConflict(
     .select()
     .single();
   if (error || !data) {
-    throw new Error(`新建冲突失败：${error?.message ?? "未知错误"}`);
+    failApiCall("ruleConflict.create", `新建冲突失败：${error?.message ?? "未知错误"}`);
   }
   return data as RuleConflict;
 }
@@ -134,7 +135,7 @@ export async function updateConflict(
   id: string,
   patch: ConflictPatch,
 ): Promise<RuleConflict> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("ruleConflict.update", NOT_CONFIGURED_MSG);
 
   const update: RuleConflictUpdate = {};
   if (patch.title !== undefined) update.title = patch.title;
@@ -143,7 +144,7 @@ export async function updateConflict(
   if (patch.resolved_by !== undefined) update.resolved_by = patch.resolved_by;
   if (patch.ruleAId !== undefined && patch.ruleBId !== undefined) {
     if (patch.ruleAId === patch.ruleBId) {
-      throw new Error("不能把同一条规则与自己设为冲突。");
+      failApiCall("ruleConflict.update", "不能把同一条规则与自己设为冲突。");
     }
     const [aId, bId] = sortRulePair(patch.ruleAId, patch.ruleBId);
     update.rule_a_id = aId;
@@ -157,7 +158,7 @@ export async function updateConflict(
     .select()
     .single();
   if (error || !data) {
-    throw new Error(`更新冲突失败：${error?.message ?? "未知错误"}`);
+    failApiCall("ruleConflict.update", `更新冲突失败：${error?.message ?? "未知错误"}`);
   }
   return data as RuleConflict;
 }
@@ -166,7 +167,7 @@ export async function updateConflict(
  * 硬删。RLS owner-only。
  */
 export async function deleteConflict(id: string): Promise<void> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("ruleConflict.delete", NOT_CONFIGURED_MSG);
   const { error } = await supabase.from("rule_conflict").delete().eq("id", id);
-  if (error) throw new Error(`删除冲突失败：${error.message}`);
+  if (error) failApiCall("ruleConflict.delete", `删除冲突失败：${error.message}`);
 }

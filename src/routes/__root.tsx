@@ -1,4 +1,5 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { Toaster } from "sonner";
 
 import appCss from "../styles/globals.css?url";
 import { AuthProvider } from "@/context/AuthContext";
@@ -76,10 +77,10 @@ function RootShell({ children }: { children: React.ReactNode }) {
  * 全局 Provider 壳。挂点列表：
  *   - AuthProvider        ✅ 已挂（Supabase 实现，见 src/api/authApi.ts）
  *   - ProfileProvider     ✅ 已挂（嵌在 AuthProvider 内，依赖 useAuth）
+ *   - <Toaster />         ✅ 已挂（sonner，richColors；接 src/lib/errorBus.ts 的 reportApiError）
  *   - QueryClientProvider 未挂（@tanstack/react-query 依赖已于 2026-05-09 移除；
  *                          真有 server-state 缓存需求时再装回 + 在此挂）
  *   - ThemeProvider       (light/dark 切换)
- *   - <Toaster />         (sonner — 已装)
  *   - ErrorBoundary       (页面级错误兜底)
  *
  * 接入新 Provider 时统一在这里包，避免 root 持续膨胀且保持层级清晰。
@@ -87,7 +88,10 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function Providers({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <ProfileProvider>{children}</ProfileProvider>
+      <ProfileProvider>
+        {children}
+        <Toaster richColors position="top-right" closeButton />
+      </ProfileProvider>
     </AuthProvider>
   );
 }

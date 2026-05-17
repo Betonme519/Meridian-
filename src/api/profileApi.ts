@@ -14,6 +14,7 @@
  */
 
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { failApiCall } from "@/lib/errorBus";
 import type { Database } from "@/types/db";
 
 // 从常量数组派生 GoalMode union —— 让 zod z.enum / 运行时校验复用同一份数据
@@ -61,13 +62,13 @@ const NOT_CONFIGURED_MSG =
  * 调用方一般是 ProfileContext，拿到 null 后走兜底 upsert。
  */
 export async function getProfile(userId: string): Promise<Profile | null> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("profile.fetch", NOT_CONFIGURED_MSG);
   const { data, error } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", userId)
     .maybeSingle();
-  if (error) throw new Error(error.message);
+  if (error) failApiCall("profile.fetch", error.message);
   return data as Profile | null;
 }
 
@@ -83,13 +84,13 @@ export async function upsertProfile(
   userId: string,
   patch: ProfilePatch = {},
 ): Promise<Profile> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("profile.upsert", NOT_CONFIGURED_MSG);
   const { data, error } = await supabase
     .from("profiles")
     .upsert({ id: userId, ...patch }, { onConflict: "id" })
     .select()
     .single();
-  if (error) throw new Error(error.message);
+  if (error) failApiCall("profile.upsert", error.message);
   return data as Profile;
 }
 
@@ -102,13 +103,13 @@ export async function updateProfile(
   userId: string,
   patch: ProfilePatch,
 ): Promise<Profile | null> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("profile.update", NOT_CONFIGURED_MSG);
   const { data, error } = await supabase
     .from("profiles")
     .update(patch)
     .eq("id", userId)
     .select()
     .maybeSingle();
-  if (error) throw new Error(error.message);
+  if (error) failApiCall("profile.update", error.message);
   return data as Profile | null;
 }

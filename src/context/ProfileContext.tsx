@@ -103,6 +103,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         // 不抛错；调用方一般是 UI 事件回调，无 user/profile 就静默
         return;
       }
+      // 与 loadProfile 共享 requestIdRef：spam-click / logout / 切账号 都能用同一个
+      // counter 让"过期"响应被丢弃（TD-5 修复）。
+      const reqId = ++requestIdRef.current;
+
       // 乐观更新
       const prev = profile;
       const next: Profile = { ...profile, ...patch } as Profile;
@@ -110,19 +114,29 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setError(null);
       try {
         const saved = await profileApi.updateProfile(user.id, patch);
+        if (reqId !== requestIdRef.current) {
+          // 已被后续 update / logout / loadProfile 取消 —— 不 setProfile（避免回写过期值）
+          return;
+        }
         if (saved) {
           setProfile(saved); // 服务器回传的最权威（updated_at 等）
         }
       } catch (e) {
-        // revert
-        setProfile(prev);
-        const msg = e instanceof Error ? e.message : "保存 profile 失败";
-        setError(msg);
-        throw e; // 让调用方有机会感知
+        if (reqId === requestIdRef.current) {
+          // latest 失败才 revert + setError；过期失败静默（让 latest 状态主导）
+          setProfile(prev);
+          const msg = e instanceof Error ? e.message : "保存 profile 失败";
+          setError(msg);
+        }
+        throw e; // 始终向上抛，让调用方决定（Upload 的 .catch console.warn 仍生效）
       }
     },
     [user, profile],
   );
+
+  // ⚠️ 已知边界：本 ref 只防 client-side race（spam-click / logout / 切账号）。
+  //   server-side race（两个 UPDATE 几乎同时抵达 Supabase，写入顺序乱）需 schema
+  //   层加 optimistic concurrency（updated_at version check）才能根治，超出本次范围。
 
   return (
     <ProfileContext.Provider

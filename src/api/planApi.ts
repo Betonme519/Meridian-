@@ -23,6 +23,7 @@
 
 import type { Edge, Node, Viewport } from "@xyflow/react";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { failApiCall } from "@/lib/errorBus";
 import type { Database, Json } from "@/types/db";
 
 /**
@@ -56,7 +57,7 @@ const NOT_CONFIGURED_MSG =
  *           idx_plan_user_updated (user_id, updated_at DESC)
  */
 export async function listPlans(userId: string): Promise<Plan[]> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("plan.list", NOT_CONFIGURED_MSG);
   const { data, error } = await supabase
     .from("plan")
     .select("*")
@@ -64,7 +65,7 @@ export async function listPlans(userId: string): Promise<Plan[]> {
     .eq("is_archived", false)
     .order("updated_at", { ascending: false });
 
-  if (error) throw new Error(`加载规划列表失败：${error.message}`);
+  if (error) failApiCall("plan.list", `加载规划列表失败：${error.message}`);
   // `as unknown as` 桥接：DB 行的 `nodes/edges/viewport` 是宽口 Json，业务层窄到
   // ReactFlow `Node[]/Edge[]/Viewport`。TS 不递归推断 Json→Node[]，所以经 unknown 转。
   return (data ?? []) as unknown as Plan[];
@@ -75,14 +76,14 @@ export async function listPlans(userId: string): Promise<Plan[]> {
  * 不抛错——切换 plan 时 URL 可能是过期 / 不存在的 id，应当优雅降级。
  */
 export async function getPlan(planId: string): Promise<Plan | null> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("plan.fetch", NOT_CONFIGURED_MSG);
   const { data, error } = await supabase
     .from("plan")
     .select("*")
     .eq("id", planId)
     .maybeSingle();
 
-  if (error) throw new Error(`加载规划失败：${error.message}`);
+  if (error) failApiCall("plan.fetch", `加载规划失败：${error.message}`);
   return (data ?? null) as unknown as Plan | null;
 }
 
@@ -98,7 +99,7 @@ export async function createPlan(opts: {
   nodes?: Node[];
   edges?: Edge[];
 }): Promise<Plan> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("plan.create", NOT_CONFIGURED_MSG);
 
   // ReactFlow Node[]/Edge[] 在结构上是 JSON-safe（仅普通 object），但 TS 不自己
   // 递归推断到 Json，所以写入侧显式 `as unknown as Json` 一次。读出侧反过来 narrow。
@@ -114,7 +115,7 @@ export async function createPlan(opts: {
     .single();
 
   if (error || !data) {
-    throw new Error(`新建规划失败：${error?.message ?? "未知错误"}`);
+    failApiCall("plan.create", `新建规划失败：${error?.message ?? "未知错误"}`);
   }
   return data as unknown as Plan;
 }
@@ -134,7 +135,7 @@ export async function updatePlanGraph(
     viewport: Viewport | null;
   },
 ): Promise<void> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("plan.updateGraph", NOT_CONFIGURED_MSG);
 
   const update: PlanUpdate = {
     nodes: patch.nodes as unknown as Json,
@@ -146,24 +147,24 @@ export async function updatePlanGraph(
     .update(update)
     .eq("id", planId);
 
-  if (error) throw new Error(`保存规划失败：${error.message}`);
+  if (error) failApiCall("plan.updateGraph", `保存规划失败：${error.message}`);
 }
 
 /**
  * 重命名。空白 / 纯空格的名字拒收（业务层应当先 trim）。
  */
 export async function renamePlan(planId: string, name: string): Promise<void> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("plan.rename", NOT_CONFIGURED_MSG);
 
   const trimmed = name.trim();
-  if (!trimmed) throw new Error("规划名不能为空");
+  if (!trimmed) failApiCall("plan.rename", "规划名不能为空");
 
   const { error } = await supabase
     .from("plan")
     .update({ name: trimmed })
     .eq("id", planId);
 
-  if (error) throw new Error(`重命名失败：${error.message}`);
+  if (error) failApiCall("plan.rename", `重命名失败：${error.message}`);
 }
 
 /**
@@ -171,8 +172,8 @@ export async function renamePlan(planId: string, name: string): Promise<void> {
  * RLS 限制 user_id = auth.uid()，跨账号删不到。
  */
 export async function deletePlan(planId: string): Promise<void> {
-  if (!isSupabaseConfigured) throw new Error(NOT_CONFIGURED_MSG);
+  if (!isSupabaseConfigured) failApiCall("plan.delete", NOT_CONFIGURED_MSG);
 
   const { error } = await supabase.from("plan").delete().eq("id", planId);
-  if (error) throw new Error(`删除规划失败：${error.message}`);
+  if (error) failApiCall("plan.delete", `删除规划失败：${error.message}`);
 }

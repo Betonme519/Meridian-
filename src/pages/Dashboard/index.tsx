@@ -9,7 +9,6 @@ import {
   ClipboardList,
   FileText,
   GraduationCap,
-  Link2,
   Sparkles,
   Target,
   Timer,
@@ -29,6 +28,9 @@ type ImportShortcut = {
   status?: string;
 };
 
+// "同步教务系统" shortcut 2026-05-17 删除：
+//   项目立项书明确"严禁爬学校系统"，无对接代码 / 无 schema；保留卡片是给假承诺。
+//   用户上传课表（下方 CalendarClock 那张）已经覆盖"教务相关数据"诉求。
 const importShortcuts: ImportShortcut[] = [
   {
     title: "上传培养方案",
@@ -43,13 +45,6 @@ const importShortcuts: ImportShortcut[] = [
     to: "/import",
     icon: ClipboardList,
     status: "已上传",
-  },
-  {
-    title: "同步教务系统",
-    desc: "授权登录抓取最新数据",
-    to: "/import",
-    icon: Link2,
-    status: "未连接",
   },
   {
     title: "导入课表",
@@ -104,14 +99,72 @@ const decisionCards: DecisionCard[] = [
     tone: "warn",
     cta: { label: "前往规则", to: "/schedule" },
   },
+  // 卡 5「下一步建议」在组件内 useMemo + pickNextStep() 动态注入，这里不放
+];
+
+// 卡 5「下一步建议」短期文案池（AI 真接通前用）。
+// 选择策略：按小时 hash 轮换（Math.floor(now / 3600) % LEN），避免每次进页都变。
+// 风格约束（CLAUDE.md "不要：营销腔" + DESIGN_SYSTEM "直接，承认局限"）：
+//   - 用"你"不用"您"，避免"赋能 / 助力 / 一键"等词
+//   - 给具体动作（拖动 / 上传 / 比较），不给口号
+//   - 承认 AI 当前能力有限（"先把数据补全"比"AI 会自动帮你做"更诚实）
+const NEXT_STEP_POOL: Array<Omit<DecisionCard, "tone">> = [
   {
     title: "下一步建议",
-    body: "在 Workspace 拖动 CS 241 看连锁影响",
-    meta: "AI 综合判断置信度 中-高",
-    tone: "neutral",
+    body: "把还没上传的培养方案补齐，AI 才能识别出你的真实毕业要求。",
+    meta: "Phase 1 · 数据补全",
+    cta: { label: "去导入", to: "/import" },
+  },
+  {
+    title: "下一步建议",
+    body: "在 Workspace 拖一节课到不同学期，看 GPA / 工作量怎么变。",
+    meta: "Phase 2 · 模拟",
     cta: { label: "打开 Workspace", to: "/course-planner" },
   },
+  {
+    title: "下一步建议",
+    body: "把目标权重调一下，看推荐排序会不会变。",
+    meta: "Phase 2 · 调权重",
+    cta: { label: "调权重", to: "/ai-advisor" },
+  },
+  {
+    title: "下一步建议",
+    body: "Rule Graph 里有几条规则置信度还是 'low'，挑一条手动确认下。",
+    meta: "Phase 1 · 规则审计",
+    cta: { label: "去规则页", to: "/schedule" },
+  },
+  {
+    title: "下一步建议",
+    body: "把上学期成绩单也传上来，GPA 计算会更准。",
+    meta: "Phase 1 · 数据补全",
+    cta: { label: "去导入", to: "/import" },
+  },
+  {
+    title: "下一步建议",
+    body: "用自然语言重新描述一次你的现状，AI 帮你重新匹配目标模式。",
+    meta: "Phase 2 · 重新对齐",
+    cta: { label: "去 Goal Mode", to: "/ai-advisor" },
+  },
+  {
+    title: "下一步建议",
+    body: "Workspace 里同时打开两种排课方案，横向比较哪个更省心。",
+    meta: "Phase 2 · 模拟",
+    cta: { label: "打开 Workspace", to: "/course-planner" },
+  },
+  {
+    title: "下一步建议",
+    body: "查一下还有哪些 requirement 卡住，优先解决那些。",
+    meta: "Phase 1 · 毕业进度",
+    cta: { label: "查毕业进度", to: "/schedule" },
+  },
 ];
+
+function pickNextStep(): DecisionCard {
+  // 按小时 hash 轮换。SSR 时 Date.now() 与客户端可能差一拍，
+  // 但本组件在 _app 鉴权之后才渲染（client-only 流程），hydration 不爆。
+  const idx = Math.floor(Date.now() / 1000 / 3600) % NEXT_STEP_POOL.length;
+  return { ...NEXT_STEP_POOL[idx], tone: "neutral" };
+}
 
 const toneClass: Record<DecisionCard["tone"], string> = {
   neutral: "border-slate-200 bg-white",
@@ -193,6 +246,14 @@ export default function DashboardPage() {
     [selectedAction],
   );
 
+  // 卡 5「下一步建议」用文案池按小时轮换；useMemo 让同一次 render 内一致，
+  // 也让组件不会因为 Date.now() 每帧变化触发重渲染。
+  const nextStepCard = useMemo(() => pickNextStep(), []);
+  const allDecisionCards = useMemo(
+    () => [...decisionCards, nextStepCard],
+    [nextStepCard],
+  );
+
   return (
     <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
       {/* Section 1 · Import shortcuts */}
@@ -201,7 +262,7 @@ export default function DashboardPage() {
           <UploadIcon className="h-5 w-5 text-slate-500" />
           <h2 className="font-semibold tracking-tight">信息导入</h2>
           <span className="ml-auto text-xs text-slate-400 tabular-nums">
-            5 个入口 · 已接入 2/5
+            {importShortcuts.length} 个入口 · 已接入 2/{importShortcuts.length}
           </span>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -254,11 +315,11 @@ export default function DashboardPage() {
           <Sparkles className="h-5 w-5 text-slate-500" />
           <h2 className="font-semibold tracking-tight">当前决策状态</h2>
           <span className="ml-auto text-xs text-slate-400 tabular-nums">
-            {decisionCards.length} 项
+            {allDecisionCards.length} 项
           </span>
         </div>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {decisionCards.map((c, i) => {
+          {allDecisionCards.map((c, i) => {
             // 「当前目标」卡片的 body 实时反映 profile.goal_mode
             const body =
               c.title === "当前目标" ? `${currentGoalMode} 模式` : c.body;

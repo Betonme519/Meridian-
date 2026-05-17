@@ -43,33 +43,56 @@ function recommendMode(text: string): GoalMode {
 function rationaleFor(mode: GoalMode, userText: string): string {
   const headline: Record<GoalMode, string> = {
     "高 GPA": "你的描述里没有明显的方向偏好，保持 GPA 通常是最稳的中间路径。",
-    "最轻松毕业": "你似乎更在意把毕业要求压到最低，省下时间做别的事。",
-    "保研路线": "保研对绩点 / 排名 / 科研经历都是硬要求，要按这条路安排课程。",
-    "留学路线": "留学申请重视 GPA / 语言成绩 / 推荐信，要早做语言准备和科研衔接。",
-    "实习优先": "把时间留给实习，意味着课程要选 workload 小、可灵活调时段的。",
-    "时间自由": "你想给个人发展留空间，建议把硬课压在少数学期、其他学期轻装。",
-    "低压力模式": "你提到了压力 / 健康 / 睡眠 —— 课程负荷要往低优先级走。",
-    "个性化定制": "你的目标看起来是多个方向的组合，建议在权重面板做精细配比。",
+    最轻松毕业: "你似乎更在意把毕业要求压到最低，省下时间做别的事。",
+    保研路线: "保研对绩点 / 排名 / 科研经历都是硬要求，要按这条路安排课程。",
+    留学路线: "留学申请重视 GPA / 语言成绩 / 推荐信，要早做语言准备和科研衔接。",
+    实习优先: "把时间留给实习，意味着课程要选 workload 小、可灵活调时段的。",
+    时间自由: "你想给个人发展留空间，建议把硬课压在少数学期、其他学期轻装。",
+    低压力模式: "你提到了压力 / 健康 / 睡眠 —— 课程负荷要往低优先级走。",
+    个性化定制: "你的目标看起来是多个方向的组合，建议在权重面板做精细配比。",
   };
 
   // 从用户文本里抓 1-2 个关键词原话引用
   const keywordHits = [
-    /保研/, /排名/, /科研/, /导师/,
-    /留学/, /申请/, /推荐信/, /海外/, /GRE/i, /托福/, /雅思/,
-    /实习/, /工作/, /面试/, /offer/i,
-    /压力/, /焦虑/, /睡眠/, /轻松/, /健康/,
-    /毕业/, /学分/, /第二课堂/, /劳动教育/,
-    /自由/, /时间/, /兴趣/, /社团/, /生活/,
-    /GPA/i, /绩点/, /workload/i,
+    /保研/,
+    /排名/,
+    /科研/,
+    /导师/,
+    /留学/,
+    /申请/,
+    /推荐信/,
+    /海外/,
+    /GRE/i,
+    /托福/,
+    /雅思/,
+    /实习/,
+    /工作/,
+    /面试/,
+    /offer/i,
+    /压力/,
+    /焦虑/,
+    /睡眠/,
+    /轻松/,
+    /健康/,
+    /毕业/,
+    /学分/,
+    /第二课堂/,
+    /劳动教育/,
+    /自由/,
+    /时间/,
+    /兴趣/,
+    /社团/,
+    /生活/,
+    /GPA/i,
+    /绩点/,
+    /workload/i,
   ];
   const quoted = keywordHits
     .map((re) => userText.match(re)?.[0])
     .filter((w): w is string => Boolean(w))
     .slice(0, 2);
 
-  const cite = quoted.length
-    ? `结合你提到的「${quoted.join("、")}」，`
-    : "";
+  const cite = quoted.length ? `结合你提到的「${quoted.join("、")}」，` : "";
 
   return `${headline[mode]} ${cite}这个模式会优先匹配该方向的课程与规则。`;
 }
@@ -90,6 +113,7 @@ export const mockChat: Chat = async function* ({ messages, signal }) {
   for (const ch of reply) {
     if (signal?.aborted) return;
     await new Promise<void>((resolve) => setTimeout(resolve, TOKEN_DELAY_MS));
-    yield ch;
+    // Token 是 discriminated union（见 stream.ts AI2 修复），yield 必须包成 TextDelta
+    yield { type: "text", value: ch };
   }
 };

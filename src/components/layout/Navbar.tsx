@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { MENU_ITEMS } from "@/config/menu";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
+import { useDrawer } from "@/hooks/useDrawer";
 import { UserMenu } from "@/components/layout/UserMenu";
 import logoBlack from "@/assets/logos/logo黑.png";
 import logoWhite from "@/assets/logos/logo白.png";
@@ -18,9 +20,15 @@ import logoWhite from "@/assets/logos/logo白.png";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
-  const [open, setOpen] = useState(false);
+  // Drawer 三件套（open + scroll-lock + Esc）由 useDrawer 统一管。
+  // Navbar 不勾 closeOnRouteChange —— 落地页 hash 跳锚点不算"路由切换"，
+  // 真正关闭由 menu item onClick 调 close() 完成。
+  const { open, toggle, close } = useDrawer();
   const { user, isAuthenticated } = useAuth();
-  const initial = (user?.name || user?.email || "?").trim().charAt(0).toUpperCase();
+  const { profile } = useProfile();
+  // 优先用 profile.name（用户可改），其次 auth.user.name（注册时填的），最后 email
+  const displayName = profile?.name || user?.name || user?.email || "?";
+  const initial = displayName.trim().charAt(0).toUpperCase();
 
   useEffect(() => {
     const onScroll = () => {
@@ -30,25 +38,6 @@ export default function Navbar() {
     onScroll();
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  // Lock body scroll while drawer is open
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    document.body.style.overflow = open ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
-
-  // Esc to close
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
 
   // Navbar appearance follows scroll only — opening the drawer does NOT
   // force opaque mode, so on the dark Hero it stays transparent / white.
@@ -79,7 +68,7 @@ export default function Navbar() {
               type="button"
               aria-label={open ? "关闭菜单" : "打开菜单"}
               aria-expanded={open}
-              onClick={() => setOpen((v) => !v)}
+              onClick={toggle}
               className="inline-flex h-10 w-10 items-center justify-center rounded-full"
               style={{
                 background: open ? "rgba(0,0,0,0.06)" : "transparent",
@@ -227,7 +216,7 @@ export default function Navbar() {
                   <button
                     type="button"
                     aria-label="个人菜单"
-                    title={user?.name ?? "个人菜单"}
+                    title={profile?.name || user?.name || "个人菜单"}
                     className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 transition-[background,color] duration-300"
                     style={{
                       background: navOpaque ? "#000" : "rgba(255,255,255,0.95)",
@@ -286,7 +275,7 @@ export default function Navbar() {
         <button
           type="button"
           aria-label="关闭菜单"
-          onClick={() => setOpen(false)}
+          onClick={close}
           className="absolute inset-0 cursor-default"
           style={{
             background: open ? "rgba(0,0,0,0.18)" : "rgba(0,0,0,0)",
@@ -318,7 +307,7 @@ export default function Navbar() {
                   <li key={item.to}>
                     <Link
                       to={item.to}
-                      onClick={() => setOpen(false)}
+                      onClick={close}
                       className="group flex items-center gap-4 py-4 border-b border-gray-100"
                       style={{
                         opacity: open ? 1 : 0,
