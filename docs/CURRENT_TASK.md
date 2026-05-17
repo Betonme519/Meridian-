@@ -9,43 +9,44 @@
 
 ## 目标
 
-**两段式推进：先收尾「与毕业路径无关的后端基础」（排队 5/6/7），再进入产品核心「毕业路径结构化 + 画布重做 + AI 落地学校」（排队 8-13）。**
+**已闭环**：排队 5/6/7/8/9 + 10 阶段 1-3。详见下方「最近完成」+ AI_MEMORY § 9 + 各 commit。
+**当前推进**：排队 10 阶段 4（`docs/ecnu_process_rules.md`）+ 11（course 表接通）+ 12（画布改造）+ 13（AI 接 track）。
+**UI 重设计（排队 14）**：等排队 12 跑通后启动。
 
-用户 2026-05-14 决定：
+用户 2026-05-14 历史决策（已生效，留作背景）：
 
-1. **先把跟毕业路径无关或基本无关的后端接好** —— 避免主线推进时回头补基建。
-   - typed client（TD-3）/ chat_message 接入 / rule + rule_conflict 接入。
+1. **先收尾跟毕业路径无关或基本无关的后端**（已完成）—— typed client（TD-3）/ chat_message 接入 / rule + rule_conflict 接入。
 2. **再做毕业路径主线** —— 三问同根（画布主线分支 / AI 锁既定逻辑 / 何时灌学校数据），都卡在结构化 schema 不存在。
 
-**TD-1（真 Anthropic）用户主动后放**。锁逻辑靠 prompt + zod schema，mock 够用，底层模型可换。
+**TD-1（真 LLM provider）用户主动后放**。骨架已升级 provider-agnostic（DeepSeek/Qwen/Zhipu/Anthropic 任一家可接），等用户拍板上游再写 server route。
 **TD-2（解析 pipeline）依赖 TD-1**，也后放。
 
 ---
 
 ## 排队（按优先级，一次开一条）
 
-### 第一阶段 · 无关基础
+### 第一阶段 · 无关基础 ✅ 全闭环
 
-#### 排队 5 — `supabase gen types` 切 typed client（TD-3）
-
-- 现状：`profileApi.ts` / `planApi.ts` / `ragSourceApi.ts` 4 处 `as Profile / as RagSource / as Plan` 手维护类型。
-- 工作量：半天。装 `supabase` CLI → 跑 `supabase gen types typescript --project-id <id> > src/types/db.ts` → 4 个 API 文件 import 替换。
-- ROI 最高 → 排队 6/7/8-13 全部受益（不切的话，后面要加 chat_message/rule/rule_conflict/track_* 共 7 个手类型）。
-- 完成标准：4 个 API 文件移除所有 `as X`；`tsc --noEmit` 干净；新加表自动有类型。
-
-#### 排队 6 — `chat_message` 表接 `/ai-advisor` 对话历史（TD-7 余尾）
-
-- 新建 `src/api/chatMessageApi.ts` + `src/hooks/useChatMessages.ts`。
-- `/ai-advisor` 流式返回结束后把整条 user/assistant 消息写入 `chat_message`（`conversation_id` 用一次会话一个 uuid）。
-- 页面加历史列表（按 `conversation_id` 分组 / 时间倒序，最近 N 条）。
-- 流式中途 abort 也要落库（保 user msg + 部分 assistant 内容 + metadata.aborted=true）。
-- 完成标准：刷新页面看得到上次对话；切 conversation 切上下文；与 `metadata` 字段对齐（DATA_MODEL §3.6）。
+> 排队 5（typed client / 原 TD-3）→ commit `9571ea5` + `c36f3c4`（4 API 改 `Omit<XxxRow, …> & {…}` 派生 + db.ts 重 gen 743 行）
+> 排队 6（chat_message 接 /ai-advisor）→ commit `44b00b6`（chatMessageApi + useChatMessages + abort metadata + 历史列表 UI）
+> 排队 7（rule + rule_conflict 接 /schedule）→ commit `9fb712e`（原 TD-24 收尾）
+>
+> ⚠️ **CURRENT_TASK 旧描述"排队 6 = TD-7 余尾"是历史用语漂移**：TD-7 在 commit `c36f3c4` 重新分配为「Dashboard 写死 const + Schedule SEED_POLICIES」，跟 chat_message 无关。
 
 ---
 
-### 第二阶段 · 毕业路径主线
+### 第二阶段 · 毕业路径主线（前段 ✅ 已闭环）
+
+> 排队 8（毕业路径五层结构契约 + UI 推迟到排队 14）→ commit `71c184e`
+> 排队 9（0002 track schema migration + verify + DATA_MODEL 入口）→ commit `4bb156b` + 后续 `e0df73b`（0003 scope 三档）+ `a2b955f`（0004 source_ref）+ `6c91af5`（0006 kind 12 档 + metadata jsonb）
 
 #### 排队 10 — 学校种子数据 seed SQL（华师大 2023 级）
+
+**进度**：
+- ✅ 阶段 1（4 份 digest A/B/C/D 录入） → commit `ef06fe2`
+- ✅ 阶段 2（数据源切 PDF + digest v2 重写为 5 份 A/B/C/D/E）→ commit `cd6c7f4` + `63252e5`
+- ✅ 阶段 3（0005_seed_ecnu_2023.sql 198 条 track_requirement 落库，用户 Supabase Dashboard 跑通）→ commit `3cae3f4` + `2fba113`
+- ✅ 阶段 4（`docs/ecnu_process_rules.md` 323 行 / 9 章，过程类规则精炼版喂排队 13 的 `gradPathAdvisorPrompt`）→ 2026-05-17
 
 **数据源文件清单**（CLAUDE.md 第 8 条禁扫名单，仅本任务 / 排队 13 读）：
 
@@ -140,20 +141,18 @@
 
 **无。等用户拍板下一波方向。** 候选：
 
-1. **阶段 4** `docs/ecnu_process_rules.md` — 把各 digest 末尾「与阶段 4 边界」段的 prompt 类规则 + AI 顾问背景知识精炼成 ~500 行内单文档，喂排队 13 的 `gradPathAdvisorPrompt`。**用户说"开始阶段 4"即启动。**
-2. **排队 11** `course` 表接 API + UI 入口（db.ts 已重 gen 解锁）。
+1. **排队 11** `course` 表接 API + UI 入口（db.ts 已重 gen 解锁；阶段 4 已完，主线进入此项）。
+2. **排队 12** 画布改造（思维导图体验，主线 = 横向排列 track_category）。
 3. **TD-10** target_gpa / goal_weights UI（需用户拍板：放 Upload 设置区还是新建 Settings 页 / weights 是 8 个 slider 还是简化）。
 4. **TD-1 余尾** 拍板 LLM 上游（DeepSeek / Qwen / Zhipu / Anthropic）→ 写 `src/routes/api/ai.chat.ts` server route，详见 `docs/AI_PROXY_SPEC.md`。
 
-### ✅ 阶段 3 — 0005 seed SQL 已落库（2026-05-16）
+### ⏳ 已采纳决策（不再追问，留备份）
 
-5 份 digest v2 → 198 条 track_requirement + 2 track（全校 / 师范学院 college）+ 30 category 落库。
-详细分布 / kind 统计已挪到 `AI_MEMORY.md`；本段只保留入口。
-
-**⏳ 已采纳决策（不再追问）**：
 - C3 强基计划独立办法在新 PDF 未收录 → 接受 4 条散见现状
 - E2 公共必修「约 40 学分」→ AI 顾问直接引用指南，不强制求和
 - 师范学院 track 颗粒度 = 单一 `college='师范学院'`，不按具体师范专业拆
+
+> 阶段 3 详细分布 / kind 统计已挪到 `AI_MEMORY.md § 9` + commit `3cae3f4` / `2fba113`。
 
 ---
 
@@ -184,6 +183,16 @@
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
 > 早于 2026-05-14 的里程碑（排队 5 / 2 / 4b / 4a / profiles / DATA_MODEL）已挪到 `docs/AI_MEMORY.md` § 9。
+
+- **2026-05-17** — 排队 10 阶段 4 ✅ `docs/ecnu_process_rules.md` 落地
+  - 5 份 digest（A/B/C/D/E）"阶段 4 边界"段汇总 → 单 md / 323 行 / 9 章
+  - 章节：(1) 培养方案结构 (2) 注册学籍 (3) 选课与免修免听 (4) 转专业 (5) 学籍变动（休学/复学/退学/试读/毕业类）(6) 考核/补考 (7) 辅修/双学位/拔尖 (8) 创新训练 CTP (9) 公共课特殊流程 (10) AI 引用规约
+  - 关键约定：与 0005 track_requirement 数据冲突 → 优先 track_requirement；source_ref 同 0005；院系细则不收录 → AI 回"查院系公示"；严重事项（作弊/退学/撤销学位）AI 先重声严肃后果再引规则
+  - 解锁排队 13 `gradPathAdvisorPrompt`：本 md + 198 条 track_requirement = AI 顾问 schema 锁定逻辑的两个数据源
+
+- **2026-05-17** — 文档漂移同步 + uuid bug 修
+  - **uuid bug**：`useChatMessages.ts:88` `genConversationId` 兜底分支生成 `${Date.now}-{rand}` base36 串（非合法 UUID），DB `conversation_id uuid` 列拒收 → `chat.insert：invalid input syntax for type uuid`。同款 bug 潜伏于 `ragSourceApi.ts:114` 的 id 兜底。修法：抽 `src/lib/uuid.ts` `randomUUID()` 三层兜底（`crypto.randomUUID` → `crypto.getRandomValues` → `Math.random`，永远返合法 UUID v4 字面量），useChatMessages + ragSourceApi 两处 import。tsc 干净。
+  - **文档漂移同步**：本文 + AI_MEMORY 多处把已闭环任务仍写"待做"。本次同步：(1) 排队 5/6/7/8/9 小节删 / 标已闭环（指 commit hash）；(2) 排队 10 标阶段 1-3 完成 / 阶段 4 待启；(3) L12 目标段改成「已闭环 + 当前推进」二段；(4) "TD-7 = chat_message 余尾"旧用法标注（实际 TD-7 已重新分配）；(5) AI_MEMORY § 5 决策表 / § 6 已完成 / § 8 中期 / § 9 时间线 同步。
 
 - **2026-05-17** — 基础设施 + TD 清理大波次（架构审计 + 16 条 TD 闭环）
   - **架构审计**：合并 `docs/ARCHITECTURE_AUDIT.md`（5-09 + 5-16 两轮），删冗余日期版，AUDIT = 历史快照 / TECH_DEBT = 唯一权威 backlog

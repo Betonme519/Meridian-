@@ -7,6 +7,7 @@ import type {
 } from "@/api/chatMessageApi";
 import type { GoalMode } from "@/api/profileApi";
 import { useAuth } from "@/hooks/useAuth";
+import { randomUUID } from "@/lib/uuid";
 
 /**
  * useChatMessages —— /ai-advisor 页对话历史本地态。
@@ -55,17 +56,6 @@ export interface UseChatMessagesValue {
   selectConversation: (id: string | null) => void;
   clearActive: () => void;
   remove: (id: string) => Promise<void>;
-}
-
-/**
- * 生成 conversation_id。统一走 crypto.randomUUID（浏览器全平台支持），
- * 极旧环境回落到 36 进制随机（与 ragSourceApi 同款兜底）。
- */
-function genConversationId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function useChatMessages(): UseChatMessagesValue {
@@ -174,7 +164,7 @@ export function useChatMessages(): UseChatMessagesValue {
     async (input: PersistRoundInput): Promise<string | null> => {
       if (!user) return null;
       const userId = user.id;
-      const conversationId = genConversationId();
+      const conversationId = randomUUID();
       const meta: ChatMessageMetadata = input.aborted ? { aborted: true } : {};
 
       try {

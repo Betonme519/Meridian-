@@ -3,7 +3,7 @@
 > 新 AI 5 分钟读完即可上手。每个里程碑 5–15 行摘要，不是开发日志。
 > 短期 sprint 看 `CURRENT_TASK.md`；技术债 backlog 看 `TECH_DEBT.md`。
 
-> Last snapshot: **2026-05-14**  ·  Branch: `main`
+> Last snapshot: **2026-05-17**  ·  Branch: `main`
 
 ---
 
@@ -22,12 +22,12 @@
 
 | 维度 | 状态 |
 |---|---|
-| 阶段 | 前端 demo 完成（落地页 + 5 功能页），业务接入期 |
-| 已接通业务表 | `profiles` ✅ · `rag_source` ✅ · `plan` ✅ |
-| 待接通业务表 | `rule` · `rule_conflict` · `chat_message` |
-| AI 抽象层 | 骨架 + mock provider ✅；真 provider 留 stub（TD-1 余尾） |
-| 下一里程碑 | 接真 Anthropic / `chat_message` 接入 / TD-2 解析 pipeline / 排队 4c（等 TD-2 后） |
-| 主要风险 | bun.lockb 与 node_modules 可能不同步；中国高校本地化文案未做；解析 pipeline 未建 |
+| 阶段 | 数据层接通收尾，主线推进毕业路径结构化 + 画布改造 + AI 落地学校 |
+| 已接通业务表 | `profiles` ✅ · `rag_source` ✅ · `plan` ✅ · `rule` ✅ · `rule_conflict` ✅ · `chat_message` ✅ |
+| 公共 track 表 | 5 张 track_* + `user_progress` schema 落地（0002-0006 migration）+ 0005 华师大 2023 级 seed 198 条 track_requirement 跑通 |
+| AI 抽象层 | provider-agnostic 骨架 ✅（mock + remote + anthropic 三 provider）；真 LLM 上游待用户拍板（TD-1） |
+| 下一里程碑 | 排队 10 阶段 4（ecnu_process_rules.md）/ 排队 11（course 表接通）/ 排队 12（画布改造）/ 排队 13（AI 接 track）/ TD-1 拍板 LLM 上游 |
+| 主要风险 | 中国高校本地化文案未做；解析 pipeline 未建（TD-2，依赖 TD-1）；多 tab realtime 未上（TD-6） |
 
 ---
 
@@ -57,10 +57,12 @@ src/
 │  ├─ layout/              Navbar · Footer · DashboardLayout · UserMenu（Navbar+DashboardLayout 共用）
 │  ├─ effects/             EmbeddedLaptop · GridMotion · SplitText · TiltedCard · CardSwap
 │  └─ ui/                  shadcn primitives，不要重写
-├─ lib/                supabase 客户端单例 · guestMode · utils
-├─ api/                profileApi · ragSourceApi · authApi（薄壳）
+├─ lib/                supabase 客户端单例 · guestMode · errorBus · uuid · utils
+├─ api/                authApi · profileApi · ragSourceApi · planApi · ruleApi · ruleConflictApi · chatMessageApi（薄壳）
 ├─ context/            AuthContext · ProfileContext
-├─ hooks/              useAuth · useProfile · useRagSources
+├─ hooks/              useAuth · useProfile · useRagSources · usePlans · useRules · useChatMessages · useDrawer
+├─ ai/                 stream · schema · prompts · providers/{mock, remote, anthropic} · AI_PROXY_SPEC（4 家 LLM SSE 协议速记）
+├─ types/              db.ts（supabase gen types 自动派生 743 行 / 11 表）· trackEnums.ts（12 档 kind + 3 档 scope/option + 5 档 status 字面量，与 SQL CHECK 同源）
 ├─ config/             menu.ts（单一真理源，Navbar + DashboardLayout 共用）
 └─ styles/             globals.css · variables.css · animations.css
 ```
@@ -76,7 +78,7 @@ src/
 | 后端 | Supabase（Postgres + Auth + Storage） | 单家 SaaS，RLS 把权限收到 DB 层；Worker BFF 之后再加 |
 | 鉴权 | D3=a 纯浏览器 `@supabase/supabase-js` | session 由 supabase-js 自管 localStorage；服务端鉴权（D3=b）推迟 |
 | 邮箱确认 | 关闭（D2=a） | 摩擦最小化，注册即用 |
-| TS 类型 | 手维护对齐 schema（待自动生成） | 当前 `as Profile` cast，TD-3 待跑 `supabase gen types` |
+| TS 类型 | `supabase gen types` 自动派生 `types/db.ts` + 业务层 `Omit<Row, …> & {…}` narrowing | 列集合自动跟随 DB，新表零手维护类型；JSONB / enum 字段在业务层窄化（如 `goal_mode: string → GoalMode`） |
 | 状态管理 | React Context | 跨页共享有限；性能问题再升 Zustand |
 | 笔记本 3D | 全 CSS preserve-3d（不用 R3F） | 试过 R3F 已 reset；CSS 已能做合盖动画 |
 | 动画 | GSAP + ScrollTrigger + SplitText | Tailwind / Framer 表达力不够（pin / scrub / 字符级） |
@@ -94,11 +96,28 @@ src/
 Hero / Flow / Explain / GpaMath / Transparency / Control / Feedback / FAQ / FinalCTA / Footer 全接好。文案需本地化中国高校。
 特色：EmbeddedLaptop（CSS 伪 3D）· GridMotion 图墙 · TiltedCard 3D tilt · Feedback 5 卡扇形 + 滚动星 · Transparency hub-and-spoke SVG 连线。
 
-### 5 功能页 demo — `100%`（visual）
-`/dashboard` · `/ai-advisor` · `/course-planner`（ReactFlow）· `/schedule` · `/import`，已套 DashboardLayout，pathless `_app` 分组，breadcrumb HoverCard。仍部分写死 const（plan / rule / chat_message 未接）。
+### 5 功能页 demo — `100%`（visual）+ 数据接通进行中
+`/dashboard` · `/ai-advisor` · `/course-planner`（ReactFlow）· `/schedule` · `/import`，已套 DashboardLayout，pathless `_app` 分组，breadcrumb HoverCard。接通现状：`/import` ✅ rag_source / `/course-planner` ✅ plan / `/ai-advisor` ✅ chat_message + AI 流式 / `/schedule` ✅ rule + rule_conflict / `/dashboard` ⏳ 5 张卡片 + 4 个 shortcut 仍写死 const（TD-7，依赖排队 11/13 后分阶段接）。
 
-### 数据库 — `100%`
-`docs/DATA_MODEL.md` 6 张主表 + 1 RAG 表 + RLS + index + trigger，已落 `supabase/migrations/0001_init_schema.sql` 跑通；Storage `rag_sources` bucket + 4 条 path-based RLS 已建。
+### 数据库 — `100%`（schema 已演进到 0006）
+- **用户私有表**：`docs/DATA_MODEL.md` 6 张主表（profiles / course / plan / rule / rule_conflict / chat_message）+ 1 RAG 表（rag_source），RLS + index + trigger 全套，`0001_init_schema.sql` 跑通；Storage `rag_sources` bucket + 4 条 path-based RLS 已建
+- **公共 track 表**：`docs/TRACK_SCHEMA.md` 5 张表（track / track_category / track_requirement / track_option / user_progress），0002 → 0006 migration 落地
+  - 0002 五层结构初版（排队 9）
+  - 0003 scope 三档演进（school / college / major）
+  - 0004 `track_requirement.source_ref` + `track_option.source_ref` 来源追溯列
+  - 0006 `requirement.kind` 扩到 12 档 + `metadata jsonb`（D-track-8）
+- **学校 seed**：0005 华师大 2023 级 198 条 track_requirement 落库（用户 Supabase Dashboard 跑通，2026-05-16）
+
+### `chat_message` 接入 — `100%`
+`chatMessageApi.ts`（list/insert/delete + Conversation Summary group by 客户端）+ `useChatMessages.ts`（race 守卫三件套 + persistRound / selectConversation / remove）。`/ai-advisor` 流式结束写 user + assistant 双消息，`conversation_id` 一次会话一个 uuid（走 `lib/uuid.ts` randomUUID 三层兜底）；abort 路径写 `metadata.aborted=true` + 部分 acc；历史列表 UI（preview / mode tag / 中断标识 / 时间倒序）+ 点历史灌 textarea+parsedNote / 新建 / 删除全套。**未解决**：`ProfileContext.updateProfile` guest 态早退导致 AIAdvisor 模式卡 guest 下点不动，已知未修。
+
+### `rule` + `rule_conflict` 接入 — `100%`
+`/schedule` 真接 `rule` + `rule_conflict` 表（原 TD-24 收尾，2026-05-14 commit 9fb712e）。trust 三档配色 / 冲突表独立 D8=b / 等等。
+
+### AI 抽象层 — `~80%`（provider-agnostic v2，余尾：上游 LLM 拍板）
+`src/ai/` 文件：`stream.ts`（`Token` discriminated union，留 citation / tool_use 扩展位）· `schema.ts`（Recommendation / ChatMessage / RagAnswer zod）· `prompts.ts`（recommendModePrompt）· `providers/mock.ts`（默认，正则 + 模板 rationale + 18ms/字 yield）· `providers/remote.ts`（**新增**，fetch `/api/ai.chat` SSE）· `providers/anthropic.ts`（已弃用，调用即抛错）· `index.ts`（`VITE_AI_PROVIDER=mock|remote|anthropic`）。`docs/AI_PROXY_SPEC.md` 记 4 家 LLM (Anthropic / OpenAI-style DeepSeek-Qwen / Zhipu / 通用) 的 SSE 事件协议速记。**余尾**：`src/routes/api/ai.chat.ts` server route 未写（等用户拍板上游再实施），当前 `VITE_AI_PROVIDER=remote` 会 404。Key 永远走 server route（CF Worker secret），不进 VITE_*。
+
+### 文档体系 — `100%`
 
 ### 用户系统 — `~95%`
 Supabase auth 接入 + 注册 / 登录 / 登出 / 多 tab 同步；`_app.tsx` beforeLoad 鉴权门禁；访客模式（localStorage flag）；Login 「暂时跳过」按钮；Home CTA 鉴权门禁；`profiles` 表前端接通（4 处消费方）。
@@ -109,9 +128,6 @@ Supabase auth 接入 + 注册 / 登录 / 登出 / 多 tab 同步；`_app.tsx` be
 
 ### `plan` 接入 — `100%`
 `/course-planner` 接通 `plan` 表（整图 JSONB，决策 D6a）。URL `?id=<uuid>` 是 source of truth；800ms debounce 自动保存；空账号 / 删光时自动建「我的第一张规划」（SEED 12 节点 + 13 边）；多 plan 切换 / 新建 / inline 重命名 / 删除（最后一张禁删）；lane 骨架渲染时拼接，不入 DB；访客模式喂 SEED 只读预览。`saveGraph` 用 `activePlanIdRef` 给 patch 盖戳，回调稳定化防"切 plan 瞬间用旧数据写新 id"。
-
-### AI 抽象层 — `~70%`（骨架完成，真 provider 待接）
-`src/ai/` 6 文件骨架：`stream.ts`（`Chat = (opts) => AsyncIterable<Token>` 协议核心）· `schema.ts`（`Recommendation` / `ChatMessage` / `RagAnswer` zod schema，对齐 DATA_MODEL）· `prompts.ts`（`recommendModePrompt`）· `providers/mock.ts`（默认实现，正则 + 模板化 rationale，18ms/字 yield）· `providers/anthropic.ts`（stub，抛"未实现"）· `index.ts`（VITE_AI_PROVIDER 选 provider，默认 mock）。`/ai-advisor` 已接通：`handleParse` 走 chat()，for-await 流式渲染到 parsedNote，按钮 streaming 态 + `▍` 光标 + AbortController（连点 / 切模式 / 卸载都 abort）。Anthropic key 必须走 Edge Function / Worker，**不能**放 VITE_*。
 
 ### 文档体系 — `100%`
 `CURRENT_TASK.md`（sprint）· `AI_MEMORY.md`（本文，长期）· `TECH_DEBT.md`（backlog）· `PROJECT_OVERVIEW.md` · `ARCHITECTURE.md` · `DESIGN_SYSTEM.md` · `DATA_MODEL.md` · `ARCHITECTURE_AUDIT.md`（一次性深度审计）。
@@ -167,17 +183,16 @@ HTML5 规范禁止 button 内含 interactive content。React 不报错但 a11y /
 ## 8. 下一阶段方向
 
 ### 短期（当前 sprint）
-- **接真 Anthropic provider** — TD-1 余尾；API key 走 Edge Function / Worker；归一 SSE 事件成 Token
-- **`chat_message` 表接 `/ai-advisor`** — 流式对话历史持久化（TD-7 余尾）
-- **TD-2 解析 pipeline** — 推进 rag_source.parsed_status；做完后 4c 才有展示价值
-- **排队 4c** — TD-2 跑通后做（详见 TECH_DEBT TD-24）
+- **排队 10 阶段 4** — `docs/ecnu_process_rules.md`（过程类规则精炼版 ~500 行内）喂排队 13 的 `gradPathAdvisorPrompt`
+- **排队 11** — `course` 表接 API + UI 入口（db.ts 已重 gen 解锁）
+- **排队 12** — 画布改造（思维导图体验，主线 = 横向排列 track_category）
+- **排队 13** — AI 接 track + user_progress + course（schema 锁逻辑；mock provider 继续）
 
 ### 中期
-- `chat_message` 表接 `/ai-advisor` 历史
-- `rag_source.parsed_status` 解析 pipeline（worker 推进 pending → parsed/failed，TD-2）
-- `<Toaster />` 全局错误通道（TD-4）
-- `supabase gen types` 切 typed client（TD-3）
-- 多 tab realtime 订阅（TD-6）
+- **TD-1 拍板 LLM 上游** — DeepSeek / Qwen / Zhipu / Anthropic 任一家 → 写 `src/routes/api/ai.chat.ts` server route（详见 `AI_PROXY_SPEC.md`）
+- **TD-2 解析 pipeline** — 依赖 TD-1，跟 RAG 公告一起做（推进 rag_source.parsed_status pending → parsed/failed）
+- **TD-6 多 tab realtime 订阅** — profile / rag_source 等表 supabase channel 订阅
+- **排队 14 UI 重设计** — 五个功能页对齐 DESIGN_SYSTEM（触发条件：排队 12 完成后）
 
 ### 长期
 - 中国高校文案本地化（Hero / Explain 仍是美式选课词汇）
@@ -190,6 +205,52 @@ HTML5 规范禁止 button 内含 interactive content。React 不报错但 a11y /
 ---
 
 ## 9. 项目时间线（按 commit 倒序，5-15 行/里程碑）
+
+### 2026-05-17 · 文档漂移大同步 + uuid bug 修
+- `useChatMessages.ts` / `ragSourceApi.ts` 兜底分支生成非合法 UUID（base36 串），DB `uuid` 列拒收。抽 `src/lib/uuid.ts` `randomUUID()` 三层兜底（`crypto.randomUUID` → `crypto.getRandomValues` → `Math.random`），两处调用 import；tsc 干净
+- 文档漂移修：CURRENT_TASK + AI_MEMORY 多处把已闭环任务仍写"待做"。本次同步排队 5/6/7/8/9 + 10 阶段 1-3 全部已闭环（指 commit hash）+ AI_MEMORY § 2/5/6/8/9 全更新；TD-7 含义已重新分配（Dashboard 写死 const）的旧用法标注
+
+### 2026-05-17 · 基础设施 + 16 条 TD 大清理（commit c36f3c4 / 96cca12 / ba45ec4）
+- **架构审计合并**：`docs/ARCHITECTURE_AUDIT.md`（5-09 + 5-16 两轮合并），AUDIT = 历史快照 / TECH_DEBT = 唯一权威 backlog
+- **AI 抽象升级 v2**（用户决定 LLM 未定 → provider-agnostic）：`Token` discriminated union 留 citation / tool_use 扩展位 + 新 `providers/remote.ts` 走 `/api/ai.chat` server proxy + 新 `docs/AI_PROXY_SPEC.md`（4 家 LLM SSE 协议速记）。server route 待用户拍 LLM 上游再写
+- **错误暴露 UI**：`src/lib/errorBus.ts`（`reportApiError` / `failApiCall`）+ `__root.tsx` 挂 `<Toaster richColors />` + 6 个 api/*.ts 接 errorBus
+- **Drawer 抽 hook**：`src/hooks/useDrawer.ts`（scroll-lock + Esc + 可选 closeOnRouteChange），Navbar + DashboardLayout 各删 ~30 行
+- **track schema 字面量**：`src/types/trackEnums.ts`（12 档 kind + 3 档 scope/option + 5 档 status）与 SQL CHECK 同源
+- **db.ts 重 gen**：471 → 743 行（含 track_* / user_progress / scope_level / 12 档 kind）
+- **Migration 规约**：`supabase/migrations/_template.sql`（UP + DOWN 段）+ `DATA_MODEL §10` 规约
+- **ProfileContext race**：`updateProfile` 接共享 `requestIdRef`，spam-click / logout / 切账号期间过期响应丢弃
+- **Dashboard 部分接通**：删教务 shortcut（立项书严禁爬学校系统）+ 卡 5「下一步建议」接文案池按小时轮换 + Navbar/DashboardLayout 头像/名称跟随 profile.name + Upload 加显示名输入字段
+- **TD 状态**：TD-3/4/5/14/15/16/17/19/21/23/24/25 + TD-27~30 共 16 条闭环 → 直接从 TECH_DEBT.md 删除；剩 4 条部分余尾（TD-1/11/12/13）精简描述
+
+### 2026-05-16 · 阶段 3 — 0005 seed SQL 落库（198 条 track_requirement）
+- `supabase/migrations/0005_seed_ecnu_2023.sql` 全段 — 2 track（school + 师范学院 college）+ 30 category（A1-A5/B1-B6/C1-C9/D1-D6/E1-E3 + E4）+ **198 track_requirement**。整片 PL/pgSQL DO 块 + `ON CONFLICT (category_id, code) DO UPDATE` 幂等可重跑
+- 段分布：A 23 + B 48 + C 56 + D 49 + E 全校 14 + E 师范 8 = 198
+- `0005_verify.sql` 扩 15 段全段验证（基本结构 + 完整性 + 5 个抽样段 + module metadata 分布）
+- 12 档 kind 分布：program_rule 56 / assessment_rule 37 / status_gate 31 / time_limit 21 / credits 13 / gpa_threshold 11 / score_scheme 11 / warning_threshold 8 / tuition 8 / all_of 2
+- **用户 Supabase Dashboard 跑通**（2026-05-16）：seed + verify 两份均 OK，零反馈修复
+- 解锁后续：阶段 4 `docs/ecnu_process_rules.md` + 排队 13 AI 顾问从 198 条结构化规则取数
+
+### 2026-05-16 · 数据源切 PDF + 旧 md 处置 + CLAUDE.md 分流条
+- 用户提供 2 份新 PDF（`docs/华师大规则文件pdf/2025本科生手册.pdf` + `2025本科生学习指南.pdf`），PDF = source of truth，旧 34 份 md 仅历史佐证
+- 全局 CLAUDE.md 加「数据源文件分流」条：规则源文件只在排队 10 / 13 读，其他任务禁 Grep
+- 旧 md 处置：99 条录完 0005 后一次性 `git mv` 到 `docs/_archive/`，禁止现在 rm（digest source_ref 链）
+- 师范生入 track（scope=college）/ 微专业单独 track；新增 TD-26（PDF 内联预览 + source_ref 精确到页码，推到排队 14）
+
+### 2026-05-15 · 排队 10 前置 — 4 份 ECNU 规则 digest 录入（commit ef06fe2）
+- AI 一次性读完 23 个 md（剔除硕博 / 二学位等不相关 11 个）→ 写 4 份 digest（A 毕业资格核心 / B 学业规则 / C 特殊计划 / D 过程类）
+- 每条规则强制 4 字段：规则中文 / 原文片段 / 来源(§条款) / 落地(track_requirement 或 prompt)
+- 用户审阅工作流：用户在 IDE 直接改 md 补 ⚠️ → AI 收 system-reminder 同步「落地」行去 ⚠️ → chat 互验 typo（A2-2 肄业 → 毕业 这种被 AI 主动质询）
+- AI OCR 工具补强：用户把表格放桌面 `C:\...\Cx-y.png` → AI Read 读图 → 录入 markdown 表 + 落地行结构。批 C 三张表都这样录入
+- 解锁 task #4：`0004_add_source_ref.sql` + `0005_seed_ecnu_2023.sql` + `docs/ecnu_process_rules.md`
+
+### 2026-05-14 · 排队 6/7 — chat_message + rule + rule_conflict 接通（commit 44b00b6 + 9fb712e）
+- 排队 6：`chatMessageApi.ts` + `useChatMessages.ts` + `/ai-advisor` persistRound（流式结束 user+assistant 双消息落库 / abort 路径写 metadata.aborted）+ 历史列表 UI（preview / mode tag / 中断标识 / 时间倒序 / 点切 / 删除）
+- 排队 7：`ruleApi.ts` + `ruleConflictApi.ts` + `useRules.ts` 接通 `/schedule`（原 TD-24 收尾）；trust 三档配色 / 冲突表独立 D8=b
+
+### 2026-05-15 · 排队 8/9 — 五层结构契约 + 0002 track schema migration（commit 71c184e + 4bb156b + e0df73b）
+- 排队 8：`docs/TRACK_SCHEMA.md` 五层契约起草（track / track_category / track_requirement / track_option / user_progress）；UI 重设计推迟到排队 14
+- 排队 9：`0002_init_track_schema.sql` + verify + `DATA_MODEL` §10 入口（11 表总览）
+- 0003 scope 三档演进（school / college / major），不分专业改全校通用为默认
 
 ### 2026-05-16 · 架构决策 D-track-8 — requirement.kind 扩档 + metadata jsonb（排队 10 task #4 阶段 0）
 - **起因**：跑 0005_seed_ecnu_2023 时抽 4 份 ECNU digest 落地行，发现 99 条 track_requirement 候选用了 **98 个不同的 kind 标签**（`time_limit / graduation_status / certificate_threshold / gpa_threshold / credit_recognition_cap / attendance_threshold / pf_credit_cap / score_mapping / overage_credit_fee / fitness_grad_threshold / thesis_resit / ...`），与 0002 schema 的 `count\|credits\|one_of\|all_of` CHECK 四档**全部不兼容**。digest 当时（2026-05-15）用户审阅期，kind 字段被当成"语义标签"自由写，没考虑 schema 兼容。

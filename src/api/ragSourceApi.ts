@@ -18,6 +18,7 @@
 
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { failApiCall } from "@/lib/errorBus";
+import { randomUUID } from "@/lib/uuid";
 import type { Database } from "@/types/db";
 
 export type RagSourceKind =
@@ -111,12 +112,8 @@ export async function uploadRagSource(
   if (!isSupabaseConfigured) failApiCall("ragSource.upload", NOT_CONFIGURED_MSG);
   const { userId, file, kind, displayName } = input;
 
-  // 1) 预生成行 id（用 crypto.randomUUID；浏览器全平台支持）
-  const id =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : // 兜底：极旧浏览器/SSR 拿不到 crypto.randomUUID 时，退化到 36 进制随机
-        `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  // 1) 预生成行 id（randomUUID 三层兜底，永远合法 UUID v4 字面量）
+  const id = randomUUID();
 
   const ext = getExt(file.name);
   const storagePath = `${userId}/${id}.${ext}`;
