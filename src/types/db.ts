@@ -331,6 +331,278 @@ export type Database = {
           },
         ]
       }
+      track: {
+        Row: {
+          college: string | null
+          created_at: string
+          description: string | null
+          id: string
+          major: string | null
+          name: string
+          school: string
+          scope_level: string
+          source_url: string | null
+          total_credits: number | null
+          updated_at: string
+          version: string | null
+          year: number
+        }
+        Insert: {
+          college?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          major?: string | null
+          name: string
+          school: string
+          scope_level?: string
+          source_url?: string | null
+          total_credits?: number | null
+          updated_at?: string
+          version?: string | null
+          year: number
+        }
+        Update: {
+          college?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          major?: string | null
+          name?: string
+          school?: string
+          scope_level?: string
+          source_url?: string | null
+          total_credits?: number | null
+          updated_at?: string
+          version?: string | null
+          year?: number
+        }
+        Relationships: []
+      }
+      track_category: {
+        Row: {
+          code: string
+          created_at: string
+          credit_target: number | null
+          description: string | null
+          id: string
+          order_index: number
+          title: string
+          track_id: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          credit_target?: number | null
+          description?: string | null
+          id?: string
+          order_index?: number
+          title: string
+          track_id: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          credit_target?: number | null
+          description?: string | null
+          id?: string
+          order_index?: number
+          title?: string
+          track_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "track_category_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "track"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      track_option: {
+        Row: {
+          code: string
+          created_at: string
+          credits: number | null
+          description: string | null
+          id: string
+          kind: string
+          name: string
+          prerequisites: string[]
+          requirement_id: string
+          semester_hint: string | null
+          source_ref: string | null
+          track_id: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          credits?: number | null
+          description?: string | null
+          id?: string
+          kind?: string
+          name: string
+          prerequisites?: string[]
+          requirement_id: string
+          semester_hint?: string | null
+          source_ref?: string | null
+          track_id: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          credits?: number | null
+          description?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          prerequisites?: string[]
+          requirement_id?: string
+          semester_hint?: string | null
+          source_ref?: string | null
+          track_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "track_option_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "track_requirement"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "track_option_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "track"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      track_requirement: {
+        Row: {
+          category_id: string
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          kind: string
+          metadata: Json
+          order_index: number
+          source_ref: string | null
+          threshold: number | null
+          title: string
+          track_id: string
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          kind?: string
+          metadata?: Json
+          order_index?: number
+          source_ref?: string | null
+          threshold?: number | null
+          title: string
+          track_id: string
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          kind?: string
+          metadata?: Json
+          order_index?: number
+          source_ref?: string | null
+          threshold?: number | null
+          title?: string
+          track_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "track_requirement_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "track_category"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "track_requirement_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "track"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_progress: {
+        Row: {
+          created_at: string
+          grade: string | null
+          id: string
+          note: string | null
+          option_id: string
+          semester: string | null
+          status: string
+          track_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          grade?: string | null
+          id?: string
+          note?: string | null
+          option_id: string
+          semester?: string | null
+          status?: string
+          track_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          grade?: string | null
+          id?: string
+          note?: string | null
+          option_id?: string
+          semester?: string | null
+          status?: string
+          track_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_progress_option_id_fkey"
+            columns: ["option_id"]
+            isOneToOne: false
+            referencedRelation: "track_option"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_progress_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "track"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
