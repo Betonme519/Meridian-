@@ -145,9 +145,8 @@
 - **风险**：track schema 第二次 pivot 后 Schedule 还得跟随重构
 - **建议**：排队 13 后 track schema 稳定时归位
 
-### TD-44 · Planner SEED_MERIDIAN_NODES 占位
-- **现状**：Planner 视觉做完了，节点数据是假的
-- **建议**：排队 12（画布改造）自然解掉
+### TD-44 · Planner SEED_MERIDIAN_NODES 占位 ✅ 2026-05-17 已解
+- 排队 12 落地，删 `seedGraph.ts` + 重写 Planner 页为按真实 track schema 三层视图。
 
 ### TD-45 · service_role 写公共表手动跑 SQL
 - **现状**：0005 seed 走 Dashboard SQL Editor，没自动化 pipeline
@@ -171,3 +170,9 @@
 - **现状**：5 功能页各自从 `lucide-react` 自由组合图标，没有"概念 → 图标"映射规范
 - **风险**：长期会出现"同一概念两套图标"
 - **建议**：与排队 14 UI 重设计一起约束
+
+### TD-50 · plan 表语义切换待定（"自由备注画布"模式）
+- **现状**：排队 12 落地后 plan 表 + planApi.ts 成 orphan；`usePlans.ts` 因依赖 seedGraph 已删
+- **设想**：未来"自由备注画布"模式 = 用户在 track 树上拖出便利贴 / 思考节点，plan.nodes shape 改为 `{ id, anchor_option_id?, text, color?, position }`，不再是 ReactFlow MeridianFlowNode
+- **风险**：若长期不用，plan 表整张退役；要删需要 migration + 数据备份
+- **建议**：排队 13 + 14 跑通后看用户需求是否真出现"想标自由想法"的需求；不主动开工

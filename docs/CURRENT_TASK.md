@@ -9,8 +9,8 @@
 
 ## 目标
 
-**已闭环**：排队 5/6/7/8/9 + 10 阶段 1-3。详见下方「最近完成」+ AI_MEMORY § 9 + 各 commit。
-**当前推进**：排队 10 阶段 4（`docs/ecnu_process_rules.md`）+ 11（course 表接通）+ 12（画布改造）+ 13（AI 接 track）。
+**已闭环**：排队 5/6/7/8/9 + 10 全部 + 11 + 12。详见下方「最近完成」+ AI_MEMORY § 9 + 各 commit。
+**当前推进**：排队 13（AI 接 track）。
 **UI 重设计（排队 14）**：等排队 12 跑通后启动。
 
 用户 2026-05-14 历史决策（已生效，留作背景）：
@@ -89,18 +89,32 @@
 
 **只做本科生内容**，硕士/博士相关全跳。
 
-#### 排队 11 — `course` 表接 API + UI 入口
+#### 排队 11 — `course` 表接 API + UI 入口 ✅ 2026-05-17
 
-- 新建 `courseApi.ts` + `useCourses.ts`。
-- UI 入口：在 `/profile` 或 `/upload` 加"我已修的课"列表/Drawer。
-- 画布要读这个判断"哪些 option 已完成"，排队 12 前置。
+- ✅ `src/api/courseApi.ts`（typed 派生 + COURSE_STATUSES / COURSE_CATEGORIES 与 DB CHECK 同源 + listCourses 按 semester desc nulls last + create/update/delete + errorBus）
+- ✅ `src/hooks/useCourses.ts`（三件套 race 守卫 + 派生 view：coursesBySemester / coursesByStatus / **courseCodeMap** + **completedCodes** Set；后两者排队 12 画布命中判定直用）
+- ✅ UI 入口：Profile 页已删 → 落 Upload 页新增 Section「我已修的课」`src/pages/Upload/CourseManager.tsx`（添加表单 + 列表 + 删除，复用 Section 6 视觉），主页 import 一行接入
+- 画布要读这个判断"哪些 option 已完成"，排队 12 前置 ✅ 解锁
 
-#### 排队 12 — 画布改造（思维导图体验）
+#### 排队 12 — 画布改造（思维导图体验）✅ 2026-05-17（**v4 预计算路径 + 徽章**）
 
-- `plan` 表保留，语义变成「用户在 track 树上的标注 + 自由备注」。
-- 主线 = 横向排列的 `track_category`。
-- 点击 category → requirement 列表；点击 requirement → option 列表。
-- option 颜色按 user_progress + course 表是否已修。
+**v1 CSS 卡片 → v2 A/B/C/D/E 段 → v3 学生友好分类 → v4 预计算推荐路径**：用户四次反馈，最后定调"多数情况无需用户导入，AI 预计算 → 路径上色 + 节点数字徽章"。v4 在 v3 基础上加 `trackRecommendation.ts` 计算 goal-aware 整链路 + unmet 徽章计数。
+
+- ✅ `src/api/trackApi.ts` + `src/api/userProgressApi.ts`（5 表 read-only + user_progress upsert/delete）
+- ✅ `src/hooks/useTrack.ts`（硬编码取首个 track + 并发拉 cat/req/opt + 派生 view）
+- ✅ `src/hooks/useUserProgress.ts`（三件套 + 乐观 upsert/remove + doneOptionIds/progressByOptionId）
+- ✅ `src/lib/trackSimulation.ts`（pickRecommendedOption 启发式占位 + simulatePick 三 delta + calcRequirementProgress / calcCategoryCredits）
+- ✅ **新增 `src/lib/trackUserView.ts`**：`classifyCategory(code, title)` 启发式按 title 关键词分类（管理规则全 hide / 公必/通识/专必/专选/任选 / 二课/论文）；`isUserVisibleRequirement(req)` 仅留 4 档 course-kind requirement，rule-kind 全过滤
+- ✅ Planner 页 **v3 全文重写为 6 类节点 / 4-5 层** ：root → 3 user-milestone（上课/二课/论文）→ (上课下) 5 bucket → category → requirement → option。新增 `meridian-bucket` 节点类型。点击逐层 toggle 展开/折叠（layered X：0/260/540/820/1100/1400），点 option → Drawer 弹三动作。MiniMap + Controls + dot background
+- ✅ **隐藏：退课/休学/学籍/警示/收费/学位授予/转专业/强基/辅修 等管理规则**（用户视野完全不可见，AI 后台仍可 SELECT 这些 row 做约束计算）
+- ✅ 头卡文案改"毕业路径"/"点击节点逐层展开 · 上课 → 类别 → 选项"，删 A/B/C/D/E 段相关字眼
+- ✅ useTrack 改默认取 **`scope_level='school'` 全校通用 track**（避开师范学院专属，用户拍板"用普通学生做"）
+- ✅ 删 `seedGraph.ts` + `usePlans.ts`；planApi.ts 保留供未来 TD-50
+- ✅ menu.ts Workspace 文案更新
+- ✅ **v4 新增 `src/lib/trackRecommendation.ts`**：`computeRecommendation({...goalMode})` 返 `{paths, pathNodeIds, pathEdgeIds, badges}` —— 每个 milestone 选 1 条主推荐路径（按 goal_mode 重排 bucket 优先级；保研/高 GPA → 专必/通识 优先；留学 → 公必/英语优先；实习 → 专必/专选优先；最轻松毕业/时间自由 → 必修先扫清）；每层 unmet count 用于节点数字徽章
+- ✅ **v4 Planner 接 useProfile + recommendation**：节点 data 加 `badgeCount` + `onPath`；推荐路径上的节点 `border-amber-400 bg-amber-50/60`，边 `stroke: rgb(245 158 11)`（amber-500）；节点右上角加 `<Badge>` 数字徽章（App 通知 style，>99 → "99+"）；root 节点加 "AI 已规划 N 条主路径" chip
+- **数据空洞**：30 category + 198 requirement ✅，**0 track_option** ⚠️（0005 没录课程清单）→ 点 requirement 节点目前无 option 子节点。补 0007 option seed 留排队 14 前置
+- 推迟：plan 表语义切换 → TD-50；track 选择器；AI 真推荐替 `computeRecommendation` → 排队 13；option seed 补录
 
 #### 排队 13 — AI 接 track + user_progress + course（schema 锁逻辑）
 
@@ -141,10 +155,10 @@
 
 **无。等用户拍板下一波方向。** 候选：
 
-1. **排队 11** `course` 表接 API + UI 入口（db.ts 已重 gen 解锁；阶段 4 已完，主线进入此项）。
-2. **排队 12** 画布改造（思维导图体验，主线 = 横向排列 track_category）。
-3. **TD-10** target_gpa / goal_weights UI（需用户拍板：放 Upload 设置区还是新建 Settings 页 / weights 是 8 个 slider 还是简化）。
-4. **TD-1 余尾** 拍板 LLM 上游（DeepSeek / Qwen / Zhipu / Anthropic）→ 写 `src/routes/api/ai.chat.ts` server route，详见 `docs/AI_PROXY_SPEC.md`。
+1. **排队 13** AI 接 track + user_progress + course（`gradPathAdvisorPrompt`，两个数据源：198 条 track_requirement + `ecnu_process_rules.md`；Planner 页 `pickRecommendedOption` 启发式占位等 AI 接入替换）。
+2. **TD-10** target_gpa / goal_weights UI（需用户拍板：放 Upload 设置区还是新建 Settings 页 / weights 是 8 个 slider 还是简化）。
+3. **TD-1 余尾** 拍板 LLM 上游（DeepSeek / Qwen / Zhipu / Anthropic）→ 写 `src/routes/api/ai.chat.ts` server route，详见 `docs/AI_PROXY_SPEC.md`。
+4. **TD-50** plan 表语义切换（"自由备注画布"模式，决定 plan.nodes 新 shape）。
 
 ### ⏳ 已采纳决策（不再追问，留备份）
 
@@ -183,6 +197,26 @@
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
 > 早于 2026-05-14 的里程碑（排队 5 / 2 / 4b / 4a / profiles / DATA_MODEL）已挪到 `docs/AI_MEMORY.md` § 9。
+
+- **2026-05-17** — 排队 12 ✅ Track Workspace 思维导图（**v4 预计算路径 + 徽章**，四轮迭代）
+  - **v1**：CSS-only 三层 + Drawer → 用户："这不是思维导图，回 ReactFlow"
+  - **v2**：ReactFlow + A/B/C/D/E 段 5 milestone（手册原结构）→ 用户："不要可视化规则手册，AI 后台懂就行"
+  - **v3**：学生友好分类（上课/二课/论文 3 milestone + 上课下 5 bucket）+ 24 个 HIDE 关键词过滤管理规则 + rule-kind requirement 全过滤；新增 `src/lib/trackUserView.ts` (`classifyCategory` + `isUserVisibleRequirement`) → 用户："多数情况无需导入，AI 预计算 + 路径上色 + 模块数字徽章"
+  - **v4（采纳）**：v3 基础 + `src/lib/trackRecommendation.ts` `computeRecommendation({goalMode})` —— goal-aware 重排 milestone / bucket 优先级（保研/高 GPA → 专必/通识；留学 → 公必/英语；实习 → 专必/专选 + thesis 提前；轻松毕业 → 必修先扫）；每 milestone 选 1 条主路径，返 `{paths, pathNodeIds, pathEdgeIds, badges}`；节点接 `useProfile.goal_mode` 后自动重算
+  - **视觉**：onPath 节点 amber border + bg-amber-50/60；onPath 边 stroke amber-500 strokeWidth=2；节点右上角 `<Badge>` 数字徽章（App 通知 style，>99 → "99+"）；root 节点加 "AI 已规划 N 条主路径" amber chip
+  - 数据层 5 文件：`trackApi.ts` / `userProgressApi.ts` / `useTrack.ts` / `useUserProgress.ts` / `lib/trackSimulation.ts` v1-v4 共用；v3 新增 `trackUserView.ts`；v4 新增 `trackRecommendation.ts`
+  - **useTrack 改默认 track 选择**：优先 `scope_level='school'` 全校通用（避开师范学院专属，"用普通学生做"）
+  - **数据空洞**：0005 seed 30 category + 198 requirement + **0 option** → option 层节点目前永远空，path 截止到 requirement 层。补 0007 option seed 留排队 14 前置
+  - **6 类自定义节点**：root / milestone(3) / bucket(5 仅"上课"下) / category / requirement / option，layered X 轴：0/260/540/820/1100/1400
+  - 解锁排队 13：替换 `computeRecommendation` 函数体即接入 AI（签名稳定）；`pickRecommendedOption` / `simulatePick` 同款替换点
+  - `tsc --noEmit` 0 新错（仅 CardSwap 老错）；eslint --fix 后 0 error / 0 warning
+
+- **2026-05-17** — 排队 11 ✅ `course` 表接通 + Upload 页「我已修的课」UI 入口
+  - `src/api/courseApi.ts` 仿 ruleApi：typed `Course` = `Omit<CourseRow, 'status'|'category'> & {...}` 派生；`COURSE_STATUSES` / `COURSE_CATEGORIES` 与 DB CHECK 同源（5 档 status / 7 档 category，null 单算未分类）；listCourses 走 `semester desc nullsFirst:false` + `created_at desc` 双索引（idx_course_user_semester / idx_course_user_status）；createCourse 仅 set 显式传入字段，让 DB 默认（`status='planned'` / `counts_in_gpa=true`）生效；错误全走 `failApiCall` errorBus
+  - `src/hooks/useCourses.ts` 三件套（requestIdRef / loadedUserIdRef / authLoading 短路）+ 乐观 CRUD（create 头插 / update map / remove filter，失败回滚）+ 派生 view：`coursesBySemester` / `coursesByStatus` / **`courseCodeMap`**（code → Course[]，重修允许多行）/ **`completedCodes`**（Set<string>，排队 12 画布最常用查询，单独缓存避免每帧扫全表）
+  - `src/pages/Upload/CourseManager.tsx`（Profile 页历史已删，按 ARCHITECTURE 注释 §1 确认）→ 落 Upload 页 Section 7：添加表单（代码*/名称*/类别/学期/学分/状态/成绩，默认 status='completed'）+ 列表 + 删除；视觉完全复用 Section 6「已导入的数据」既有 grid + slate + emerald/amber/rose pill 色板（避免风格漂移）；空数字校验静默忽略不弹 toast
+  - `tsc --noEmit` 0 新错（仅 CardSwap 老错保留）；eslint --fix 后净，无 react-hooks 警告
+  - 解锁排队 12：画布 option 命中判定可直接 `completedCodes.has(option.code)`
 
 - **2026-05-17** — 排队 10 阶段 4 ✅ `docs/ecnu_process_rules.md` 落地
   - 5 份 digest（A/B/C/D/E）"阶段 4 边界"段汇总 → 单 md / 323 行 / 9 章

@@ -19,6 +19,7 @@ import {
 import { useProfile } from "@/hooks/useProfile";
 import { useRagSources } from "@/hooks/useRagSources";
 import type { ParsedStatus, RagSourceKind } from "@/api/ragSourceApi";
+import CourseManager from "@/pages/Upload/CourseManager";
 
 /* ───────────────────────── Section 2 · File import slots ───────────────────────── */
 
@@ -82,10 +83,10 @@ type MiniApp = {
 };
 
 const miniApps: MiniApp[] = [
-  { title: "超级课程表",  desc: "课表 + 课评数据同步",       status: "可连接", icon: Smartphone },
-  { title: "小红书课评",  desc: "聚合学生真实评价",           status: "可连接", icon: Smartphone },
-  { title: "学校论坛",    desc: "本校匿名社区抓取（按学校）",  status: "可连接", icon: Database },
-  { title: "自定义 RSS",  desc: "教务公告 / 通知订阅",        status: "可连接", icon: Cloud },
+  { title: "超级课程表", desc: "课表 + 课评数据同步", status: "可连接", icon: Smartphone },
+  { title: "小红书课评", desc: "聚合学生真实评价", status: "可连接", icon: Smartphone },
+  { title: "学校论坛", desc: "本校匿名社区抓取（按学校）", status: "可连接", icon: Database },
+  { title: "自定义 RSS", desc: "教务公告 / 通知订阅", status: "可连接", icon: Cloud },
 ];
 
 /* ───────────────────────── Section 6 · Imported data list ───────────────────────── */
@@ -147,8 +148,8 @@ export default function UploadPage() {
   // school 是 select，change 即 commit
   const handleSchoolChange = (v: string) => {
     setSchool(v);
-    void updateProfile({ school: v === schoolOptions[0] ? null : v }).catch(
-      (e) => console.warn("[Upload] 保存学校失败:", e),
+    void updateProfile({ school: v === schoolOptions[0] ? null : v }).catch((e) =>
+      console.warn("[Upload] 保存学校失败:", e),
     );
   };
 
@@ -168,9 +169,7 @@ export default function UploadPage() {
       setGrade(profile?.grade != null ? String(profile.grade) : "");
       return;
     }
-    void updateProfile({ grade: n }).catch((e) =>
-      console.warn("[Upload] 保存入学年份失败:", e),
-    );
+    void updateProfile({ grade: n }).catch((e) => console.warn("[Upload] 保存入学年份失败:", e));
   };
 
   const handleMajorBlur = () => {
@@ -206,9 +205,9 @@ export default function UploadPage() {
     const fmime = (file.type || "").toLowerCase();
     return tokens.some((tok) => {
       if (!tok) return false;
-      if (tok.startsWith(".")) return fname.endsWith(tok);                // 扩展名
-      if (tok.endsWith("/*")) return fmime.startsWith(tok.slice(0, -1));  // image/* → image/
-      return fmime === tok;                                                // 精确 mime
+      if (tok.startsWith(".")) return fname.endsWith(tok); // 扩展名
+      if (tok.endsWith("/*")) return fmime.startsWith(tok.slice(0, -1)); // image/* → image/
+      return fmime === tok; // 精确 mime
     });
   };
 
@@ -223,9 +222,7 @@ export default function UploadPage() {
     for (const file of Array.from(files)) {
       // TD-15-4：drop 路径手动校验文件类型（input click 已经走浏览器 accept 过滤）
       if (!matchesAccept(file, slot.accept)) {
-        console.warn(
-          `[Upload] 跳过 "${file.name}"：类型不匹配 slot 的 accept（${slot.accept}）`,
-        );
+        console.warn(`[Upload] 跳过 "${file.name}"：类型不匹配 slot 的 accept（${slot.accept}）`);
         continue;
       }
       try {
@@ -527,6 +524,9 @@ export default function UploadPage() {
           ))}
         </div>
       </div>
+
+      {/* Section 7 · 我已修的课（排队 11） */}
+      <CourseManager />
     </section>
   );
 }
