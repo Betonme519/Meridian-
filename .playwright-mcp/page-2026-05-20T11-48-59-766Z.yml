@@ -1,0 +1,239 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - button "打开菜单" [ref=e6]
+          - link "Meridian Meridian" [ref=e10] [cursor=pointer]:
+            - /url: /
+            - img "Meridian" [ref=e12]
+            - generic [ref=e13]: Meridian
+        - generic [ref=e14]:
+          - generic [ref=e15]: 2026 春季学期
+          - link "登录" [ref=e16] [cursor=pointer]:
+            - /url: /login
+    - main [ref=e17]:
+      - generic [ref=e19]:
+        - main [ref=e22]:
+          - generic [ref=e23]:
+            - generic [ref=e24]:
+              - generic [ref=e25]:
+                - generic [ref=e26]:
+                  - generic [ref=e27]: 高 GPA
+                  - generic [ref=e28]: 华东师范大学 · 2023 级
+                - paragraph [ref=e29]: 优先标出收益高、但需要控制风险的路径。
+              - generic [ref=e30]:
+                - generic [ref=e31]:
+                  - img [ref=e32]
+                  - text: 推荐
+                  - strong [ref=e35]: 1 条
+                - generic [ref=e36]:
+                  - img [ref=e37]
+                  - text: 可见节点
+                  - strong [ref=e41]: "12"
+                - generic [ref=e42]:
+                  - img [ref=e43]
+                  - text: 待处理
+                  - strong [ref=e46]: "10"
+                - generic [ref=e47]:
+                  - button "全部路径" [ref=e48]
+                  - button "只看推荐" [ref=e49]
+            - generic [ref=e51]: 已匹配 0 个已修课程，当前学分 0
+          - generic [ref=e53]:
+            - generic [ref=e54]:
+              - generic [ref=e55]:
+                - img [ref=e57]
+                - generic [ref=e61]:
+                  - heading "路径画布" [level=2] [ref=e62]
+                  - paragraph [ref=e63]: 点击节点展开下一层；金色线表示当前 高 GPA 下最值得先看的路径。
+              - generic [ref=e64]:
+                - generic [ref=e65]: 推荐路径
+                - generic [ref=e67]: 已满足
+                - generic [ref=e69]: 其他路径
+                - generic [ref=e71]:
+                  - img [ref=e72]
+                  - text: 点选后看右侧影响
+            - generic [ref=e75]:
+              - img [ref=e76]
+              - button "我的目标 规则已匹配 1" [ref=e86]:
+                - generic [ref=e87]:
+                  - img [ref=e88]
+                  - generic [ref=e90]: 我的目标
+                - generic [ref=e91]:
+                  - generic [ref=e92]: 规则已匹配
+                  - generic [ref=e93]: "1"
+              - button "上课 已展开 12" [ref=e94]:
+                - generic [ref=e95]:
+                  - img [ref=e96]
+                  - generic [ref=e98]: 上课
+                - generic [ref=e99]:
+                  - generic [ref=e100]: 已展开
+                  - generic [ref=e101]: "12"
+              - button "第二课堂 已展开 0" [ref=e102]:
+                - generic [ref=e103]:
+                  - img [ref=e104]
+                  - generic [ref=e106]: 第二课堂
+                - generic [ref=e107]:
+                  - generic [ref=e108]: 已展开
+                  - generic [ref=e109]: "0"
+              - button "论文项目 已展开 0" [ref=e110]:
+                - generic [ref=e111]:
+                  - img [ref=e112]
+                  - generic [ref=e114]: 论文项目
+                - generic [ref=e115]:
+                  - generic [ref=e116]: 已展开
+                  - generic [ref=e117]: "0"
+              - button "公共必修 点击看机会 8" [ref=e118]:
+                - generic [ref=e119]:
+                  - img [ref=e120]
+                  - generic [ref=e122]: 公共必修
+                - generic [ref=e123]:
+                  - generic [ref=e124]: 点击看机会
+                  - generic [ref=e125]: "8"
+              - button "通识必修 显示具体机会 4" [ref=e126]:
+                - generic [ref=e127]:
+                  - img [ref=e128]
+                  - generic [ref=e130]: 通识必修
+                - generic [ref=e131]:
+                  - generic [ref=e132]: 显示具体机会
+                  - generic [ref=e133]: "4"
+              - button "用通识模块补齐学分，同时控制绩点风险 还差 8学分 · 先补模块缺口，再看课程负担" [ref=e134]:
+                - generic [ref=e135]:
+                  - img [ref=e136]
+                  - generic [ref=e139]: 用通识模块补齐学分，同时控制绩点风险
+                - generic [ref=e141]: 还差 8学分 · 先补模块缺口，再看课程负担
+              - button "用通识模块补齐学分，同时控制绩点风险 还差 1学分 · 先补模块缺口，再看课程负担" [ref=e142]:
+                - generic [ref=e143]:
+                  - img [ref=e144]
+                  - generic [ref=e147]: 用通识模块补齐学分，同时控制绩点风险
+                - generic [ref=e149]: 还差 1学分 · 先补模块缺口，再看课程负担
+              - button "用通识模块补齐学分，同时控制绩点风险 还差 2学分 · 先补模块缺口，再看课程负担" [ref=e150]:
+                - generic [ref=e151]:
+                  - img [ref=e152]
+                  - generic [ref=e155]: 用通识模块补齐学分，同时控制绩点风险
+                - generic [ref=e157]: 还差 2学分 · 先补模块缺口，再看课程负担
+              - button "用通识模块补齐学分，同时控制绩点风险 还差 2学分 · 先补模块缺口，再看课程负担" [ref=e158]:
+                - generic [ref=e159]:
+                  - img [ref=e160]
+                  - generic [ref=e163]: 用通识模块补齐学分，同时控制绩点风险
+                - generic [ref=e165]: 还差 2学分 · 先补模块缺口，再看课程负担
+        - complementary [ref=e166]:
+          - generic [ref=e167]:
+            - generic [ref=e168]:
+              - generic [ref=e169]:
+                - img [ref=e170]
+                - heading "选择模拟器" [level=2] [ref=e173]
+              - generic [ref=e174]: 推荐路径
+            - heading "用通识模块补齐学分，同时控制绩点风险" [level=3] [ref=e175]
+            - paragraph [ref=e176]: 还差 8学分 · 先补模块缺口，再看课程负担
+            - generic [ref=e177]:
+              - button "选择它" [ref=e178]
+              - button "推迟它" [ref=e179]
+              - button "换目标" [ref=e180]
+            - generic [ref=e181]:
+              - generic [ref=e182]:
+                - generic [ref=e183]: 判断
+                - generic [ref=e184]: 规则级判断
+              - generic [ref=e185]:
+                - generic [ref=e186]:
+                  - img [ref=e187]
+                  - paragraph [ref=e190]: 学分影响
+                  - paragraph [ref=e191]: "+8"
+                - generic [ref=e192]:
+                  - img [ref=e193]
+                  - paragraph [ref=e197]: 本要求
+                  - paragraph [ref=e198]: 0 → 8
+                - generic [ref=e199]:
+                  - img [ref=e200]
+                  - paragraph [ref=e204]: 本分类
+                  - paragraph [ref=e205]: 0 → 8
+                - generic [ref=e206]:
+                  - img [ref=e207]
+                  - paragraph [ref=e210]: 时间后果
+                  - paragraph [ref=e211]: 待拆分
+              - paragraph [ref=e212]: 目标：8学分。分类目标：未设定。
+            - paragraph [ref=e213]: 这条目前只有规则级判断，还缺课程或项目清单。补充 option seed 后，模拟器会给出具体选择。
+            - paragraph [ref=e214]: 访客模式可看模拟，登录后才能保存进度。
+          - generic [ref=e215]:
+            - generic [ref=e216]:
+              - img [ref=e217]
+              - heading "规则证据" [level=2] [ref=e220]
+            - generic [ref=e221]:
+              - generic [ref=e222]:
+                - img [ref=e223]
+                - generic [ref=e227]:
+                  - paragraph [ref=e228]: 策略
+                  - paragraph [ref=e229]: 用通识模块补齐学分，同时控制绩点风险
+              - generic [ref=e230]:
+                - img [ref=e231]
+                - generic [ref=e233]:
+                  - paragraph [ref=e234]: 规则
+                  - paragraph [ref=e235]: 通识教育总学分 (8 学分 / 3 模块)
+              - generic [ref=e236]:
+                - img [ref=e237]
+                - generic [ref=e240]:
+                  - paragraph [ref=e241]: 分类
+                  - paragraph [ref=e242]: 通识教育课程
+              - generic [ref=e243]:
+                - img [ref=e244]
+                - generic [ref=e246]:
+                  - paragraph [ref=e247]: AI 理由
+                  - paragraph [ref=e248]: 通识教育课程 · GPA 主战场，先攻这里
+              - generic [ref=e249]:
+                - paragraph [ref=e250]: 来源
+                - paragraph [ref=e251]: 华东师范大学2025年本科生学习指南.md §一、培养方案 / 05
+    - generic:
+      - button
+      - complementary:
+        - generic:
+          - generic: 功能导航
+          - list:
+            - listitem:
+              - link:
+                - /url: /dashboard
+                - generic:
+                  - img
+                - generic:
+                  - generic: AI Feed
+                  - generic: 决策状态与建议
+                - generic: →
+            - listitem:
+              - link:
+                - /url: /course-planner
+                - generic:
+                  - img
+                - generic:
+                  - generic: Workspace
+                  - generic: 毕业路径 track 浏览
+                - generic: →
+            - listitem:
+              - link:
+                - /url: /ai-advisor
+                - generic:
+                  - img
+                - generic:
+                  - generic: Goal Mode
+                  - generic: 目标与权重定制
+                - generic: →
+            - listitem:
+              - link:
+                - /url: /schedule
+                - generic:
+                  - img
+                - generic:
+                  - generic: Rule Graph
+                  - generic: 规则透明与来源
+                - generic: →
+            - listitem:
+              - link:
+                - /url: /import
+                - generic:
+                  - img
+                - generic:
+                  - generic: Import
+                  - generic: 导入数据与设置
+                - generic: →
+          - generic: Meridian · Academic Decision Engine
+  - region "Notifications alt+T"
+  - generic:
+    - document

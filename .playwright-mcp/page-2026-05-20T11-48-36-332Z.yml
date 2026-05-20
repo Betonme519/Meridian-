@@ -1,0 +1,73 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - button "打开菜单" [ref=e6]
+          - link "Meridian Meridian" [ref=e10] [cursor=pointer]:
+            - /url: /
+            - img "Meridian" [ref=e12]
+            - generic [ref=e13]: Meridian
+        - generic [ref=e14]:
+          - generic [ref=e15]: 2026 春季学期
+          - link "登录" [ref=e16] [cursor=pointer]:
+            - /url: /login
+    - main [ref=e17]:
+      - generic [ref=e19]:
+        - img [ref=e20]
+        - text: 正在计算你的毕业路径
+    - generic:
+      - button
+      - complementary:
+        - generic:
+          - generic: 功能导航
+          - list:
+            - listitem:
+              - link:
+                - /url: /dashboard
+                - generic:
+                  - img
+                - generic:
+                  - generic: AI Feed
+                  - generic: 决策状态与建议
+                - generic: →
+            - listitem:
+              - link:
+                - /url: /course-planner
+                - generic:
+                  - img
+                - generic:
+                  - generic: Workspace
+                  - generic: 毕业路径 track 浏览
+                - generic: →
+            - listitem:
+              - link:
+                - /url: /ai-advisor
+                - generic:
+                  - img
+                - generic:
+                  - generic: Goal Mode
+                  - generic: 目标与权重定制
+                - generic: →
+            - listitem:
+              - link:
+                - /url: /schedule
+                - generic:
+                  - img
+                - generic:
+                  - generic: Rule Graph
+                  - generic: 规则透明与来源
+                - generic: →
+            - listitem:
+              - link:
+                - /url: /import
+                - generic:
+                  - img
+                - generic:
+                  - generic: Import
+                  - generic: 导入数据与设置
+                - generic: →
+          - generic: Meridian · Academic Decision Engine
+  - region "Notifications alt+T"
+  - generic:
+    - document
