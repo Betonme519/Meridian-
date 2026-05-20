@@ -96,9 +96,9 @@
 - ✅ UI 入口：Profile 页已删 → 落 Upload 页新增 Section「我已修的课」`src/pages/Upload/CourseManager.tsx`（添加表单 + 列表 + 删除，复用 Section 6 视觉），主页 import 一行接入
 - 画布要读这个判断"哪些 option 已完成"，排队 12 前置 ✅ 解锁
 
-#### 排队 12 — 画布改造（思维导图体验）✅ 2026-05-17（**v4 预计算路径 + 徽章**）
+#### 排队 12 — 画布改造（思维导图体验）✅ 2026-05-17 v4 / ✅ 2026-05-20 v5 重写（**捷径策略卡 + FocusMode 双视图 + ImpactPanel**）
 
-**v1 CSS 卡片 → v2 A/B/C/D/E 段 → v3 学生友好分类 → v4 预计算推荐路径**：用户四次反馈，最后定调"多数情况无需用户导入，AI 预计算 → 路径上色 + 节点数字徽章"。v4 在 v3 基础上加 `trackRecommendation.ts` 计算 goal-aware 整链路 + unmet 徽章计数。
+**v1 CSS 卡片 → v2 A/B/C/D/E 段 → v3 学生友好分类 → v4 预计算推荐路径 → v5 捷径策略卡 + 双视图**：用户五次反馈。v5（commit `974c21b`）抛 React Flow，自绘 SVG + 绝对定位 DIV；requirement 卡从"课名"切到"可执行策略短句"；加 FocusMode `全部路径 / 只看推荐` toggle；右侧 `ImpactPanel`（选择模拟器）take/delay/switch 三动作 + before/after delta。
 
 - ✅ `src/api/trackApi.ts` + `src/api/userProgressApi.ts`（5 表 read-only + user_progress upsert/delete）
 - ✅ `src/hooks/useTrack.ts`（硬编码取首个 track + 并发拉 cat/req/opt + 派生 view）
@@ -113,14 +113,48 @@
 - ✅ menu.ts Workspace 文案更新
 - ✅ **v4 新增 `src/lib/trackRecommendation.ts`**：`computeRecommendation({...goalMode})` 返 `{paths, pathNodeIds, pathEdgeIds, badges}` —— 每个 milestone 选 1 条主推荐路径（按 goal_mode 重排 bucket 优先级；保研/高 GPA → 专必/通识 优先；留学 → 公必/英语优先；实习 → 专必/专选优先；最轻松毕业/时间自由 → 必修先扫清）；每层 unmet count 用于节点数字徽章
 - ✅ **v4 Planner 接 useProfile + recommendation**：节点 data 加 `badgeCount` + `onPath`；推荐路径上的节点 `border-amber-400 bg-amber-50/60`，边 `stroke: rgb(245 158 11)`（amber-500）；节点右上角加 `<Badge>` 数字徽章（App 通知 style，>99 → "99+"）；root 节点加 "AI 已规划 N 条主路径" chip
+- ✅ **v5 重写（commit `974c21b`）**：抛 React Flow → 自绘 SVG path + 绝对定位 DIV 卡（`buildGraph`/`edgePath`/`GraphNodeButton`），三层结构 root → milestone(3) → bucket → requirement（option 层暂未渲染，等 0007 seed）；展开状态用 `expandedMilestones` / `expandedBuckets` 两个 Set 维护
+- ✅ **v5 `strategyForItem()`**：requirement 卡 title 从"课名"切到"可执行策略短句"，按 bucket + keyword 分支 ——「把体育与体测放进低冲突学期」/「用通过成本低的公共课先清掉硬性缺口」/「公共必修按低负担组合完成」/「先锁定会卡后续学期的专业必修」等 9 档；meta 行带"已有可执行候选 / 待补充具体候选"提示
+- ✅ **v5 `FocusMode` toggle**：头卡右上 `全部路径 / 只看推荐` 圆角药丸切换；"只看推荐" 过滤到 `isOnPath`；"全部路径" 全规则图显示，非推荐边走 slate dashed `5 7`（仍可见但弱化）
+- ✅ **v5 `GOAL_COPY`**：8 种 `goal_mode` 各一句目标说明（高 GPA / 最轻松毕业 / 保研 / 留学 / 实习优先 / 时间自由 / 低压力 / 个性化），在头卡 goal pill 下方一行小字解释当前高亮逻辑
+- ✅ **v5 `ImpactPanel` 选择模拟器**：右侧栏选中 requirement 后显示 strategy.title/meta + `take/delay/switch` 三 action 圆角分段；before/after credits delta + category delta + target 对比；接 `simulatePick`
+- ✅ **v5 头卡指标 chip**：推荐 N 条 / 可见节点 N / 待处理 N + 学分进度条（earned / target）
+- ✅ **v5 Playwright 验证**：4 份 `.playwright-mcp/page-2026-05-20T*.yml` snapshot 入 commit，开发期浏览器实测
 - **数据空洞**：30 category + 198 requirement ✅，**0 track_option** ⚠️（0005 没录课程清单）→ 点 requirement 节点目前无 option 子节点。补 0007 option seed 留排队 14 前置
-- 推迟：plan 表语义切换 → TD-50；track 选择器；AI 真推荐替 `computeRecommendation` → 排队 13；option seed 补录
+- 推迟（v5 后明确）：
+  - **捷径变体下钻**：requirement 卡再点开一层"多条并列具体策略"（"公必塞已有课的那天" / "公必不计 APF 任选课" / "体育放在轻量学期" 等并列变体），目前 requirement 是叶子节点
+  - **捷径 × 目标适配标签**：单卡显式标"此捷径对 实习优先 最优 / 对 保研 一般"，目前只有整路径按当前 goal 高亮，没在单卡上写匹配度
+  - 上两条都依赖 AI 真推荐（排队 13）才能给出具体变体 → 见 **排队 13.5**
+  - plan 表语义切换 → TD-50；track 选择器；option seed 补录；展开状态持久化
 
 #### 排队 13 — AI 接 track + user_progress + course（schema 锁逻辑）
 
 - `src/ai/prompts.ts` 加 `gradPathAdvisorPrompt`（system prompt 硬编码"你是 Meridian 规划顾问，只能基于以下 track 数据 + 用户进度回答…"）。
 - `src/ai/schema.ts` 加 zod 类型：`PathSuggestion` / `OptionRanking` / `RequirementGap`。
 - mock provider 沿用模板化 rationale，**还不接真 Anthropic**。
+
+#### 排队 13.5 — 捷径变体下钻 + 目标适配标签（v5 workspace 延伸）
+
+**起因**：2026-05-20 v5 重写后用户反馈，requirement 卡目前是"一卡一策略"的叶子节点，但学生真正想看的是"一条要求下有多种并列的可执行捷径"，并且要知道"此捷径对自己目标是否最优"。两条延伸需求都依赖排队 13 AI 真推荐先落地（启发式占位无法给出"塞已有课的那天"这种结合用户课表的具体变体）。
+
+- **A · 捷径变体下钻**
+  - requirement 卡从叶子改为可展开节点：点开后展示同一 requirement 下的**多条并列具体策略变体**
+  - 示例（公共必修体育）：
+    - 变体 1：塞进已经有专必课的那天，不多占用整块日
+    - 变体 2：放进最轻松学期（GPA 不计 APF 时）一次冲完
+    - 变体 3：与体测合并选课，单次出勤双覆盖
+  - 数据源：排队 13 `gradPathAdvisorPrompt` 输出 `PathSuggestion.variants[]`（zod schema 加 variants 字段）；AI 看 `course`（已修课表）+ `track_requirement` + `ecnu_process_rules.md` 综合生成
+  - UI：新增第 4 层节点 `variant`，x 轴接 requirement 右侧；推荐变体 amber 高亮，其他 slate dashed
+  - 文件：`src/lib/trackRecommendation.ts` 函数签名扩 `variants[]`；`src/pages/Planner/index.tsx` `buildGraph` 加 variant 层；`strategyForItem` 复用到变体节点
+
+- **B · 捷径 × 目标适配标签**
+  - 每个 requirement 卡 / 变体卡显式标"对哪些目标最优 / 一般 / 不推荐"
+  - 视觉：卡片右下角放 3-5 个目标 chip（实习 ✓ / 保研 — / 留学 ✗ 等），用 lucide 小图标 + slate/amber/emerald 三色
+  - 数据源：排队 13 AI 输出 `OptionRanking.goalFit: Record<GoalMode, "best" | "ok" | "bad">`；启发式占位可以先按 bucket × goalMode 矩阵硬编码（保研 → 专必 best / 公必 ok；实习 → 专选 best / thesis best）
+  - 文件：`src/ai/schema.ts` 加 `goalFit` 字段；`src/pages/Planner/index.tsx` `GraphNodeButton` 加 chip 区域
+
+- **顺序**：排队 13 AI 接通先 → 13.5 跟做；启发式部分（goalFit 矩阵）可与排队 13 并行
+- **不在 13.5 范围**：UI 大改（留排队 14）；track 选择器；多 track 跨校对比
 
 ---
 
@@ -197,6 +231,27 @@
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
 > 早于 2026-05-14 的里程碑（排队 5 / 2 / 4b / 4a / profiles / DATA_MODEL）已挪到 `docs/AI_MEMORY.md` § 9。
+
+- **2026-05-20** — 排队 12 v5 ✅ Workspace 大改（commit `974c21b`，merge `c9efedd` 从 `auth-system` 分支并入）
+  - **抛 React Flow**：`src/pages/Planner/index.tsx` 1121 行重写为自绘 SVG path + 绝对定位 DIV 卡（`buildGraph` / `edgePath` / `GraphNodeButton`），不再依赖 reactflow MiniMap / Controls
+  - **三层导图结构**：root「我的目标」→ milestone(上课/第二课堂/论文项目，3 个) → bucket(公共必修/通识必修/专业必修/专业选修/任选) → requirement；`expandedMilestones` / `expandedBuckets` 两个 Set 做层级展开
+  - **核心改动 `strategyForItem()`**：requirement 卡 title 从"课名"切换到"可执行策略短句"，按 bucket + keyword 分 9 档：
+    - 公必 + 体育 →「把体育与体测放进低冲突学期 · 不和核心课、实习周抢精力」
+    - 公必 + 英语 →「用通过成本低的公共课先清掉硬性缺口」
+    - 公必 其他 →「公共必修按低负担组合完成 · 优先选不额外占用整天的安排」
+    - 通识 →「用通识模块补齐学分，同时控制绩点风险」
+    - 专必 →「先锁定会卡后续学期的专业必修」
+    - 专选 →「把专业选修对齐当前目标方向 · GPA、保研、实习按收益排序」
+    - 任选 →「用任选学分填平剩余缺口」
+    - second milestone →「用项目型经历一次覆盖第二课堂要求」
+    - thesis →「把论文和实习排进课业压力较低的窗口」
+  - **`FocusMode` toggle**：头卡右上"全部路径 / 只看推荐"圆角药丸；"全部"非推荐边走 slate dashed `5 7`（弱化但可见），"只看推荐" 过滤到 `isOnPath`
+  - **`GOAL_COPY` 8 档**：每个 `goal_mode` 一句话目标说明显示在头卡 pill 下方（实习优先 →「不挤压连续实习时间的安排」/ 保研 →「排名、核心课与科研时间之间的取舍」等）
+  - **右侧 `ImpactPanel` 选择模拟器**：take/delay/switch 三 action 圆角分段 + before/after credits delta + category delta + target 对比，接 `simulatePick`
+  - **视觉**：推荐路径 amber #d97706 实线 strokeWidth 2.4；非推荐 slate dashed；完成态 emerald-50/200；选中态 ring-2 ring-slate-950
+  - **附 4 份 `.playwright-mcp/page-2026-05-20T*.yml` snapshot**：开发期用 Playwright MCP 浏览器实测过
+  - **设计原则演进**（用户口述记录）：学生要的是"看到所有捷径"+"做选择看影响"两件事；捷径对不同目标不同，需要标注；不能只展示推荐 3 条，其他变体也得在图上可见
+  - **延伸需求 → 排队 13.5**：(A) requirement 卡再下钻"多条并列具体捷径变体"，(B) 每条捷径标"对哪种目标最优"标签；都依赖排队 13 AI 真推荐落地后做
 
 - **2026-05-17** — 排队 12 ✅ Track Workspace 思维导图（**v4 预计算路径 + 徽章**，四轮迭代）
   - **v1**：CSS-only 三层 + Drawer → 用户："这不是思维导图，回 ReactFlow"
