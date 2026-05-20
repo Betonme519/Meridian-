@@ -1,0 +1,552 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - link "Skip to content" [ref=e4] [cursor=pointer]:
+        - /url: "#start-of-content"
+      - banner "Global Navigation Menu" [ref=e8]:
+        - generic [ref=e9]:
+          - generic [ref=e10]:
+            - button "打开菜单" [ref=e12] [cursor=pointer]:
+              - img [ref=e13]
+            - link "主页 (g then d)" [ref=e15] [cursor=pointer]:
+              - /url: /
+              - img [ref=e16]
+          - generic [ref=e18]:
+            - navigation "Breadcrumbs" [ref=e19]:
+              - list [ref=e20]:
+                - listitem [ref=e21]:
+                  - link "Betonme519" [ref=e22] [cursor=pointer]:
+                    - /url: /Betonme519
+                    - generic [ref=e23]: Betonme519
+                - listitem [ref=e24]:
+                  - link "Meridian-" [ref=e25] [cursor=pointer]:
+                    - /url: /Betonme519/Meridian-
+                    - generic [ref=e26]: Meridian-
+                    - img [ref=e27]
+            - button "Search or jump to… (forward slash)" [ref=e29] [cursor=pointer]:
+              - img [ref=e30]
+          - generic [ref=e32]:
+            - generic [ref=e33]:
+              - generic [ref=e36]:
+                - link "与 Copilot 聊天" [ref=e38] [cursor=pointer]:
+                  - /url: /copilot
+                  - img [ref=e39]
+                - button "Open Copilot…" [ref=e43] [cursor=pointer]:
+                  - generic:
+                    - img
+              - button "新建…" [ref=e45] [cursor=pointer]:
+                - generic [ref=e46]:
+                  - generic:
+                    - img
+                - generic:
+                  - img
+              - generic [ref=e47]:
+                - link "所有议题" [ref=e48] [cursor=pointer]:
+                  - /url: /issues
+                  - img [ref=e49]
+                - link "所有拉取请求" [ref=e52] [cursor=pointer]:
+                  - /url: /pulls
+                  - img [ref=e53]
+                - link "所有仓库" [ref=e55] [cursor=pointer]:
+                  - /url: /repos
+                  - img [ref=e56]
+            - link "您没有未读通知 (g then n)" [ref=e58] [cursor=pointer]:
+              - /url: /notifications
+              - img [ref=e59]
+            - button "打开用户导航菜单" [ref=e62] [cursor=pointer]:
+              - img "User avatar" [ref=e63]
+        - heading "Repository navigation" [level=2] [ref=e64]
+        - navigation "Repository" [ref=e65]:
+          - list [ref=e66]:
+            - listitem [ref=e67]:
+              - link "代码" [ref=e68] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-
+                - img [ref=e70]
+                - generic [ref=e72]: 代码
+            - listitem [ref=e73]:
+              - link "议题" [ref=e74] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-/issues
+                - img [ref=e76]
+                - generic [ref=e79]: 议题
+            - listitem [ref=e80]:
+              - link "拉取请求" [ref=e81] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-/pulls
+                - img [ref=e83]
+                - generic [ref=e85]: 拉取请求
+            - listitem [ref=e86]:
+              - link "操作" [ref=e87] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-/actions
+                - img [ref=e89]
+                - generic [ref=e91]: 操作
+            - listitem [ref=e92]:
+              - link "项目" [ref=e93] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-/projects
+                - img [ref=e95]
+                - generic [ref=e97]: 项目
+            - listitem [ref=e98]:
+              - link "安全和质量" [ref=e99] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-/security
+                - img [ref=e101]
+                - generic [ref=e103]: 安全和质量
+            - listitem [ref=e104]:
+              - link "洞察" [ref=e105] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-/network/dependencies
+                - img [ref=e107]
+                - generic [ref=e109]: 洞察
+            - listitem [ref=e110]:
+              - link "设置" [ref=e111] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-/settings
+                - img [ref=e113]
+                - generic [ref=e115]: 设置
+    - main [ref=e119]:
+      - generic [ref=e132]:
+        - generic [ref=e135]:
+          - generic [ref=e137]:
+            - generic [ref=e139]:
+              - img "Owner avatar" [ref=e140]
+              - strong [ref=e141]:
+                - link "Meridian-" [ref=e142] [cursor=pointer]:
+                  - /url: /Betonme519/Meridian-
+              - generic [ref=e143]: 私有
+            - generic [ref=e144]:
+              - list:
+                - listitem
+                - listitem [ref=e145]:
+                  - generic [ref=e146]:
+                    - button "复刻 0" [disabled] [ref=e147]:
+                      - img [ref=e148]
+                      - text: 复刻
+                      - generic "0" [ref=e150]
+                    - group [ref=e151]:
+                      - button "See your forks of this repository" [ref=e152] [cursor=pointer]:
+                        - img [ref=e153]
+                - listitem [ref=e155]:
+                  - generic [ref=e157]:
+                    - button "Star this repository (0)" [ref=e159] [cursor=pointer]:
+                      - img [ref=e160]
+                      - text: 星标
+                      - generic "0 users starred this repository" [ref=e162]: "0"
+                    - button "Add this repository to a list" [ref=e166] [cursor=pointer]:
+                      - img
+          - heading "Betonme519/Meridian-" [level=1] [ref=e169]
+        - generic [ref=e170]:
+          - generic [ref=e173]:
+            - generic [ref=e174]:
+              - generic [ref=e175]:
+                - button "main branch" [ref=e177] [cursor=pointer]:
+                  - generic [ref=e178]:
+                    - generic [ref=e180]:
+                      - img [ref=e182]
+                      - generic [ref=e185]: main
+                    - generic:
+                      - img
+                - generic [ref=e186]:
+                  - link "Go to Branches page" [ref=e187] [cursor=pointer]:
+                    - /url: /Betonme519/Meridian-/branches
+                    - img [ref=e188]
+                  - link "Go to Tags page" [ref=e190] [cursor=pointer]:
+                    - /url: /Betonme519/Meridian-/tags
+                    - img [ref=e191]
+              - generic [ref=e193]:
+                - generic [ref=e194]:
+                  - button "转到文件" [ref=e196] [cursor=pointer]:
+                    - generic [ref=e198]: 转到文件
+                  - generic [ref=e199]:
+                    - heading "添加文件" [level=2] [ref=e200]
+                    - button "Add file" [ref=e201] [cursor=pointer]:
+                      - img [ref=e204]
+                - button "代码" [ref=e206] [cursor=pointer]:
+                  - generic [ref=e207]:
+                    - generic:
+                      - img
+                    - generic [ref=e208]: 代码
+                    - generic:
+                      - img
+            - generic [ref=e209]:
+              - generic [ref=e210]:
+                - heading "Folders and files" [level=2] [ref=e211]
+                - table "Folders and files" [ref=e212]:
+                  - rowgroup:
+                    - row "文件名 最后提交消息 最后提交时间":
+                      - columnheader "文件名"
+                      - columnheader "最后提交消息":
+                        - generic "Last commit message": 最后提交消息
+                      - columnheader "最后提交时间":
+                        - generic "Last commit date": 最后提交时间
+                  - rowgroup [ref=e213]:
+                    - row "Latest commit 历史 View commit history for this file." [ref=e214]:
+                      - cell "Latest commit 历史 View commit history for this file." [ref=e215]:
+                        - generic [ref=e216]:
+                          - heading "Latest commit" [level=2] [ref=e217]
+                          - generic [ref=e220]:
+                            - heading "历史" [level=2] [ref=e221]
+                            - link "View commit history for this file." [ref=e223] [cursor=pointer]:
+                              - /url: /Betonme519/Meridian-/commits/main/
+                              - generic [ref=e224]:
+                                - generic:
+                                  - img
+                    - row ".claude, (Directory)" [ref=e225]:
+                      - cell ".claude, (Directory)" [ref=e226]:
+                        - generic [ref=e227]:
+                          - img [ref=e228]
+                          - link ".claude, (Directory)" [ref=e233] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/tree/main/.claude
+                            - text: .claude
+                      - cell [ref=e234]
+                      - cell [ref=e236]
+                    - row "docs, (Directory)" [ref=e239]:
+                      - cell "docs, (Directory)" [ref=e240]:
+                        - generic [ref=e241]:
+                          - img [ref=e242]
+                          - link "docs, (Directory)" [ref=e247] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/tree/main/docs
+                            - text: docs
+                      - cell [ref=e248]
+                      - cell [ref=e250]
+                    - row "public, (Directory)" [ref=e253]:
+                      - cell "public, (Directory)" [ref=e254]:
+                        - generic [ref=e255]:
+                          - img [ref=e256]
+                          - link "public, (Directory)" [ref=e261] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/tree/main/public
+                            - text: public
+                      - cell [ref=e262]
+                      - cell [ref=e264]
+                    - row "src, (Directory)" [ref=e267]:
+                      - cell "src, (Directory)" [ref=e268]:
+                        - generic [ref=e269]:
+                          - img [ref=e270]
+                          - link "src, (Directory)" [ref=e275] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/tree/main/src
+                            - text: src
+                      - cell [ref=e276]
+                      - cell [ref=e278]
+                    - row "supabase/migrations, (Directory)" [ref=e281]:
+                      - cell "supabase/migrations, (Directory)" [ref=e282]:
+                        - generic [ref=e283]:
+                          - img [ref=e284]
+                          - link "supabase/migrations, (Directory)" [ref=e289] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/tree/main/supabase/migrations
+                            - text: supabase/migrations
+                      - cell [ref=e290]
+                      - cell [ref=e292]
+                    - row ".env.example, (File)" [ref=e295]:
+                      - cell ".env.example, (File)" [ref=e296]:
+                        - generic [ref=e297]:
+                          - img [ref=e298]
+                          - link ".env.example, (File)" [ref=e303] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/blob/main/.env.example
+                            - text: .env.example
+                      - cell [ref=e304]
+                      - cell [ref=e306]
+                    - row ".gitignore, (File)" [ref=e309]:
+                      - cell ".gitignore, (File)" [ref=e310]:
+                        - generic [ref=e311]:
+                          - img [ref=e312]
+                          - link ".gitignore, (File)" [ref=e317] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/blob/main/.gitignore
+                            - text: .gitignore
+                      - cell [ref=e318]
+                      - cell [ref=e320]
+                    - row ".prettierignore, (File)" [ref=e323]:
+                      - cell ".prettierignore, (File)" [ref=e324]:
+                        - generic [ref=e325]:
+                          - img [ref=e326]
+                          - link ".prettierignore, (File)" [ref=e331] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/blob/main/.prettierignore
+                            - text: .prettierignore
+                      - cell [ref=e332]
+                      - cell [ref=e334]
+                    - row ".prettierrc, (File)" [ref=e337]:
+                      - cell ".prettierrc, (File)" [ref=e338]:
+                        - generic [ref=e339]:
+                          - img [ref=e340]
+                          - link ".prettierrc, (File)" [ref=e345] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/blob/main/.prettierrc
+                            - text: .prettierrc
+                      - cell [ref=e346]
+                      - cell [ref=e348]
+                    - row "AGENTS.md, (File)" [ref=e351]:
+                      - cell "AGENTS.md, (File)" [ref=e352]:
+                        - generic [ref=e353]:
+                          - img [ref=e354]
+                          - link "AGENTS.md, (File)" [ref=e359] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/blob/main/AGENTS.md
+                            - text: AGENTS.md
+                      - cell [ref=e360]
+                      - cell [ref=e362]
+                    - row "CLAUDE.md, (File)" [ref=e365]:
+                      - cell "CLAUDE.md, (File)" [ref=e366]:
+                        - generic [ref=e367]:
+                          - img [ref=e368]
+                          - link "CLAUDE.md, (File)" [ref=e373] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/blob/main/CLAUDE.md
+                            - text: CLAUDE.md
+                      - cell [ref=e374]
+                      - cell [ref=e376]
+                    - row "bun.lockb, (File)" [ref=e379]:
+                      - cell "bun.lockb, (File)" [ref=e380]:
+                        - generic [ref=e381]:
+                          - img [ref=e382]
+                          - link "bun.lockb, (File)" [ref=e387] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/blob/main/bun.lockb
+                            - text: bun.lockb
+                      - cell [ref=e388]
+                      - cell [ref=e390]
+                    - row "bunfig.toml, (File)" [ref=e393]:
+                      - cell "bunfig.toml, (File)" [ref=e394]:
+                        - generic [ref=e395]:
+                          - img [ref=e396]
+                          - link "bunfig.toml, (File)" [ref=e401] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/blob/main/bunfig.toml
+                            - text: bunfig.toml
+                      - cell [ref=e402]
+                      - cell [ref=e404]
+                    - row "components.json, (File)" [ref=e407]:
+                      - cell "components.json, (File)" [ref=e408]:
+                        - generic [ref=e409]:
+                          - img [ref=e410]
+                          - link "components.json, (File)" [ref=e415] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/blob/main/components.json
+                            - text: components.json
+                      - cell [ref=e416]
+                      - cell [ref=e418]
+                    - row "eslint.config.js, (File)" [ref=e421]:
+                      - cell "eslint.config.js, (File)" [ref=e422]:
+                        - generic [ref=e423]:
+                          - img [ref=e424]
+                          - link "eslint.config.js, (File)" [ref=e429] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/blob/main/eslint.config.js
+                            - text: eslint.config.js
+                      - cell [ref=e430]
+                      - cell [ref=e432]
+                    - row "package-lock.json, (File)" [ref=e435]:
+                      - cell "package-lock.json, (File)" [ref=e436]:
+                        - generic [ref=e437]:
+                          - img [ref=e438]
+                          - link "package-lock.json, (File)" [ref=e443] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/blob/main/package-lock.json
+                            - text: package-lock.json
+                      - cell [ref=e444]
+                      - cell [ref=e446]
+                    - row "package.json, (File)" [ref=e449]:
+                      - cell "package.json, (File)" [ref=e450]:
+                        - generic [ref=e451]:
+                          - img [ref=e452]
+                          - link "package.json, (File)" [ref=e457] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/blob/main/package.json
+                            - text: package.json
+                      - cell [ref=e458]
+                      - cell [ref=e460]
+                    - row "tsconfig.json, (File)" [ref=e463]:
+                      - cell "tsconfig.json, (File)" [ref=e464]:
+                        - generic [ref=e465]:
+                          - img [ref=e466]
+                          - link "tsconfig.json, (File)" [ref=e471] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/blob/main/tsconfig.json
+                            - text: tsconfig.json
+                      - cell [ref=e472]
+                      - cell [ref=e474]
+                    - row "vite.config.ts, (File)" [ref=e477]:
+                      - cell "vite.config.ts, (File)" [ref=e478]:
+                        - generic [ref=e479]:
+                          - img [ref=e480]
+                          - link "vite.config.ts, (File)" [ref=e485] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/blob/main/vite.config.ts
+                            - text: vite.config.ts
+                      - cell [ref=e486]
+                      - cell [ref=e488]
+                    - row "wrangler.jsonc, (File)" [ref=e491]:
+                      - cell "wrangler.jsonc, (File)" [ref=e492]:
+                        - generic [ref=e493]:
+                          - img [ref=e494]
+                          - link "wrangler.jsonc, (File)" [ref=e499] [cursor=pointer]:
+                            - /url: /Betonme519/Meridian-/blob/main/wrangler.jsonc
+                            - text: wrangler.jsonc
+                      - cell [ref=e500]
+                      - cell [ref=e502]
+              - generic [ref=e506]:
+                - generic [ref=e507]:
+                  - heading "Repository files navigation" [level=2] [ref=e508]
+                  - navigation "Repository files" [ref=e509]:
+                    - list [ref=e510]:
+                      - listitem [ref=e511]:
+                        - link "自述文件" [ref=e512] [cursor=pointer]:
+                          - /url: "#"
+                          - img [ref=e514]
+                          - generic [ref=e516]: 自述文件
+                - generic [ref=e518]:
+                  - img [ref=e520]
+                  - heading "添加 README" [level=2] [ref=e522]
+                  - paragraph [ref=e523]: 为您项目添加一个概述 README 文件。
+                  - link "添加 README" [ref=e525] [cursor=pointer]:
+                    - /url: /Betonme519/Meridian-/new/main?filename=README.md
+                    - generic [ref=e527]: 添加 README
+          - generic [ref=e531]:
+            - generic [ref=e533]:
+              - group:
+                - button "Edit repository metadata" [ref=e534] [cursor=pointer]:
+                  - img "Edit repository metadata" [ref=e536]
+              - generic [ref=e538]:
+                - heading "关于" [level=2] [ref=e539]
+                - generic [ref=e540]: 未提供描述、网站或主题。
+                - generic [ref=e541] [cursor=pointer]: 翻译
+                - link "活动" [ref=e543] [cursor=pointer]:
+                  - /url: /Betonme519/Meridian-/activity
+                  - img [ref=e544]
+                  - text: 活动
+                - heading "星标" [level=3] [ref=e546]
+                - link "0 星标" [ref=e548] [cursor=pointer]:
+                  - /url: /Betonme519/Meridian-/stargazers
+                  - img [ref=e549]
+                  - strong [ref=e551]: "0"
+                  - text: 星标
+                - heading "Watchers" [level=3] [ref=e552]
+                - link "0 关注" [ref=e554] [cursor=pointer]:
+                  - /url: /Betonme519/Meridian-/watchers
+                  - img [ref=e555]
+                  - strong [ref=e557]: "0"
+                  - text: 关注
+                - heading "Forks" [level=3] [ref=e558]
+                - link "0 复刻" [ref=e560] [cursor=pointer]:
+                  - /url: /Betonme519/Meridian-/forks
+                  - img [ref=e561]
+                  - strong [ref=e563]: "0"
+                  - text: 复刻
+            - generic [ref=e565]:
+              - heading "发行版" [level=2] [ref=e566]:
+                - link "发行版" [ref=e567] [cursor=pointer]:
+                  - /url: /Betonme519/Meridian-/releases
+              - generic [ref=e568]: 未发布任何版本
+              - link "创建发行版" [ref=e570] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-/releases/new
+            - generic [ref=e572]:
+              - heading "软件包" [level=2] [ref=e573]:
+                - link "软件包" [ref=e574] [cursor=pointer]:
+                  - /url: /users/Betonme519/packages?repo_name=Meridian-
+              - generic [ref=e575]:
+                - text: 未发布软件包
+                - link "发布软件包" [ref=e576] [cursor=pointer]:
+                  - /url: /Betonme519/Meridian-/packages
+            - generic [ref=e578]:
+              - heading "贡献者 1" [level=2] [ref=e579]:
+                - link "贡献者 1" [ref=e580] [cursor=pointer]:
+                  - /url: /Betonme519/Meridian-/graphs/contributors
+                  - text: 贡献者
+                  - generic "1" [ref=e581]
+              - list [ref=e582]:
+                - listitem [ref=e583]:
+                  - link "@Betonme519" [ref=e584] [cursor=pointer]:
+                    - /url: https://github.com/Betonme519
+                    - img "@Betonme519" [ref=e585]
+                  - link "Betonme519" [ref=e587] [cursor=pointer]:
+                    - /url: https://github.com/Betonme519
+                    - strong [ref=e588]: Betonme519
+            - generic [ref=e590]:
+              - heading "语言" [level=2] [ref=e591]
+              - list [ref=e598]:
+                - listitem [ref=e599]:
+                  - link "TypeScript 93.5%" [ref=e600] [cursor=pointer]:
+                    - /url: /Betonme519/Meridian-/search?l=typescript
+                    - img [ref=e601]
+                    - generic [ref=e603]: TypeScript
+                    - generic [ref=e604]: 93.5%
+                - listitem [ref=e605]:
+                  - link "CSS 3.6%" [ref=e606] [cursor=pointer]:
+                    - /url: /Betonme519/Meridian-/search?l=css
+                    - img [ref=e607]
+                    - generic [ref=e609]: CSS
+                    - generic [ref=e610]: 3.6%
+                - listitem [ref=e611]:
+                  - link "PLpgSQL 2.8%" [ref=e612] [cursor=pointer]:
+                    - /url: /Betonme519/Meridian-/search?l=plpgsql
+                    - img [ref=e613]
+                    - generic [ref=e615]: PLpgSQL
+                    - generic [ref=e616]: 2.8%
+                - listitem [ref=e617]:
+                  - link "JavaScript 0.1%" [ref=e618] [cursor=pointer]:
+                    - /url: /Betonme519/Meridian-/search?l=javascript
+                    - img [ref=e619]
+                    - generic [ref=e621]: JavaScript
+                    - generic [ref=e622]: 0.1%
+            - generic [ref=e624]:
+              - generic [ref=e625]:
+                - heading "建议的工作流程" [level=2] [ref=e626]
+                - generic [ref=e627]: 基于您的技术堆栈
+              - list [ref=e628]:
+                - listitem [ref=e629]:
+                  - generic [ref=e630]:
+                    - generic [ref=e631]:
+                      - img [ref=e633]
+                      - generic [ref=e635]: Webpack
+                      - link "设置 Webpack" [ref=e636] [cursor=pointer]:
+                        - /url: /Betonme519/Meridian-/new/main?filename=.github%2Fworkflows%2Fwebpack.yml&workflow_template=ci%2Fwebpack
+                        - generic [ref=e638]:
+                          - text: 设置
+                          - generic [ref=e639]: Webpack
+                    - generic [ref=e640]: Build a NodeJS project with npm and webpack.
+                - listitem [ref=e641]:
+                  - generic [ref=e642]:
+                    - generic [ref=e643]:
+                      - img [ref=e645]
+                      - generic [ref=e647]: SLSA Generic generator
+                      - link "设置 SLSA Generic generator" [ref=e648] [cursor=pointer]:
+                        - /url: /Betonme519/Meridian-/new/main?filename=.github%2Fworkflows%2Fgenerator-generic-ossf-slsa3-publish.yml&workflow_template=ci%2Fgenerator-generic-ossf-slsa3-publish
+                        - generic [ref=e650]:
+                          - text: 设置
+                          - generic [ref=e651]: SLSA Generic generator
+                    - generic [ref=e652]: Generate SLSA3 provenance for your existing release workflows
+                - listitem [ref=e653]:
+                  - generic [ref=e654]:
+                    - generic [ref=e655]:
+                      - img [ref=e657]
+                      - generic [ref=e659]: Datadog Synthetics
+                      - link "设置 Datadog Synthetics" [ref=e660] [cursor=pointer]:
+                        - /url: /Betonme519/Meridian-/new/main?filename=.github%2Fworkflows%2Fdatadog-synthetics.yml&workflow_template=ci%2Fdatadog-synthetics
+                        - generic [ref=e662]:
+                          - text: 设置
+                          - generic [ref=e663]: Datadog Synthetics
+                    - generic [ref=e664]: Run Datadog Synthetic tests within your GitHub Actions workflow
+              - generic [ref=e665]:
+                - link "更多工作流程" [ref=e666] [cursor=pointer]:
+                  - /url: /Betonme519/Meridian-/actions/new
+                - button "隐藏建议" [ref=e668] [cursor=pointer]:
+                  - generic [ref=e670]: 隐藏建议
+    - contentinfo [ref=e672]:
+      - heading "Footer" [level=2] [ref=e673]
+      - generic [ref=e674]:
+        - generic [ref=e675]:
+          - link "GitHub Homepage" [ref=e676] [cursor=pointer]:
+            - /url: https://github.com
+            - img [ref=e677]
+          - generic [ref=e679]: © 2026 GitHub, Inc.
+        - navigation "Footer" [ref=e680]:
+          - heading "Footer navigation" [level=3] [ref=e681]
+          - list "Footer navigation" [ref=e682]:
+            - listitem [ref=e683]:
+              - link "服务条款" [ref=e684] [cursor=pointer]:
+                - /url: https://docs.github.com/site-policy/github-terms/github-terms-of-service
+            - listitem [ref=e685]:
+              - link "隐私" [ref=e686] [cursor=pointer]:
+                - /url: https://docs.github.com/site-policy/privacy-policies/github-privacy-statement
+            - listitem [ref=e687]:
+              - link "安全" [ref=e688] [cursor=pointer]:
+                - /url: https://github.com/security
+            - listitem [ref=e689]:
+              - link "状态" [ref=e690] [cursor=pointer]:
+                - /url: https://www.githubstatus.com/
+            - listitem [ref=e691]:
+              - link "社区" [ref=e692] [cursor=pointer]:
+                - /url: https://github.community/
+            - listitem [ref=e693]:
+              - link "文档" [ref=e694] [cursor=pointer]:
+                - /url: https://docs.github.com/
+            - listitem [ref=e695]:
+              - link "联系我们" [ref=e696] [cursor=pointer]:
+                - /url: https://support.github.com?tags=dotcom-footer
+            - listitem [ref=e697]:
+              - button "管理 Cookies" [ref=e699] [cursor=pointer]
+            - listitem [ref=e700]:
+              - button "请勿分享我的个人信息" [ref=e702] [cursor=pointer]
+  - generic:
+    - document

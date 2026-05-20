@@ -1,0 +1,181 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - link "Skip to content" [ref=e4] [cursor=pointer]:
+        - /url: "#start-of-content"
+      - banner "Global Navigation Menu" [ref=e8]:
+        - generic [ref=e9]:
+          - generic [ref=e10]:
+            - button "打开菜单" [ref=e12] [cursor=pointer]:
+              - img [ref=e13]
+            - link "主页 (g then d)" [ref=e15] [cursor=pointer]:
+              - /url: /
+              - img [ref=e16]
+          - generic [ref=e18]:
+            - navigation "Breadcrumbs" [ref=e19]:
+              - list [ref=e20]:
+                - listitem [ref=e21]:
+                  - link "Betonme519" [ref=e22] [cursor=pointer]:
+                    - /url: /Betonme519
+                    - generic [ref=e23]: Betonme519
+                - listitem [ref=e24]:
+                  - link "Meridian-" [ref=e25] [cursor=pointer]:
+                    - /url: /Betonme519/Meridian-
+                    - generic [ref=e26]: Meridian-
+                    - img [ref=e27]
+            - button "Search or jump to… (forward slash)" [ref=e29] [cursor=pointer]:
+              - img [ref=e30]
+          - generic [ref=e32]:
+            - generic [ref=e33]:
+              - generic [ref=e36]:
+                - link "与 Copilot 聊天" [ref=e38] [cursor=pointer]:
+                  - /url: /copilot
+                  - img [ref=e39]
+                - button "Open Copilot…" [ref=e43] [cursor=pointer]:
+                  - generic:
+                    - img
+              - button "新建…" [ref=e45] [cursor=pointer]:
+                - generic [ref=e46]:
+                  - generic:
+                    - img
+                - generic:
+                  - img
+              - generic [ref=e47]:
+                - link "所有议题" [ref=e48] [cursor=pointer]:
+                  - /url: /issues
+                  - img [ref=e49]
+                - link "所有拉取请求" [ref=e52] [cursor=pointer]:
+                  - /url: /pulls
+                  - img [ref=e53]
+                - link "所有仓库" [ref=e55] [cursor=pointer]:
+                  - /url: /repos
+                  - img [ref=e56]
+            - link "您没有未读通知 (g then n)" [ref=e58] [cursor=pointer]:
+              - /url: /notifications
+              - img [ref=e59]
+            - button "打开用户导航菜单" [ref=e62] [cursor=pointer]:
+              - img "User avatar" [ref=e63]
+        - heading "Repository navigation" [level=2] [ref=e64]
+        - navigation "Repository" [ref=e65]:
+          - list [ref=e66]:
+            - listitem [ref=e67]:
+              - link "代码" [ref=e68] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-
+                - generic [ref=e69]: 代码
+            - listitem [ref=e70]:
+              - link "议题" [ref=e71] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-/issues
+                - generic [ref=e72]: 议题
+            - listitem [ref=e73]:
+              - link "拉取请求" [ref=e74] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-/pulls
+                - generic [ref=e75]: 拉取请求
+            - listitem [ref=e76]:
+              - link "操作" [ref=e77] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-/actions
+                - generic [ref=e78]: 操作
+            - listitem [ref=e79]:
+              - link "项目" [ref=e80] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-/projects
+                - generic [ref=e81]: 项目
+            - listitem [ref=e82]:
+              - link "安全和质量" [ref=e83] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-/security
+                - generic [ref=e84]: 安全和质量
+            - listitem [ref=e85]:
+              - link "洞察" [ref=e86] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-/network/dependencies
+                - generic [ref=e87]: 洞察
+            - listitem [ref=e88]:
+              - link "设置" [ref=e89] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-/settings
+                - generic [ref=e90]: 设置
+    - main [ref=e94]:
+      - generic [ref=e97]:
+        - 'heading "Pull requests: Betonme519/Meridian-" [level=1] [ref=e98]'
+        - generic [ref=e99]:
+          - search [ref=e100]:
+            - group [ref=e101]:
+              - button "筛选" [ref=e102] [cursor=pointer]:
+                - generic [ref=e104]: 筛选
+                - generic:
+                  - img
+            - search "Issues" [ref=e105]:
+              - textbox "Search all issues" [ref=e106]:
+                - /placeholder: 搜索所有议题
+                - text: is:pr is:open
+              - img
+            - navigation "Issue" [ref=e108]:
+              - link "标签 9" [ref=e109] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-/labels
+                - img [ref=e110]
+                - text: 标签 9
+              - link "里程碑 0" [ref=e112] [cursor=pointer]:
+                - /url: /Betonme519/Meridian-/milestones
+                - img [ref=e113]
+                - text: 里程碑 0
+          - link "发起拉取请求" [ref=e117] [cursor=pointer]:
+            - /url: /Betonme519/Meridian-/compare
+            - generic [ref=e120]: 发起拉取请求
+        - generic [ref=e122]:
+          - link "0 打开" [ref=e123] [cursor=pointer]:
+            - /url: /Betonme519/Meridian-/pulls?q=is%3Aopen+is%3Apr
+            - img [ref=e124]
+            - text: 0 打开
+          - link "0 已关闭" [ref=e126] [cursor=pointer]:
+            - /url: /Betonme519/Meridian-/pulls?q=is%3Apr+is%3Aclosed
+            - img [ref=e127]
+            - text: 0 已关闭
+        - generic [ref=e131]:
+          - img [ref=e132]
+          - heading "欢迎使用拉取请求！" [level=2] [ref=e135]
+          - paragraph [ref=e136]:
+            - text: 拉取请求可帮助您与其他人协作处理代码。创建拉取请求后，它们将出现在可搜索和可筛选的列表中。要开始，您应该
+            - link "创建拉取请求" [ref=e137] [cursor=pointer]:
+              - /url: /Betonme519/Meridian-/compare
+            - text: 。
+        - generic [ref=e138]:
+          - img [ref=e139]
+          - strong [ref=e141]: 专业提示！
+          - text: 通过搜索查找您创建的所有内容：
+          - link "author:Betonme519" [ref=e142] [cursor=pointer]:
+            - /url: /Betonme519/Meridian-/issues?q=is%3Apr+is%3Aopen+author%3ABetonme519
+          - text: 。
+    - contentinfo [ref=e143]:
+      - heading "Footer" [level=2] [ref=e144]
+      - generic [ref=e145]:
+        - generic [ref=e146]:
+          - link "GitHub Homepage" [ref=e147] [cursor=pointer]:
+            - /url: https://github.com
+            - img [ref=e148]
+          - generic [ref=e150]: © 2026 GitHub, Inc.
+        - navigation "Footer" [ref=e151]:
+          - heading "Footer navigation" [level=3] [ref=e152]
+          - list "Footer navigation" [ref=e153]:
+            - listitem [ref=e154]:
+              - link "服务条款" [ref=e155] [cursor=pointer]:
+                - /url: https://docs.github.com/site-policy/github-terms/github-terms-of-service
+            - listitem [ref=e156]:
+              - link "隐私" [ref=e157] [cursor=pointer]:
+                - /url: https://docs.github.com/site-policy/privacy-policies/github-privacy-statement
+            - listitem [ref=e158]:
+              - link "安全" [ref=e159] [cursor=pointer]:
+                - /url: https://github.com/security
+            - listitem [ref=e160]:
+              - link "状态" [ref=e161] [cursor=pointer]:
+                - /url: https://www.githubstatus.com/
+            - listitem [ref=e162]:
+              - link "社区" [ref=e163] [cursor=pointer]:
+                - /url: https://github.community/
+            - listitem [ref=e164]:
+              - link "文档" [ref=e165] [cursor=pointer]:
+                - /url: https://docs.github.com/
+            - listitem [ref=e166]:
+              - link "联系我们" [ref=e167] [cursor=pointer]:
+                - /url: https://support.github.com?tags=dotcom-footer
+            - listitem [ref=e168]:
+              - button "管理 Cookies" [ref=e170] [cursor=pointer]
+            - listitem [ref=e171]:
+              - button "请勿分享我的个人信息" [ref=e173] [cursor=pointer]
+  - generic:
+    - document
