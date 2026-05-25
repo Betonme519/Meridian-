@@ -9,8 +9,9 @@
 
 ## 目标
 
-**已闭环**：排队 5/6/7/8/9 + 10 全部 + 11 + 12。详见下方「最近完成」+ AI_MEMORY § 9 + 各 commit。
-**当前推进**：排队 13（AI 接 track）。
+**已闭环**：排队 5/6/7/8/9 + 10 全部 + 11 + 12 + 13 mock + **13.5 静态路径库**。详见下方「最近完成」+ AI_MEMORY § 9 + 各 commit。
+**当前推进**：无主线在跑。候选下一步：12.5 workspace 二次重构（shortcut 层用 link 数据填）/ 13.2 TD-1 真 LLM（推迟，先看静态库够不够）/ 14 UI 重设计。
+**架构转向（2026-05-25）**：用户拍板"静态路径库 + AI 连接"。改原 AI runtime 生成 reason 为 Claude 预编译 (goal × req) → 280 advice + 40 link 关系，DB 查询替代 runtime AI 调用。
 **UI 重设计（排队 14）**：等排队 12 跑通后启动。
 
 用户 2026-05-14 历史决策（已生效，留作背景）：
@@ -129,22 +130,71 @@
   - 上两条 + 兴趣维度全部并入 **排队 12.5**（2026-05-25 用户重新思考核心呈现方式后）
   - plan 表语义切换 → TD-50；track 选择器；option seed 补录；展开状态持久化
 
-#### 排队 13 — AI 接 track + user_progress + course（schema 锁逻辑）
+#### 排队 13 — AI 接 track + user_progress + course（schema 锁逻辑）✅ 2026-05-25 mock 落地
 
-- `src/ai/prompts.ts` 加 `gradPathAdvisorPrompt`（system prompt 硬编码"你是 Meridian 规划顾问，只能基于以下 track 数据 + 用户进度回答…"）。
-- `src/ai/schema.ts` 加 zod 类型：`PathSuggestion` / `OptionRanking` / `RequirementGap`。
-- mock provider 沿用模板化 rationale，**还不接真 Anthropic**。
+- ✅ `src/ai/schema.ts` 加 `PathSuggestionSchema`（含 `shortcuts[]` 12.5 占位）/ `OptionRankingSchema` / `RequirementGapSchema` / `GradPathAdvisorResponseSchema`
+- ✅ `src/ai/prompts.ts` 加 `gradPathAdvisorPrompt(input)` + `GRAD_PATH_ADVISOR_MARKER`；system prompt 硬编码"只能基于 user 消息 JSON 数据回答 / 不在数据里写'需查阅手册'"；198 条 requirement 全量 JSON 喂
+- ✅ `src/ai/providers/mock.ts` 识别 marker → 8 goal × 5 bucket = 40 句矩阵 + 8 × 2 milestone(second/thesis) = 16 句 → JSON.stringify 输出
+- ✅ `src/lib/trackRecommendation.ts` 加 `fetchAdvisorRecommendation(args, signal?)` async 版：启发式产骨架 → AI 升级 reason → 失败回退骨架不闪屏
+- ✅ Planner index.tsx：useMemo `recommendation` 改 `baselineRecommendation` + `useState` + 两个 useEffect（输入变回落启发式 / 异步升级 reason）
+- 选项决策（2026-05-25 用户拍板 A/A/A/C/A）：全量 JSON / shortcuts[] 预留 / goal×bucket 矩阵 / process_rules 留 13.8 RAG / 替换 trackRecommendation 函数体
+- `tsc --noEmit` 0 新错（仅 CardSwap 历史遗留）
 
-#### 排队 13.2 — TD-1 接真 LLM provider（13 mock 落地后顺位接上）
+**不在 13 范围**：真 LLM（13.2）/ shortcut 层（12.5）/ rankings / gaps 字段填充（13.2）/ ecnu_process_rules.md 喂入（13.8）
+
+#### 排队 13.5 — 静态路径库 ✅ 2026-05-25 完成（NEW 同日拍板 + 同日落地）
+
+**起因**：2026-05-25 用户反思 13 mock —— 「AI runtime 生成 reason 不稳定，能不能 Claude 现在预编译所有路径，运行时只查表」。从 dynamic-AI 转 static-library 架构。link 表是关键创新：扁平 advice 表编码不了 req↔req 关系（如 E2-6 劳动可被 C6-1 创新创业顶 ≤ 2 分），独立 link 表能存。
+
+**两张表**：
+- `requirement_advice`（0007）—— (goal_mode, requirement_id) → one_liner / goal_fit / shortcut_oneliners jsonb / priority / source_ref
+- `requirement_link`（0008）—— (from_req, to_req, kind) 5 档：substitute / prerequisite / excludes / cross_ref / triggers
+
+**已交付**：
+- ✅ `supabase/migrations/0007_add_requirement_advice.sql` + `0007_verify.sql`（8 段）
+- ✅ `supabase/migrations/0008_add_requirement_link.sql` + `0008_verify.sql`（6 段）
+- ✅ `supabase/migrations/0007_seed_requirement_advice.sql` —— 280 INSERT（35 reqs × 8 goals），自动生成 4778 行
+- ✅ `supabase/migrations/0008_seed_requirement_link.sql` —— 40 INSERT（真实存在的关系，自环已跳）
+- ✅ `scripts/genRequirementAdvice.ts` —— TS 生成器 660 行，所有文案 + link 全在此（修文案 → `npx tsx scripts/genRequirementAdvice.ts` → 新 SQL 幂等覆盖）
+
+**35 reqs 覆盖范围**：
+- 15 用户可见（画布显示）：E1-3 / E2-1~8 / E3-1~4 / E4-4 / E4-5
+- 20 关键规则（AI 后台用）：A1-10 A1-12 A2-1 A3-2 A3-3 A4-2 / B3-1 B3-4 B4-4 B5-9 / C1-9 C2-6 C3-3 C5-2 C6-1 C9-1 C9-3 / D3-6 D4-11 D4-12
+
+**40 link 实际数量分布**：
+- substitute 1（E2-6 ↔ C6-1）
+- cross_ref 14（E2-8 → E2-6/E2-7；E3-1 → E3-2/3/4；A2-1 ↔ A1-12；C2-6/C1-9 → A3-2；等）
+- prerequisite 12（E2-1/2/4/5/6/7 → A2-1；C9-1 → C9-3；B5-9 → A1-12；等）
+- excludes 2（E4-4 ↔ E1-3；C3-3 ↔ C9-1）
+- triggers 11（A1-10 → A1-12；B3-1 → B3-4；D4-12 → D4-11 → A2-1；B5-9 → A1-12；等）
+
+**用户 2026-05-25 跑通 6 份 SQL** → 落库 280 advice + 40 link ✅
+
+**代码层 2026-05-25 同日落地**：
+- ✅ `src/api/requirementAdviceApi.ts` —— listAdvice(goal, reqIds[]) + listLinksForRequirements(reqIds[])（两次 IN UNION 而非 OR，避免索引退化）+ GOAL_FITS / LINK_KINDS / AdviceShortcut 类型与 SQL CHECK 同源
+- ✅ `src/hooks/useRequirementAdvice.ts` —— requestIdRef + cacheKey（goal + sorted req ids）race 守卫 + 派生四个 view（adviceByReqId / linksFromReqId / linksToReqId / linksByReqId）+ LINK_KIND_LABELS 中文标签
+- ✅ `src/types/db.ts` 手动补 requirement_advice + requirement_link 类型块（Row/Insert/Update/Relationships 全套，对齐 supabase gen 格式）
+- ✅ Planner index.tsx：删 fetchAdvisorRecommendation 异步 useEffect + AbortController；改用 useRequirementAdvice hook 拉 DB advice + useMemo 合并启发式骨架（adviceByReqId 空时退回启发式）；新增 reqMetaById 全 req 索引（含隐藏规则 req，给 link target 标题查找用）
+- ✅ Planner EvidencePanel：加 `<RelatedRulesBlock>` 子组件，按 (selfId is from/to) 计算 link 方向 + emerald/blue/rose/slate/amber 5 色 pill + 中文 kind 标签 + metadata JSON 显示
+- ✅ `tsc --noEmit` 0 新错（仅 CardSwap 历史遗留）
+- mock AI 矩阵代码保留作 fallback（fetchAdvisorRecommendation 不删，13.2 真 LLM 可换）
+
+#### 排队 13.2 — TD-1 接真 LLM provider（推迟，13.5 后看是否还需要）
+
+**2026-05-25 推迟原因**：静态路径库可能 90% 场景够用，真 LLM 只解决"用户课表 × 兴趣 → 具体课程 chip 推荐"这种 runtime 变量。先看 13.5 跑通后剩多少缺口。
 
 - 用户拍板 LLM 上游：DeepSeek / Qwen / Zhipu / Anthropic 任一家
 - 写 `src/routes/api/ai.chat.ts` server route，按 `docs/AI_PROXY_SPEC.md` 4 家 SSE 协议骨架转发
 - providers/remote.ts 已就绪，只需把 mock 换成真 SSE
-- 解锁 13.5（"塞已有课的那天"这种结合用户课表的具体变体需要真 AI）
 
-#### 排队 12.5 — workspace 二次重构（核心呈现层换思路）
+#### 排队 12.5 — workspace 二次重构（核心呈现层换思路 + 进度收集反向勾选）
 
 **起因**：2026-05-25 用户重新思考画布的核心价值。v5（commit `974c21b`）做完后用户发现**当前呈现并不直接 ——「学生要的不是 9 档启发式策略短句，而是 AI 看完学校全部规章 + 个人课表 + 兴趣后给出的、针对该条规则的、具体可执行的多条捷径」**。这把原排队 13.5（捷径变体下钻 + goalFit 标签）从延伸需求提到主线核心，并新增**兴趣维度**作为第三个输入信号。
+
+**2026-05-25 二次扩 = 合并 11.5 进度收集子模块**：用户提出现实约束 —— 学校开课表 / 项目表 / 第二课堂 ingest 全不现实，无 API 无爬虫。学生填"还剩几学分"颗粒度太细 → 用户放弃。**反向勾选**心智模型："默认全已完成，取消勾选 = 还没做"。大三大四 95% 已完成只需取消 1-2 条；大一大二全部取消一次性几下完事。心智从"我做了什么"翻转到"我还差什么"。
+- 数据：现有 `user_progress` 表 + `useUserProgress` hook 直接用
+- UI 位置：合并到 12.5 的画布 / 或单出独立 Import 页 Section（拍板时定）
+- 副作用：删 Planner 里 `这条目前只有规则级判断 ... 补充 option seed 后` 提示（option seed 永远不会有）+ 改「待补充候选 / 已有可执行候选」字眼
 
 ##### 核心思路差距
 
@@ -171,6 +221,12 @@
 ```
 
 ##### 实施清单
+
+- **0 · 反向勾选式进度收集器**（NEW 2026-05-25 合并入）
+  - 默认全 requirement 勾选为已完成
+  - 取消勾选 → 写 user_progress（status 'not_completed' 或对应 enum）
+  - 同步勾选状态 → useUserProgress / completedCodes / 画布徽章 / impact 计算
+  - 删 Planner option seed 提示语 + Import 页瘦身（沉底或删不切实际功能）
 
 - **A · 画布加第 4 层 `shortcut`（捷径）**
   - root → milestone → bucket → requirement → **shortcut** →（兴趣 input + 候选课 chips）
@@ -242,11 +298,24 @@
 
 **无。等用户拍板下一波方向。** 候选：
 
-1. **排队 13** AI 接 track + user_progress + course（`gradPathAdvisorPrompt`，两个数据源：198 条 track_requirement + `ecnu_process_rules.md`；Planner 页 `pickRecommendedOption` 启发式占位等 AI 接入替换）。
-2. **TD-10** target_gpa / goal_weights UI（需用户拍板：放 Upload 设置区还是新建 Settings 页 / weights 是 8 个 slider 还是简化）。
-3. **TD-50** plan 表语义切换（"自由备注画布"模式，决定 plan.nodes 新 shape）。
+1. **排队 12.5** workspace 二次重构（shortcut 层 + 兴趣维度）—— 现在 link 表已就位，shortcut_oneliners jsonb 字段已预留，可在 12.5 启用
+2. **排队 13.2** TD-1 真 LLM provider —— 推迟评估：静态库可能 90% 够用，真 LLM 只解决"用户课表 × 兴趣 → 具体课程 chip"runtime 变量
+3. **排队 14** 全局功能页 UI 重设计 —— 12 + 13 都跑通了，可以启动
+4. **TD-10** target_gpa / goal_weights UI（需用户拍板：放 Upload 设置区还是新建 Settings 页）
+5. **TD-50** plan 表语义切换（"自由备注画布"模式，决定 plan.nodes 新 shape）
 
-> **新主线顺序（2026-05-25 调整）**：13 mock → 13.2 TD-1 真 provider → **12.5 workspace 二次重构（核心呈现层换思路 + 兴趣维度）** → 13.8 TD-2 RAG → 14 UI 重设计
+> **新主线顺序（2026-05-25 二次调整后）**：13 mock ✅ → 13.5 静态路径库 ✅ → 12.5 workspace 二次重构（shortcut 层用 link 数据填）/ 13.2 真 provider（推迟）/ 14 UI 重设计 三选一
+
+## 已采纳决策（2026-05-25 静态路径库相关）
+
+- **架构转向**：dynamic AI runtime → static library + 后期 AI 连接（不再每次让 AI 生成 reason，预编译查表）
+- **粒度**：(goal × req) 1584 → 实际 35 reqs × 8 goal = 280 行（中间方案：15 可见 + 20 关键规则）
+- **存储**：Supabase migration 0007 / 0008，可 join 可查询
+- **生成方式**：TS 生成器 → 输出 SQL，两份都进 git
+- **link 表新增**：5 档 kind 关系（substitute/prerequisite/excludes/cross_ref/triggers），独立表可查询
+- **link 数量**：40 真实关系（不注水）vs 计划 60-100，使用后再增量加
+
+### ⏳ 已采纳决策（不再追问，留备份）
 
 ### ⏳ 已采纳决策（不再追问，留备份）
 
@@ -285,6 +354,30 @@
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
 > 早于 2026-05-14 的里程碑（排队 5 / 2 / 4b / 4a / profiles / DATA_MODEL）已挪到 `docs/AI_MEMORY.md` § 9。
+
+- **2026-05-25** — 排队 13.5 ✅ 静态路径库 + 代码层全栈落地（同日提案 + 同日完成）
+  - **架构转向（用户反思 13 mock）**：AI runtime 生成 reason 视觉无差异、不稳定、要钱 → Claude 现在预编译所有 (goal × req) → 文案静态库，运行时只查表。link 表 5 档关系（substitute/prerequisite/excludes/cross_ref/triggers）独立存 req↔req 关系，AI 后期只用不挖
+  - **0007 / 0008 DDL**：requirement_advice (goal_mode × requirement_id) 唯一 + shortcut_oneliners jsonb 占位（12.5 用）+ priority 0-100 排序键；requirement_link (from, to, kind) 唯一 + 自环 CHECK + 5 档 kind
+  - **0007 / 0008 seed**：280 advice INSERT（35 reqs × 8 goal，全部 ON CONFLICT DO UPDATE 幂等）+ 40 link INSERT；都用 PL/pgSQL DO 块 + code lookup（避免硬编码 UUID）+ RAISE NOTICE 报 inserted/skipped 计数
+  - **scripts/genRequirementAdvice.ts 660 行**：ADVICE_MATRIX 8×35 嵌套 record + LINKS array + sqlEscape / buildAdviceSql / buildLinkSql 三段；运行 `npx tsx scripts/genRequirementAdvice.ts` → 2 文件覆盖（跑 0.4s）
+  - **35 reqs 范围**：15 用户可见（E1-3 + E2-1~8 + E3-1~4 + E4-4/5）+ 20 关键规则（A1-10/12, A2-1, A3-2/3, A4-2 / B3-1/4, B4-4, B5-9 / C1-9, C2-6, C3-3, C5-2, C6-1, C9-1/3 / D3-6, D4-11/12）
+  - **40 link 关系（真实存在不注水）**：substitute 1 / cross_ref 14 / prerequisite 12 / excludes 2 / triggers 11
+  - **同时修 UI bug**：EvidencePanel「AI 理由」从右栏下方提到 ImpactPanel 顶部紫色高亮框 + Sparkles 图标，用户点击节点必看到
+  - **用户跑通 6 份 SQL**（4 DDL + verify + 2 seed）落库 280 advice + 40 link
+  - **代码层落地**：requirementAdviceApi.ts（两次 IN UNION 避索引退化）+ useRequirementAdvice hook（cacheKey race 守卫 + 派生四 view）+ db.ts 手补两表类型块 + Planner 删 fetchAdvisorRecommendation 改 hook 合并骨架 + EvidencePanel 加 RelatedRulesBlock 5 色 pill 显示 link
+  - **tsc 0 新错**（仅 CardSwap 历史遗留）；mock AI 矩阵代码保留作 fallback 不删
+  - **解锁**：12.5 shortcut 层（shortcut_oneliners jsonb 已预留）/ 13.2 推迟（先看够不够）
+
+- **2026-05-25** — 排队 13 ✅ AI mock advisor 落地（模板化 rationale，未接真 LLM）
+  - **schema** `src/ai/schema.ts` 加 4 个 zod：`PathSuggestionSchema`（含 `shortcuts[]` 12.5 占位强制 [])` / `OptionRankingSchema` / `RequirementGapSchema` / `GradPathAdvisorResponseSchema`。`AdvisorMilestoneSchema` 三档 enum 与 `trackUserView.UserMilestoneCode` 对齐（不 import 防循环）
+  - **prompt** `src/ai/prompts.ts` 加 `gradPathAdvisorPrompt(input)` + 导出 `GRAD_PATH_ADVISOR_MARKER`。system prompt 硬编码"你只能基于下面 user 消息里的 JSON 数据回答"+ 不知道写"需查阅手册"+ 输出单行 JSON 不要 markdown 围栏。input shape：`{goalMode, categories[], requirements[], completedCodes[], skeleton[]}`，requirements 用精简 shape（id/category_id/code/title/kind/threshold/source_ref）避免把整 DB 行（含 metadata jsonb）喂 LLM
+  - **mock** `src/ai/providers/mock.ts` 识别 marker → 解析 user JSON → 8 goal × 5 bucket = 40 句 `ADVISOR_BUCKET_RATIONALE` + 8 × 2 milestone = 16 句 `ADVISOR_MILESTONE_RATIONALE` + 8 句 fallback → JSON 一次性输出（不按字符流，advisor 不需要打字感）。解析失败兜底返 `{paths:[],rankings:[],gaps:[]}`
+  - **trackRecommendation** `src/lib/trackRecommendation.ts` 加 `fetchAdvisorRecommendation(args, signal?)` async 版：流程 = 启发式 `computeRecommendation` 产骨架 → 组装 `GradPathAdvisorInput` → `chat({messages: gradPathAdvisorPrompt(input), signal}) + collect` → `JSON.parse + GradPathAdvisorResponseSchema.safeParse` → 按 requirementId 索引 AI paths 覆盖骨架 reason。失败 / abort / parse 错全部回退骨架不闪屏
+  - **Planner** `src/pages/Planner/index.tsx`：useMemo `recommendation` 拆为 `baselineRecommendation` (useMemo 启发式即刻产首帧) + `useState recommendation` + 两个 useEffect。第一个 effect 输入变回落启发式（避免显过期 AI reason）；第二个 effect 调 fetchAdvisorRecommendation，AbortController 在 cleanup 触发组件卸载 abort。useEffect deps 含 `completedCodes` （Set 引用稳定靠 useCourses 已实现）
+  - **选项决策（2026-05-25 用户 A/A/A/C/A）**：全量 JSON 塞（mock 不收钱，13.2 切片）/ shortcuts[] 预留（12.5 无返工）/ goal×bucket 矩阵硬编码 40 句（不复用 strategyForItem 因 12.5 要删它）/ process_rules 留 13.8 RAG（13 只验证 track_requirement 这条路）/ 替换 trackRecommendation 函数体（画布自动跑，AIAdvisor 留 chat 流）
+  - **数据流验证**：mock 收到 marker → 解 user JSON → skeleton 每条按 (milestone, bucket, goalMode) 查表 → 拼新 reason → JSON 一次性 yield。Planner 首帧 = 启发式 reason；~50ms 后 AI reason 覆盖（mock 无网络延迟）；真实 LLM 接入时此延迟变 500-2000ms，组件已能 abort 不悬挂
+  - **解锁 13.2 + 12.5**：schema 形状已对齐真 LLM 输出契约；shortcut[] 字段已在 path 里占位；mock 与真 provider 互换只需切 `VITE_AI_PROVIDER=remote`
+  - `tsc --noEmit` 0 新错（仅 CardSwap 历史遗留 1 条）
 
 - **2026-05-20** — 排队 12 v5 ✅ Workspace 大改（commit `974c21b`，merge `c9efedd` 从 `auth-system` 分支并入）
   - **抛 React Flow**：`src/pages/Planner/index.tsx` 1121 行重写为自绘 SVG path + 绝对定位 DIV 卡（`buildGraph` / `edgePath` / `GraphNodeButton`），不再依赖 reactflow MiniMap / Controls

@@ -7,10 +7,16 @@
  *   "多数情况都不需要用户导入，我们本身就已经把路径都计算好了，只不过根据用户不同的目标，
  *    把合适他的路径标注出来。"
  *
- * 当前是 **启发式占位**（按 goal_mode 重排 milestone / bucket 优先级 + 取首个 unmet req）。
- * 排队 13 接 AI 后替换为 `gradPathAdvisorPrompt` 返的 zod `PathSuggestion[]`。
+ * **两层 API**（排队 13 完成后）：
+ *  - `computeRecommendation(args)` 同步启发式占位 —— 即刻产出，画布首帧用
+ *  - `fetchAdvisorRecommendation(args, signal?)` async AI 加强版 —— Planner useEffect
+ *    调用，回来后 setState 覆盖启发式 reason。失败 / abort 时回退 computeRecommendation
+ *    结果（caller 责任：useEffect 内 try/catch 后 setState fallback）。
  *
- * 主要产出：
+ * 13 mock 阶段：AI 只升级 paths[].reason 字段（模板化 rationale），骨架仍走启发式。
+ * 13.2 真 LLM：本函数体不变，prompt 已包含全量 schema + 用户进度，LLM 可重排 paths。
+ *
+ * 主要产出（两层 API 一致）：
  *  - `paths`            每个 milestone 一条主推荐路径（最多 3 条）
  *  - `pathNodeIds`      路径上所有节点 id 集合（含 root / ms / bucket / cat / req / opt）
  *  - `pathEdgeIds`      路径上所有边 id（命名需对齐 Planner 页 edge 生成规则）
@@ -22,6 +28,9 @@ import type { UserProgress } from "@/api/userProgressApi";
 import type { GoalMode } from "@/api/profileApi";
 import { classifyCategory, type UserMilestoneCode, type CourseBucket } from "./trackUserView";
 import { calcRequirementProgress, pickRecommendedOption } from "./trackSimulation";
+import { chat, collect } from "@/ai";
+import { gradPathAdvisorPrompt, type GradPathAdvisorInput } from "@/ai/prompts";
+import { GradPathAdvisorResponseSchema } from "@/ai/schema";
 
 export interface RecommendedPath {
   milestone: UserMilestoneCode;
@@ -255,4 +264,119 @@ function buildReason(goalMode: GoalMode | null, c: Candidate): string {
     return `${t} · 必修先扫清`;
   }
   return `${t} · 推荐优先完成`;
+}
+
+/* ───────────────────────── AI 加强版（排队 13） ───────────────────────── */
+
+/**
+ * 异步 advisor —— 先跑同步 computeRecommendation 拿骨架，再调 AI 升级 reason。
+ *
+ * 流程：
+ *   1. computeRecommendation 启发式产 RecommendationResult（含 paths 骨架）
+ *   2. 组装 GradPathAdvisorInput（categories / requirements / completedCodes / skeleton）
+ *   3. gradPathAdvisorPrompt → chat → collect → JSON.parse → zod.parse
+ *   4. AI 返 PathSuggestion[]，按 requirementId 匹配回骨架，覆盖 reason 字段
+ *   5. 重建 pathNodeIds / pathEdgeIds（path 集合可能被 AI 重排）
+ *
+ * Caller（Planner useEffect）负责：
+ *   - 失败 / abort 时显示同步骨架（不阻塞渲染）
+ *   - signal 通过 chat({ signal }) 透传，组件卸载 abort 不抛 AbortError
+ *
+ * **不在本函数处理的事**：
+ *   - 缓存（13.2 接 server route 时统一加 IndexedDB / sessionStorage）
+ *   - 重试（13.2 fetch wrapper 统一处理）
+ *   - rankings / gaps 字段（13 mock 阶段返 []）
+ */
+export async function fetchAdvisorRecommendation(args: {
+  categories: TrackCategory[];
+  requirementsByCategoryId: Map<string, TrackRequirement[]>;
+  optionsByRequirementId: Map<string, TrackOption[]>;
+  progressByOptionId: Map<string, UserProgress>;
+  goalMode?: GoalMode | null;
+  completedCodes?: Set<string>;
+  signal?: AbortSignal;
+}): Promise<RecommendationResult> {
+  const skeleton = computeRecommendation(args);
+
+  // 没有候选路径时直接返启发式，省一次 AI 调用
+  if (skeleton.paths.length === 0) return skeleton;
+
+  const input: GradPathAdvisorInput = {
+    goalMode: args.goalMode ?? null,
+    categories: args.categories.map((c) => ({
+      id: c.id,
+      code: c.code,
+      title: c.title,
+      order_index: c.order_index,
+    })),
+    requirements: collectAdvisorRequirements(args.categories, args.requirementsByCategoryId),
+    completedCodes: args.completedCodes ? Array.from(args.completedCodes) : [],
+    skeleton: skeleton.paths.map((p) => ({
+      milestone: p.milestone,
+      bucket: p.bucket ?? null,
+      categoryId: p.categoryId,
+      requirementId: p.requirementId,
+      optionId: p.optionId ?? null,
+      reason: p.reason,
+    })),
+  };
+
+  let raw: string;
+  try {
+    raw = await collect(chat({ messages: gradPathAdvisorPrompt(input), signal: args.signal }));
+  } catch {
+    // chat 失败 / abort → 返启发式骨架，画布不闪屏
+    return skeleton;
+  }
+
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(raw);
+  } catch {
+    return skeleton;
+  }
+  const safe = GradPathAdvisorResponseSchema.safeParse(parsedJson);
+  if (!safe.success) return skeleton;
+
+  // 按 requirementId 索引 AI 返的 path，覆盖骨架 reason 字段
+  const aiByReqId = new Map(safe.data.paths.map((p) => [p.requirementId, p]));
+  const enhancedPaths: RecommendedPath[] = skeleton.paths.map((p) => {
+    const ai = aiByReqId.get(p.requirementId);
+    if (!ai) return p;
+    return { ...p, reason: ai.reason };
+  });
+
+  // path 节点集合本身不变（AI 在 13 mock 阶段不重排），直接复用骨架的 nodeIds / edgeIds
+  return {
+    paths: enhancedPaths,
+    pathNodeIds: skeleton.pathNodeIds,
+    pathEdgeIds: skeleton.pathEdgeIds,
+    badges: skeleton.badges,
+  };
+}
+
+/**
+ * 把按 categoryId 分组的 requirements flatten 成 AdvisorRequirementInput[]，
+ * 只保留 prompt 需要的字段，避免把整 DB 行（含 metadata jsonb）喂 LLM。
+ */
+function collectAdvisorRequirements(
+  categories: TrackCategory[],
+  requirementsByCategoryId: Map<string, TrackRequirement[]>,
+): GradPathAdvisorInput["requirements"] {
+  const out: GradPathAdvisorInput["requirements"] = [];
+  for (const c of categories) {
+    const reqs = requirementsByCategoryId.get(c.id) ?? [];
+    for (const r of reqs) {
+      out.push({
+        id: r.id,
+        category_id: r.category_id,
+        code: r.code,
+        title: r.title,
+        kind: r.kind,
+        threshold: r.threshold,
+        source_ref: r.source_ref,
+      });
+    }
+  }
+  return out;
 }

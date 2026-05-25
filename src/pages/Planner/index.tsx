@@ -42,6 +42,8 @@ import {
   type UserMilestoneCode,
 } from "@/lib/trackUserView";
 import { computeRecommendation, type RecommendedPath } from "@/lib/trackRecommendation";
+import { useRequirementAdvice, LINK_KIND_LABELS } from "@/hooks/useRequirementAdvice";
+import type { RequirementLink } from "@/api/requirementAdviceApi";
 
 type ActionMode = "take" | "delay" | "switch";
 type FocusMode = "all" | "recommended";
@@ -104,17 +106,6 @@ const MILESTONE_LABEL: Record<UserMilestoneCode, string> = {
   thesis: "论文项目",
 };
 
-const GOAL_COPY: Record<GoalMode, string> = {
-  "高 GPA": "优先标出收益高、但需要控制风险的路径。",
-  最轻松毕业: "优先标出成本最低、最容易补齐的路径。",
-  保研路线: "优先标出排名、核心课与科研时间之间的取舍。",
-  留学路线: "优先标出 GPA、课程含金量与推荐信价值。",
-  实习优先: "优先标出不挤压连续实习时间的安排。",
-  时间自由: "优先标出能保留大块个人时间的安排。",
-  低压力模式: "优先标出考试重负少、后果更轻的安排。",
-  个性化定制: "按你的权重组合高亮多目标折中路径。",
-};
-
 const ACTION_LABEL: Record<ActionMode, string> = {
   take: "选择它",
   delay: "推迟它",
@@ -154,7 +145,17 @@ export default function PlannerPage() {
     return m;
   }, [requirementsByCategoryId]);
 
-  const recommendation = useMemo(
+  // 全 req 元数据索引（含隐藏的规则 req，link 可能指向它们）—— EvidencePanel 查 link target 标题
+  const reqMetaById = useMemo(() => {
+    const m = new Map<string, { code: string; title: string }>();
+    for (const reqs of requirementsByCategoryId.values()) {
+      for (const r of reqs) m.set(r.id, { code: r.code, title: r.title });
+    }
+    return m;
+  }, [requirementsByCategoryId]);
+
+  // 启发式即刻产骨架（首帧），排队 13.5 用 useRequirementAdvice 拿 DB advice merge
+  const baselineRecommendation = useMemo(
     () =>
       computeRecommendation({
         categories,
@@ -165,6 +166,28 @@ export default function PlannerPage() {
       }),
     [categories, visibleReqsByCategoryId, optionsByRequirementId, progressByOptionId, goalMode],
   );
+
+  // 拉 DB advice + link（按可见 req 全集）
+  const visibleReqIds = useMemo(() => {
+    const out: string[] = [];
+    for (const reqs of visibleReqsByCategoryId.values()) {
+      for (const r of reqs) out.push(r.id);
+    }
+    return out;
+  }, [visibleReqsByCategoryId]);
+
+  const { adviceByReqId, linksByReqId } = useRequirementAdvice(goalMode, visibleReqIds);
+
+  // DB advice 覆盖启发式骨架 paths[].reason；adviceByReqId 空时退回启发式
+  const recommendation = useMemo(() => {
+    if (adviceByReqId.size === 0) return baselineRecommendation;
+    const enhancedPaths: RecommendedPath[] = baselineRecommendation.paths.map((p) => {
+      const a = adviceByReqId.get(p.requirementId);
+      if (!a) return p;
+      return { ...p, reason: a.one_liner };
+    });
+    return { ...baselineRecommendation, paths: enhancedPaths };
+  }, [baselineRecommendation, adviceByReqId]);
 
   const visibleRequirements = useMemo<VisibleRequirement[]>(() => {
     const pathByReq = new Map<string, RecommendedPath>();
@@ -378,7 +401,11 @@ export default function PlannerPage() {
             onActionChange={setActionMode}
             onMarkDone={() => void handleMarkDone()}
           />
-          <EvidencePanel selected={selected} />
+          <EvidencePanel
+            selected={selected}
+            links={selected ? linksByReqId.get(selected.requirement.id) ?? [] : []}
+            reqMetaById={reqMetaById}
+          />
         </aside>
       </div>
     </section>
@@ -424,7 +451,9 @@ function WorkbenchHeader({
               {school} · {year} 级
             </span>
           </div>
-          <p className="mt-1 text-sm text-slate-500">{GOAL_COPY[goalMode]}</p>
+          <p className="mt-1 text-xs text-slate-400">
+            推荐路径 amber 高亮 · 来自 8 goal × {summary?.visible ?? 0} requirement 静态库
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -771,7 +800,6 @@ function buildGraph({
 
       if (expandedBuckets.has(key)) {
         for (const item of bucketItems) {
-          const strategy = strategyForItem(item);
           const node: GraphNode = {
             id: `requirement:${item.requirement.id}`,
             kind: "requirement",
@@ -779,8 +807,8 @@ function buildGraph({
             y: requirementY,
             w: 360,
             h: 74,
-            title: strategy.title,
-            meta: strategy.meta,
+            title: item.requirement.title,
+            meta: `${item.category.title} · ${formatMissing(item)}`,
             item,
             isRecommended: item.isOnPath,
             isActive: item.requirement.id === selectedId,
@@ -818,79 +846,6 @@ function bucketKey(milestone: UserMilestoneCode, bucket?: CourseBucket): string 
   return bucket ? `${milestone}:${bucket}` : milestone;
 }
 
-function strategyForItem(item: VisibleRequirement): { title: string; meta: string } {
-  const missing = formatMissing(item);
-  const title = `${item.category.title} ${item.requirement.title}`;
-  const hasConcreteCandidate = item.recommendedOption != null;
-  const candidateHint = hasConcreteCandidate ? "已有可执行候选" : "待补充具体候选";
-
-  if (item.bucket === "公共必修") {
-    if (/体育|体质/.test(title)) {
-      return {
-        title: "把体育与体测放进低冲突学期",
-        meta: `${missing} · 不和核心课、实习周抢精力`,
-      };
-    }
-    if (/英语|外语/.test(title)) {
-      return {
-        title: "用通过成本低的公共课先清掉硬性缺口",
-        meta: `${missing} · 公共课权重低，适合先稳定推进`,
-      };
-    }
-    return {
-      title: "公共必修按低负担组合完成",
-      meta: `${missing} · 优先选不额外占用整天的安排`,
-    };
-  }
-
-  if (item.bucket === "通识必修") {
-    return {
-      title: "用通识模块补齐学分，同时控制绩点风险",
-      meta: `${missing} · 先补模块缺口，再看课程负担`,
-    };
-  }
-
-  if (item.bucket === "专业必修") {
-    return {
-      title: "先锁定会卡后续学期的专业必修",
-      meta: `${missing} · 避免先修链断掉影响毕业节奏`,
-    };
-  }
-
-  if (item.bucket === "专业选修") {
-    return {
-      title: "把专业选修对齐当前目标方向",
-      meta: `${missing} · GPA、保研、实习按收益排序`,
-    };
-  }
-
-  if (item.bucket === "任选") {
-    return {
-      title: "用任选学分填平剩余缺口",
-      meta: `${missing} · ${candidateHint}`,
-    };
-  }
-
-  if (item.milestone === "second") {
-    return {
-      title: "用项目型经历一次覆盖第二课堂要求",
-      meta: `${missing} · 竞赛、实践、训练优先选可复用经历`,
-    };
-  }
-
-  if (item.milestone === "thesis") {
-    return {
-      title: "把论文和实习排进课业压力较低的窗口",
-      meta: `${missing} · 提前预留连续时间`,
-    };
-  }
-
-  return {
-    title: "把这条要求转成可执行安排",
-    meta: `${missing} · ${candidateHint}`,
-  };
-}
-
 function ImpactPanel({
   selected,
   actionMode,
@@ -916,8 +871,6 @@ function ImpactPanel({
     );
   }
 
-  const strategy = strategyForItem(selected);
-
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between gap-3">
@@ -931,8 +884,24 @@ function ImpactPanel({
           </span>
         )}
       </div>
-      <h3 className="mt-3 text-sm font-semibold leading-6 text-slate-950">{strategy.title}</h3>
-      <p className="mt-1 text-xs leading-5 text-slate-500">{strategy.meta}</p>
+      <h3 className="mt-3 text-sm font-semibold leading-6 text-slate-950">
+        {selected.requirement.title}
+      </h3>
+      <p className="mt-1 text-xs leading-5 text-slate-500">
+        {selected.category.title} · {formatMissing(selected)}
+      </p>
+
+      {selected.pathReason && (
+        <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50/60 p-3">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="h-3.5 w-3.5 text-violet-600" />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-700">
+              AI 理由
+            </span>
+          </div>
+          <p className="mt-1.5 text-xs leading-5 text-violet-900">{selected.pathReason}</p>
+        </div>
+      )}
 
       <div className="mt-4 grid grid-cols-3 gap-1 rounded-full bg-slate-100 p-1">
         {(Object.keys(ACTION_LABEL) as ActionMode[]).map((mode) => (
@@ -1047,7 +1016,15 @@ function ImpactMetric({
   );
 }
 
-function EvidencePanel({ selected }: { selected: VisibleRequirement | null }) {
+function EvidencePanel({
+  selected,
+  links,
+  reqMetaById,
+}: {
+  selected: VisibleRequirement | null;
+  links: RequirementLink[];
+  reqMetaById: Map<string, { code: string; title: string }>;
+}) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center gap-2">
@@ -1056,7 +1033,6 @@ function EvidencePanel({ selected }: { selected: VisibleRequirement | null }) {
       </div>
       {selected ? (
         <div className="mt-4 space-y-3 text-sm">
-          <EvidenceLine icon={Target} label="策略" value={strategyForItem(selected).title} />
           <EvidenceLine icon={BookOpen} label="规则" value={selected.requirement.title} />
           <EvidenceLine icon={Compass} label="分类" value={selected.category.title} />
           <EvidenceLine
@@ -1072,6 +1048,9 @@ function EvidencePanel({ selected }: { selected: VisibleRequirement | null }) {
               {selected.requirement.source_ref ?? "暂无 source_ref"}
             </p>
           </div>
+          {links.length > 0 && (
+            <RelatedRulesBlock selected={selected} links={links} reqMetaById={reqMetaById} />
+          )}
         </div>
       ) : (
         <p className="mt-3 text-sm text-slate-500">选择一个节点后查看引用来源。</p>
@@ -1079,6 +1058,75 @@ function EvidencePanel({ selected }: { selected: VisibleRequirement | null }) {
     </section>
   );
 }
+
+function RelatedRulesBlock({
+  selected,
+  links,
+  reqMetaById,
+}: {
+  selected: VisibleRequirement;
+  links: RequirementLink[];
+  reqMetaById: Map<string, { code: string; title: string }>;
+}) {
+  const selfId = selected.requirement.id;
+  // 把 link 按"我是 from 还是 to"分方向，统一计算 target req
+  const items = links.map((l) => {
+    const isFrom = l.from_req === selfId;
+    const otherId = isFrom ? l.to_req : l.from_req;
+    const meta = reqMetaById.get(otherId);
+    return {
+      key: l.id,
+      kind: l.kind,
+      label: LINK_KIND_LABELS[l.kind],
+      direction: isFrom ? ("out" as const) : ("in" as const),
+      bidirectional: l.bidirectional,
+      otherCode: meta?.code ?? "—",
+      otherTitle: meta?.title ?? "（未知 req）",
+      note: l.note,
+      metadata: l.metadata as Record<string, unknown>,
+    };
+  });
+  return (
+    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+      <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">
+        相关规则 · {items.length}
+      </p>
+      <ul className="mt-2 space-y-2">
+        {items.map((it) => (
+          <li key={it.key} className="text-xs leading-5">
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${KIND_PILL_CLASS[it.kind]}`}
+              >
+                {it.label}
+              </span>
+              <span className="font-mono text-[11px] text-slate-500">
+                {it.direction === "out" ? "→" : "←"} {it.otherCode}
+              </span>
+              {it.bidirectional && (
+                <span className="text-[10px] text-slate-400">（双向）</span>
+              )}
+            </div>
+            <p className="mt-1 text-slate-600">{it.note ?? it.otherTitle}</p>
+            {it.metadata && Object.keys(it.metadata).length > 0 && (
+              <p className="mt-0.5 font-mono text-[10px] text-slate-400">
+                {JSON.stringify(it.metadata)}
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+const KIND_PILL_CLASS: Record<RequirementLink["kind"], string> = {
+  substitute: "bg-emerald-100 text-emerald-800",
+  prerequisite: "bg-blue-100 text-blue-800",
+  excludes: "bg-rose-100 text-rose-800",
+  cross_ref: "bg-slate-200 text-slate-700",
+  triggers: "bg-amber-100 text-amber-800",
+};
 
 function EvidenceLine({
   icon: Icon,

@@ -227,6 +227,104 @@ export type Database = {
         }
         Relationships: []
       }
+      requirement_advice: {
+        Row: {
+          created_at: string
+          goal_fit: string
+          goal_mode: string
+          id: string
+          one_liner: string
+          priority: number
+          requirement_id: string
+          shortcut_oneliners: Json
+          source_ref: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          goal_fit: string
+          goal_mode: string
+          id?: string
+          one_liner: string
+          priority?: number
+          requirement_id: string
+          shortcut_oneliners?: Json
+          source_ref?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          goal_fit?: string
+          goal_mode?: string
+          id?: string
+          one_liner?: string
+          priority?: number
+          requirement_id?: string
+          shortcut_oneliners?: Json
+          source_ref?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "requirement_advice_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "track_requirement"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      requirement_link: {
+        Row: {
+          bidirectional: boolean
+          created_at: string
+          from_req: string
+          id: string
+          kind: string
+          metadata: Json
+          note: string | null
+          source_ref: string | null
+          to_req: string
+        }
+        Insert: {
+          bidirectional?: boolean
+          created_at?: string
+          from_req: string
+          id?: string
+          kind: string
+          metadata?: Json
+          note?: string | null
+          source_ref?: string | null
+          to_req: string
+        }
+        Update: {
+          bidirectional?: boolean
+          created_at?: string
+          from_req?: string
+          id?: string
+          kind?: string
+          metadata?: Json
+          note?: string | null
+          source_ref?: string | null
+          to_req?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "requirement_link_from_req_fkey"
+            columns: ["from_req"]
+            isOneToOne: false
+            referencedRelation: "track_requirement"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "requirement_link_to_req_fkey"
+            columns: ["to_req"]
+            isOneToOne: false
+            referencedRelation: "track_requirement"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rule: {
         Row: {
           body: string | null

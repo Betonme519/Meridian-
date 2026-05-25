@@ -1,16 +1,19 @@
 /**
  * Prompt 模板集合。
  *
- * 真 provider（接 Anthropic 后）按这些模板组 messages；mock 不读 prompt，走启发式
- * 规则。模板返回 `Message[]`，调用方直接喂 `chat({ messages, signal })`。
+ * 真 provider（接 Anthropic 后）按这些模板组 messages；mock 不读 prompt 走启发式，
+ * 但靠 `[GRAD_PATH_ADVISOR]` 等 system marker 识别调用类型，模板化返结构化 JSON。
  *
  * 一个 prompt = 一个 use case，独立函数；不在这里搞 prompt 链。
  *
  * 公共 API：
- *  - recommendModePrompt(userText)  —— 根据用户自描述推荐 goal_mode
+ *  - recommendModePrompt(userText)         根据用户自描述推荐 goal_mode
+ *  - gradPathAdvisorPrompt(input)          排队 13：毕业路径 advisor（PathSuggestion[]）
+ *  - GRAD_PATH_ADVISOR_MARKER              system prompt 头部 marker，mock 用来识别
  */
 
 import type { Message } from "./stream";
+import type { GoalMode } from "@/api/profileApi";
 
 /**
  * 根据用户的中文自描述，推荐最匹配的 goal_mode。
@@ -47,3 +50,120 @@ const RECOMMEND_MODE_SYSTEM = `你是 Meridian 的学业决策助手。
 推荐：<mode 名，必须与上面列出的 8 个完全一致>
 
 理由：<2-3 句话，引用用户原话里的关键词解释为什么选这个 mode>`;
+
+/* ───────────────────────── Grad Path Advisor（排队 13） ───────────────────────── */
+
+/** mock provider 用此 marker 识别 advisor 调用，prompt 头部必须以此开头 */
+export const GRAD_PATH_ADVISOR_MARKER = "[GRAD_PATH_ADVISOR]";
+
+/** 上层传入的精简 requirement / category，避免把整 DB 行喂 LLM */
+export interface AdvisorRequirementInput {
+  id: string;
+  category_id: string;
+  code: string;
+  title: string;
+  kind: string;
+  /** kind 决定 threshold 含义：count → 门数 / credits → 学分 / gpa_threshold → 分数 等 */
+  threshold: number | null;
+  source_ref: string | null;
+}
+
+export interface AdvisorCategoryInput {
+  id: string;
+  code: string;
+  title: string;
+  order_index: number;
+}
+
+/** 启发式产的骨架，LLM 可改可不改；mock 直接沿用并升级 reason */
+export interface AdvisorSkeletonPath {
+  milestone: "course" | "second" | "thesis";
+  bucket: string | null;
+  categoryId: string;
+  requirementId: string;
+  optionId: string | null;
+  /** 启发式 reason，mock 阶段会被模板化 rationale 覆盖 */
+  reason: string;
+}
+
+export interface GradPathAdvisorInput {
+  goalMode: GoalMode | null;
+  /** 全量 30 条 category */
+  categories: AdvisorCategoryInput[];
+  /** 用户可见的 4 档 course-kind requirement，约 100+ 条（rule-kind 已过滤掉） */
+  requirements: AdvisorRequirementInput[];
+  /** 已修课程 code（user_progress + course 表合并去重） */
+  completedCodes: string[];
+  /** 启发式产的骨架路径，每 milestone 1 条 */
+  skeleton: AdvisorSkeletonPath[];
+}
+
+/**
+ * 毕业路径 advisor —— 排队 13 主入口。
+ *
+ * 调用方（trackRecommendation.fetchAdvisorRecommendation）先用启发式
+ * computeRecommendation 拿骨架 path，再调本函数把骨架 + 全量 schema 喂 LLM，
+ * 期望 LLM 返 GradPathAdvisorResponseSchema 形状的 JSON（一行，不带 markdown 围栏）。
+ *
+ * 13 mock 阶段：mock 看到 GRAD_PATH_ADVISOR_MARKER → 模板化 rationale 覆盖 skeleton.reason
+ *               → JSON.stringify 输出（一次性，不分 token 流式）。
+ *
+ * 13.2 真 LLM：本 prompt 已含全量 schema + 用户进度，LLM 可重排或保留骨架。
+ *               schema 不变，下游消费方无需修改。
+ *
+ * 选项决策（2026-05-25）：
+ *  - 数据压缩：全量 JSON 塞（不切片）
+ *  - shortcut[] 预留：是（强制空数组占位，12.5 填）
+ *  - mock rationale：goal × bucket 矩阵（8 × 5 = 40 句）
+ *  - process_rules：13 阶段不喂（留 13.8 RAG）
+ *  - 调用入口：替换 trackRecommendation 函数体（Planner 自动跑）
+ */
+export function gradPathAdvisorPrompt(input: GradPathAdvisorInput): Message[] {
+  const userPayload = JSON.stringify({
+    goalMode: input.goalMode,
+    categories: input.categories,
+    requirements: input.requirements,
+    completedCodes: input.completedCodes,
+    skeleton: input.skeleton,
+  });
+
+  return [
+    { role: "system", content: GRAD_PATH_ADVISOR_SYSTEM },
+    { role: "user", content: userPayload },
+  ];
+}
+
+const GRAD_PATH_ADVISOR_SYSTEM = `${GRAD_PATH_ADVISOR_MARKER}
+你是 Meridian 毕业路径规划顾问。
+
+**铁律**：你只能基于下面 user 消息里的 JSON 数据回答 ——
+  - categories[] 30 条一级分类
+  - requirements[] 用户可见的课程类要求
+  - completedCodes[] 用户已修课程代码
+  - skeleton[] 启发式预算的候选路径（你可保留或重排）
+
+不要凭印象编造华师大规则。如果用户问的内容不在数据里，在 reason 字段写"该规则未在数据中，需查阅手册"。
+
+任务：根据用户的 goalMode + 已修课程，从 skeleton 出发为 3 个 milestone（course / second / thesis）
+各产出至多 1 条推荐路径。reason 要解释"为什么对这个 goalMode 推这条"。
+
+输出（必须是单行 JSON，不要 markdown 围栏，不要任何其他文字）：
+
+{
+  "paths": [
+    {
+      "milestone": "course" | "second" | "thesis",
+      "bucket": "公共必修" | "通识必修" | "专业必修" | "专业选修" | "任选" | null,
+      "categoryId": "<uuid>",
+      "requirementId": "<uuid>",
+      "optionId": "<uuid> | null",
+      "reason": "<一句话，必须解释 goalMode 与这条的关系>",
+      "shortcuts": []
+    }
+  ],
+  "rankings": [],
+  "gaps": []
+}
+
+shortcuts 数组在排队 12.5 之前**强制为空 []**，不要凭空造。
+rankings / gaps 13 阶段也可返 []，留给 13.2 真 LLM 阶段填。`;
