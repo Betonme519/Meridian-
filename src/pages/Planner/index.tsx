@@ -44,6 +44,7 @@ import {
 import { computeRecommendation, type RecommendedPath } from "@/lib/trackRecommendation";
 import { useRequirementAdvice, LINK_KIND_LABELS } from "@/hooks/useRequirementAdvice";
 import type { RequirementLink } from "@/api/requirementAdviceApi";
+import { useUserRequirementDone } from "@/hooks/useUserRequirementDone";
 
 type ActionMode = "take" | "delay" | "switch";
 type FocusMode = "all" | "recommended";
@@ -135,6 +136,7 @@ export default function PlannerPage() {
   } = useUserProgress(track?.id ?? null);
 
   const { completedCodes } = useCourses();
+  const { incompleteReqIds } = useUserRequirementDone();
 
   const visibleReqsByCategoryId = useMemo(() => {
     const m = new Map<string, TrackRequirement[]>();
@@ -205,8 +207,10 @@ export default function PlannerPage() {
         const options = optionsByRequirementId.get(requirement.id) ?? [];
         const progress = calcRequirementProgress(requirement, options, progressByOptionId);
         const path = pathByReq.get(requirement.id);
-        const isUnmet =
-          progress == null || progress.target == null || progress.current < progress.target;
+        // 反向勾选语义（排队 12.5 sub-task 0）：incompleteReqIds 是单一真相 ——
+        // 用户在 Import 页取消勾选才会进 incompleteReqIds。
+        // 不在集合 = 默认已完成（不再依赖 calcRequirementProgress 推导）。
+        const isUnmet = incompleteReqIds.has(requirement.id);
         out.push({
           category,
           requirement,
@@ -239,6 +243,7 @@ export default function PlannerPage() {
     optionsByRequirementId,
     progressByOptionId,
     recommendation.paths,
+    incompleteReqIds,
   ]);
 
   const [selectedReqId, setSelectedReqId] = useState<string | null>(null);
@@ -985,8 +990,9 @@ function ImpactPanel({
       )}
 
       {!impact.option && (
-        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
-          这条目前只有规则级判断，还缺课程或项目清单。补充 option seed 后，模拟器会给出具体选择。
+        <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+          想标这条「未完成」？去 <strong className="text-slate-900">Upload 页 Section 8</strong>{" "}
+          反向勾选 —— 默认全部已完成，取消勾选即标未做。
         </p>
       )}
 

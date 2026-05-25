@@ -647,6 +647,41 @@ export type Database = {
           },
         ]
       }
+      user_requirement_done: {
+        Row: {
+          created_at: string
+          id: string
+          note: string | null
+          requirement_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          requirement_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          requirement_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_requirement_done_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "track_requirement"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_progress: {
         Row: {
           created_at: string

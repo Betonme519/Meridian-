@@ -20,6 +20,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useRagSources } from "@/hooks/useRagSources";
 import type { ParsedStatus, RagSourceKind } from "@/api/ragSourceApi";
 import CourseManager from "@/pages/Upload/CourseManager";
+import RequirementProgress from "@/pages/Upload/RequirementProgress";
 
 /* ───────────────────────── Section 2 · File import slots ───────────────────────── */
 
@@ -527,6 +528,9 @@ export default function UploadPage() {
 
       {/* Section 7 · 我已修的课（排队 11） */}
       <CourseManager />
+
+      {/* Section 8 · 毕业要求完成情况 反向勾选（排队 12.5 sub-task 0） */}
+      <RequirementProgress />
     </section>
   );
 }

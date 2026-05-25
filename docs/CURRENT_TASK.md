@@ -222,11 +222,14 @@
 
 ##### 实施清单
 
-- **0 · 反向勾选式进度收集器**（NEW 2026-05-25 合并入）
-  - 默认全 requirement 勾选为已完成
-  - 取消勾选 → 写 user_progress（status 'not_completed' 或对应 enum）
-  - 同步勾选状态 → useUserProgress / completedCodes / 画布徽章 / impact 计算
-  - 删 Planner option seed 提示语 + Import 页瘦身（沉底或删不切实际功能）
+- **0 · 反向勾选式进度收集器** ✅ 2026-05-25 落地
+  - ✅ 0009 migration: `user_requirement_done` 表（独立于 user_progress，**只存"未完成"行**；空表 = 全部完成）+ RLS owner-only + idx_urd_user/req + trg_urd_updated_at
+  - ✅ `src/api/userRequirementDoneApi.ts`：listIncomplete / markIncomplete / unmarkIncomplete / batchSetIncomplete（保留旧行 note 不全删重建）
+  - ✅ `src/hooks/useUserRequirementDone.ts`：requestIdRef + loadedUserIdRef 三件套 + 乐观 mark/unmark/toggle/batchSet + `incompleteReqIds` Set 派生
+  - ✅ `src/types/db.ts` 加 user_requirement_done 类型块
+  - ✅ `src/pages/Upload/RequirementProgress.tsx`（Section 8）：按 category 分组 grid + emerald ✓ / rose ○ 圆圈 toggle + 已完成/待完成 双 pill 计数；访客只读
+  - ✅ Planner isUnmet 改语义：`incompleteReqIds.has(id)` 为单一真相（不再依赖 calcRequirementProgress 推导，因为 option seed 永远没有）
+  - ✅ 改 Planner amber 提示语 → slate 提示"去 Upload 页 Section 8 反向勾选"
 
 - **A · 画布加第 4 层 `shortcut`（捷径）**
   - root → milestone → bucket → requirement → **shortcut** →（兴趣 input + 候选课 chips）
@@ -354,6 +357,15 @@
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
 > 早于 2026-05-14 的里程碑（排队 5 / 2 / 4b / 4a / profiles / DATA_MODEL）已挪到 `docs/AI_MEMORY.md` § 9。
+
+- **2026-05-25** — 排队 12.5 sub-task 0 ✅ 反向勾选式进度收集器（用户洞察 + 同日落地）
+  - **设计动机**：学校 ingest 不现实（无 API / 无爬虫），让学生填"还差几学分"颗粒度太细。**反向打勾**：默认全 requirement 视为已完成，取消勾选 = 还没做 → 写一行入表。心智从"我做了什么"翻转到"我还差什么"。高年级 95% 已完成只需取消 1-2 条；新生全部取消一次性勾几下。
+  - **0009 migration**：`user_requirement_done` (id / user_id / requirement_id / note / created_at / updated_at)；unique (user_id, requirement_id)；FK on delete cascade；RLS owner-only ALL；trg_urd_updated_at
+  - **API 设计**：四个函数 listIncomplete / markIncomplete / unmarkIncomplete / **batchSetIncomplete**（保存按钮用：算 diff 只发 add/remove 而非全删重建，保留旧 note）
+  - **hook**：乐观更新（mark 立即插假行，DB 回填用真 created_at 替换）+ toggle 一句话切换 + 三件套 race 守卫
+  - **UI Section 8**：按 category 分组 2-col grid + emerald ✓ / rose ○ 圆圈 toggle + 头部双 pill（已完成 N/M + 待完成 N，>0 时显示）+ 访客只读 + Loading/Empty state
+  - **Planner 集成**：isUnmet 改为 `incompleteReqIds.has(id)` 单一真相（option seed 永远没有，calcRequirementProgress 推导不再有效）；amber 提示语改 slate 引导文案"去 Upload Section 8 反向勾选"
+  - **tsc 0 新错**；用户 Supabase Dashboard 跑通 0009 + verify
 
 - **2026-05-25** — 排队 13.5 ✅ 静态路径库 + 代码层全栈落地（同日提案 + 同日完成）
   - **架构转向（用户反思 13 mock）**：AI runtime 生成 reason 视觉无差异、不稳定、要钱 → Claude 现在预编译所有 (goal × req) → 文案静态库，运行时只查表。link 表 5 档关系（substitute/prerequisite/excludes/cross_ref/triggers）独立存 req↔req 关系，AI 后期只用不挖
