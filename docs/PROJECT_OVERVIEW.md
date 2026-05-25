@@ -135,11 +135,12 @@
 - ✅ 6 张用户私有表（profile / rag_source / rule / rule_conflict / plan / chat_message）+ 5 张公共 track 表 RLS 完整
 - ✅ AI 抽象骨架（`src/ai/{stream, schema, prompts, providers/{mock, anthropic}}`） + mock provider 流式 UI
 - ✅ 0005 华师大 2023 级培养方案 seed 落库（198 条 track_requirement）
-- 🚧 接真 Anthropic provider（需先决策 AI BFF 路线）
-- 🚧 排队 11：`course` 表 + UI 入口（先 regen `types/db.ts`）
+- ✅ 排队 11：`course` 表 + UI 入口（commit `1c76e50`，2026-05-17）
+- ✅ 排队 12：画布改造 v5 Track Workspace（自绘 SVG + 5 命名组件，commit `974c21b` + `6f8b241`，2026-05-20）
 - 🚧 Dashboard 数据契约（5 张卡片仍写死 const，唯一未接通页）
-- 🚧 排队 12：画布改造（思维导图体验）
-- 🚧 排队 13：AI 接 track + user_progress + course（schema 锁逻辑）
+- 🚧 排队 13：AI 接 track + user_progress + course mock（`gradPathAdvisorPrompt` + zod schema）
+- 🚧 排队 13.2 / TD-1：接真 LLM provider（需先拍板 DeepSeek/Qwen/Zhipu/Anthropic 上游）
+- 🚧 排队 12.5：workspace 二次重构（requirement 加 shortcut 层 + AI 现算捷径 + 兴趣 input，依赖 13 + 13.2）
 
 ---
 

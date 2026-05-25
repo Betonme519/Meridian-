@@ -105,10 +105,10 @@
 - **现状**：两个 hook 名字差一个词，读 grep 混淆
 - **建议**：合并或重命名（如 `useProfileForm` / `useProfileEditing`），看实际用途差异决定
 
-### TD-35 · URL state 范式不一致
-- **现状**：Planner 用 `useSearch` 把状态写进 URL，Schedule / AIAdvisor 没有
-- **风险**：同样是"数据态可分享"，不同页处理范式不一致 —— 一种"重复但分歧"
-- **建议**：定一份规约（"页面级筛选 / 选中态进 URL"），但不强制重构旧页
+### TD-35 · URL state 范式不一致（**2026-05-25 已失效**）
+- **历史**：旧 plan-based Planner 用 `useSearch` 把 `?id=<uuid>` 写进 URL
+- **现状**：v5 Track Workspace 重写后 Planner **无任何 URL state**（grep `useSearch` 0 hit）；Schedule / AIAdvisor 同样无；只剩 Upload 内的 ragSource 可能用，但未确认
+- **结论**：跨页规约暂无必要 —— 真出现"数据态可分享"需求时再定。本条留底，可删
 
 ### TD-36 · `prompts.ts` 单文件
 - **现状**：`src/ai/prompts.ts` 只有 1 个 prompt 函数（`recommendModePrompt`）
@@ -129,8 +129,9 @@
 - **建议**：与 TD-9 / 排队 14 一起做
 
 ### TD-40 · "guest / loading / empty / data" 状态机重复
-- **现状**：Schedule line 79-86 写明 `isResolving / isGuest / isEmpty / showSeed`；Planner / Upload 推测同款
-- **建议**：抽 `useGuestAwareData()` hook；下次改 Schedule / Planner / Upload 时顺手
+- **现状**：Schedule line 79-86 写明 `isResolving / isGuest / isEmpty / showSeed`；Upload 同款
+- **2026-05-25 update**：Planner v5 重写后**已删 SEED 模式 + showSeed 分支**（自绘 SVG 不需要 guest seed 兜底），本条对 Planner 已不适用
+- **建议**：抽 `useGuestAwareData()` hook 仅覆盖 Schedule + Upload；下次改这两页时顺手
 
 ### TD-41 · Trust / status / tone 颜色映射 3 页各一份
 - **现状**：Schedule(`TRUST_META`) · Upload(`STATUS_CLS`) · Dashboard(`toneClass`) 各写一份 className → 色阶 map

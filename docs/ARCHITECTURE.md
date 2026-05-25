@@ -25,7 +25,7 @@ src/
 │  ├─ Login / Register/    鉴权页（独立壳，不进 _app）
 │  ├─ Dashboard/           AI Feed（卡片网格，仍写死 const ⚠️）
 │  ├─ AIAdvisor/           Goal Mode 设置 + 流式对话（接 useChatMessages）
-│  ├─ Planner/             ReactFlow 决策图谱（seedGraph 占位，排队 12 真接）
+│  ├─ Planner/             Track Workspace 思维导图（自绘 SVG + 绝对定位 DIV；v5 已抛 ReactFlow；接 useTrack + useUserProgress + useCourses + useProfile）
 │  ├─ Schedule/            Rule Graph（接 useRules + ruleConflict + SEED 兜底）
 │  └─ Upload/              Import 数据接入（接 useRagSources + useProfile）
 │
@@ -43,8 +43,10 @@ src/
 │
 ├─ layouts/                DashboardLayout（仅此 1 个；由 _app.tsx 唯一调用）
 ├─ context/                AuthContext · ProfileContext（全局态，挂在 __root）
-├─ hooks/                  useAuth · useProfile · useUserProfile · useRules · usePlans
+├─ hooks/                  useAuth · useProfile · useUserProfile · useRules
+│                          · useTrack · useUserProgress · useCourses
 │                          · useRagSources · useChatMessages · use-mobile
+│                          （usePlans 已删；planApi 保留供 TD-50 plan 表语义切换）
 ├─ api/                    Supabase 薄壳，一表一文件
 │                          authApi · profileApi · ragSourceApi · ruleApi · ruleConflictApi
 │                          · planApi · chatMessageApi
@@ -105,8 +107,10 @@ src/
       ┌──────────────────┐                  ┌────────────────────┐
       │  context/         │                  │  hooks/            │
       │  AuthContext      │  ◄─ useAuth ─    │  useRules          │
-      │  ProfileContext   │  ◄─ useProfile ─ │  usePlans          │
-      └────────┬─────────┘                   │  useRagSources     │
+      │  ProfileContext   │  ◄─ useProfile ─ │  useTrack          │
+      └────────┬─────────┘                   │  useUserProgress   │
+               │                              │  useCourses        │
+               │                              │  useRagSources     │
                │                              │  useChatMessages   │
                │                              └─────────┬──────────┘
                │                                        │
@@ -219,7 +223,9 @@ Provider 挂载在 `src/routes/__root.tsx`：
 | Hook | 用在 | 调的 api |
 |---|---|---|
 | `useRules` | Schedule | ruleApi + ruleConflictApi |
-| `usePlans` | Planner | planApi |
+| `useTrack` | Planner | trackApi（read-only：track + categories + requirements + options） |
+| `useUserProgress` | Planner | userProgressApi（upsert/delete user_progress） |
+| `useCourses` | Planner + Upload | courseApi（completedCodes 给画布命中判定） |
 | `useRagSources` | Upload | ragSourceApi |
 | `useChatMessages` | AIAdvisor | chatMessageApi |
 | `useUserProfile` | （TODO 合并到 useProfile） | profileApi |

@@ -149,7 +149,7 @@ zustand / jotai / valtio  ❌ 未引入
 | Register | `/register` | inline | useAuth | ✅ |
 | **Dashboard** | `/dashboard` | `_app` | **写死 5 张卡 const** + useProfile（只读） | **半接** |
 | AIAdvisor | `/ai-advisor` | `_app` | useProfile · useChatMessages · GOAL_MODES | ✅ |
-| Planner | `/course-planner` | `_app` | useAuth · usePlans · SEED_MERIDIAN_NODES（视觉占位） | ✅ |
+| Planner | `/course-planner` | `_app` | useAuth · useTrack · useUserProgress · useCourses · useProfile（v5 Track Workspace，自绘 SVG，已抛 React Flow + usePlans + SEED） | ✅ |
 | Schedule | `/schedule` | `_app` | useAuth · useRules · SEED_RULES（访客/空态用） | ✅ |
 | Upload | `/import` | `_app` | useProfile · useRagSources | ✅ |
 
@@ -159,7 +159,7 @@ zustand / jotai / valtio  ❌ 未引入
 |---|---|---|
 | P1 | 🔴 高 | **Dashboard 是 5 功能页里唯一仍 100% 写死的页**。`importShortcuts` / `decisionCards`（5 张卡 line 80–124）全是占位文案 + 假数字。**未来必爆**：用户第一次登录第一眼看 Dashboard，与其他 4 页接真数据的体验差异巨大；新接手 AI 不知 5 张卡该接哪些表。 |
 | P2 | 🟡 中 | **Schedule 跨表语义已在 page 硬写**：注释明示"学校特殊政策：暂走 SEED，不入库（属 track_* 范畴）"。track schema 第二次 pivot 后 Schedule 还得跟随。 |
-| P3 | 🟡 中 | **Planner 用 SEED_MERIDIAN_NODES 占位**——排队 12（画布改造）启动时要替换。 |
+| ~~P3~~ | ✅ 已解 | ~~Planner 用 SEED_MERIDIAN_NODES 占位~~ → 排队 12 v5 重写已替换为 track + user_progress + course，commit `974c21b`（2026-05-20）。本条作为历史记录留底。 |
 | P4 | 🟢 低 | 图标自由组合，没有"概念 → 图标"映射规范。 |
 
 ---
@@ -480,7 +480,7 @@ zustand / jotai / valtio  ❌ 未引入
 - **AI4 / A8**：mock 关键词与 prompt 关键词双源 —— 抽 `goalModeKeywords.ts`
 - **C2–C7**：状态机 / 色彩 / 日期 / Page hero / Card / CTA 重复（多数依赖排队 14 UI 重设计）
 - **P2**：Schedule 跨表占位（track schema 稳后归位）
-- **P3**：Planner SEED 占位（排队 12 会解）
+- ~~**P3**~~：✅ 已解，commit `974c21b`（v5 Track Workspace）
 - **SB3**：service_role 写公共表自动化 pipeline（落 `scripts/seed.ts`）
 - **TD-9**：shadcn primitives 在功能页 0 引用（依赖排队 14）
 

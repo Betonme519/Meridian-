@@ -150,7 +150,8 @@ idx_course_user_code        (user_id, code)             -- 重复修课 / 替代
 
 ### 3.3 `plan`
 
-**用途：** 用户在 `/course-planner` 页面建的决策图。一行 = 一张完整的 ReactFlow 工作区快照。
+**用途（历史）：** 用户在 `/course-planner` 页面建的决策图。一行 = 一张完整的 ReactFlow 工作区快照。
+**现状（2026-05-20 起）：** v5 Track Workspace 重写后 `/course-planner` **不再消费 plan 表**（改走 `track_*` + `user_progress` + `course`）。本表 schema 保留 + `planApi.ts` 留作 **TD-50「自由备注画布」语义切换**的接入点（plan.nodes shape 改为 `{ id, anchor_option_id?, text, color?, position }`，不再是 ReactFlow node）。当前无业务消费方。
 
 | 字段 | 类型 | 必填 | 默认 | 说明 |
 |---|---|---|---|---|

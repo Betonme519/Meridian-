@@ -420,6 +420,6 @@ INSERT INTO track (school, year, scope_level, name) VALUES (...);
 - `user_progress` 表（本文档 § 3.5）= 用户在 track 中的进度，**绑定 option**
 - 排队 11 给 `course` 表做 UI；排队 12 画布读 `user_progress`
 
-**排队 12 — 画布改造**：读 `track_category` → `track_requirement` → `track_option`，与 `user_progress` join 染色。
+**排队 12 — 画布改造**：✅ 闭环（v5 commit `974c21b`）。Planner 读 `track_category` → `track_requirement` → `track_option`，与 `user_progress` join 染色。**12.5 二次重构**待启动：requirement 加 shortcut 层 + AI 现算捷径 + 兴趣 input（依赖排队 13 + 13.2）。
 
 **排队 13 — AI 接 track**：整 track JSON 喂 prompt，AI 输出锁在 zod schema（PathSuggestion 引用 option_id，不允许编造）。

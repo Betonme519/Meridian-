@@ -3,7 +3,7 @@
 > 新 AI 5 分钟读完即可上手。每个里程碑 5–15 行摘要，不是开发日志。
 > 短期 sprint 看 `CURRENT_TASK.md`；技术债 backlog 看 `TECH_DEBT.md`。
 
-> Last snapshot: **2026-05-17**  ·  Branch: `main`
+> Last snapshot: **2026-05-20**  ·  Branch: `main`
 
 ---
 
@@ -26,7 +26,7 @@
 | 已接通业务表 | `profiles` ✅ · `rag_source` ✅ · `plan` ✅ · `rule` ✅ · `rule_conflict` ✅ · `chat_message` ✅ |
 | 公共 track 表 | 5 张 track_* + `user_progress` schema 落地（0002-0006 migration）+ 0005 华师大 2023 级 seed 198 条 track_requirement 跑通 |
 | AI 抽象层 | provider-agnostic 骨架 ✅（mock + remote + anthropic 三 provider）；真 LLM 上游待用户拍板（TD-1） |
-| 下一里程碑 | 排队 10 阶段 4（ecnu_process_rules.md）/ 排队 11（course 表接通）/ 排队 12（画布改造）/ 排队 13（AI 接 track）/ TD-1 拍板 LLM 上游 |
+| 下一里程碑 | 排队 13（AI mock 接 track，gradPathAdvisorPrompt + zod）→ 13.2（TD-1 拍板 LLM 上游，写 ai.chat server route）→ 12.5（workspace 二次重构：requirement 加 shortcut 层 + AI 现算捷径 + 兴趣 input）→ 13.8（TD-2 RAG）→ 14（UI 重设计） |
 | 主要风险 | 中国高校本地化文案未做；解析 pipeline 未建（TD-2，依赖 TD-1）；多 tab realtime 未上（TD-6） |
 
 ---
@@ -58,9 +58,10 @@ src/
 │  ├─ effects/             EmbeddedLaptop · GridMotion · SplitText · TiltedCard · CardSwap
 │  └─ ui/                  shadcn primitives，不要重写
 ├─ lib/                supabase 客户端单例 · guestMode · errorBus · uuid · utils
-├─ api/                authApi · profileApi · ragSourceApi · planApi · ruleApi · ruleConflictApi · chatMessageApi（薄壳）
+├─ api/                authApi · profileApi · ragSourceApi · planApi · ruleApi · ruleConflictApi · chatMessageApi · trackApi · userProgressApi · courseApi（薄壳）
 ├─ context/            AuthContext · ProfileContext
-├─ hooks/              useAuth · useProfile · useRagSources · usePlans · useRules · useChatMessages · useDrawer
+├─ hooks/              useAuth · useProfile · useRagSources · useRules · useChatMessages · useDrawer · useTrack · useUserProgress · useCourses
+│                     （usePlans 已删，planApi 留作 TD-50 接入点）
 ├─ ai/                 stream · schema · prompts · providers/{mock, remote, anthropic} · AI_PROXY_SPEC（4 家 LLM SSE 协议速记）
 ├─ types/              db.ts（supabase gen types 自动派生 743 行 / 11 表）· trackEnums.ts（12 档 kind + 3 档 scope/option + 5 档 status 字面量，与 SQL CHECK 同源）
 ├─ config/             menu.ts（单一真理源，Navbar + DashboardLayout 共用）
@@ -84,7 +85,7 @@ src/
 | 动画 | GSAP + ScrollTrigger + SplitText | Tailwind / Framer 表达力不够（pin / scrub / 字符级） |
 | 路由分组 | TanStack pathless `_app` layout | 5 功能页共享 DashboardLayout 不泄露到 page |
 | 全局菜单 | `src/config/menu.ts` 单一真理 | Navbar + DashboardLayout 共用，避免改一处忘另一处 |
-| Plan 存储 | JSONB 整存 ReactFlow graph（D6=a） | 不拆 plan_node / plan_edge，图状结构天然 JSONB 友好 |
+| Plan 存储 | JSONB 整存 graph（D6=a） | 不拆 plan_node / plan_edge，图状结构天然 JSONB 友好。**⚠️ plan 表现在已与 Planner 解耦**：v5 workspace 改用 track_* + user_progress；plan 表保留供未来 TD-50「自由备注画布」语义切换 |
 | 冲突表 | 独立 `rule_conflict`（D8=b） | 不嵌进 `rule.conflicts_with[]`，便于 AI 判断和审计 |
 | chat_message | 不开 parent table（D9=a） | conversation_id 字段挂消息上，未来加 conversation 表升级路径 |
 
@@ -97,7 +98,7 @@ Hero / Flow / Explain / GpaMath / Transparency / Control / Feedback / FAQ / Fina
 特色：EmbeddedLaptop（CSS 伪 3D）· GridMotion 图墙 · TiltedCard 3D tilt · Feedback 5 卡扇形 + 滚动星 · Transparency hub-and-spoke SVG 连线。
 
 ### 5 功能页 demo — `100%`（visual）+ 数据接通进行中
-`/dashboard` · `/ai-advisor` · `/course-planner`（ReactFlow）· `/schedule` · `/import`，已套 DashboardLayout，pathless `_app` 分组，breadcrumb HoverCard。接通现状：`/import` ✅ rag_source / `/course-planner` ✅ plan / `/ai-advisor` ✅ chat_message + AI 流式 / `/schedule` ✅ rule + rule_conflict / `/dashboard` ⏳ 5 张卡片 + 4 个 shortcut 仍写死 const（TD-7，依赖排队 11/13 后分阶段接）。
+`/dashboard` · `/ai-advisor` · `/course-planner`（v5 Track Workspace，自绘 SVG）· `/schedule` · `/import`，已套 DashboardLayout，pathless `_app` 分组，breadcrumb HoverCard。接通现状：`/import` ✅ rag_source / `/course-planner` ✅ track + user_progress + course（v5 已抛 React Flow + usePlans + seedGraph，commit `974c21b`）/ `/ai-advisor` ✅ chat_message + AI 流式 / `/schedule` ✅ rule + rule_conflict / `/dashboard` ⏳ 5 张卡片 + 4 个 shortcut 仍写死 const（TD-7，依赖排队 11/13 后分阶段接）。
 
 ### 数据库 — `100%`（schema 已演进到 0006）
 - **用户私有表**：`docs/DATA_MODEL.md` 6 张主表（profiles / course / plan / rule / rule_conflict / chat_message）+ 1 RAG 表（rag_source），RLS + index + trigger 全套，`0001_init_schema.sql` 跑通；Storage `rag_sources` bucket + 4 条 path-based RLS 已建
@@ -126,8 +127,11 @@ Supabase auth 接入 + 注册 / 登录 / 登出 / 多 tab 同步；`_app.tsx` be
 ### `rag_source` 接入 — `100%`
 `/import` 真上传到 Supabase Storage + 写 `rag_source` 表 + 列表读 DB + 删除。文件路径 `<auth_uid>/<rag_source_id>.<ext>`。upload 兜底清孤儿 storage。当前 `parsed_status` 永远 pending（解析流程依赖 AI provider，TD-2）。
 
-### `plan` 接入 — `100%`
-`/course-planner` 接通 `plan` 表（整图 JSONB，决策 D6a）。URL `?id=<uuid>` 是 source of truth；800ms debounce 自动保存；空账号 / 删光时自动建「我的第一张规划」（SEED 12 节点 + 13 边）；多 plan 切换 / 新建 / inline 重命名 / 删除（最后一张禁删）；lane 骨架渲染时拼接，不入 DB；访客模式喂 SEED 只读预览。`saveGraph` 用 `activePlanIdRef` 给 patch 盖戳，回调稳定化防"切 plan 瞬间用旧数据写新 id"。
+### `track + user_progress + course` 接入 — `100%`（v5 Track Workspace）
+`/course-planner` v5 重写（commit `974c21b`，2026-05-20）抛 React Flow + 删 `usePlans` / `seedGraph` / `SEED_MERIDIAN_NODES`，改自绘 SVG + 绝对定位 DIV。数据走 `useTrack`（read-only 全校 track + 30 cat + 198 req）+ `useUserProgress`（upsert/delete）+ `useCourses`（completedCodes 命中已修）+ `useProfile`（goal_mode）。算法层 `computeRecommendation({goalMode})` 启发式预算主推荐路径 + 节点徽章。UI 三栏：PathGraph（root → milestone → bucket → requirement 思维导图）+ ImpactPanel（take/delay/switch 模拟器）+ EvidencePanel（规则证据 + source_ref）。post-v5 拆件重构（commit `6f8b241`）抽 `WorkbenchHeader` / `PathGraph` / `ImpactPanel` / `EvidencePanel` 5 命名组件 + 新增 `EvidencePanel`「规则证据」面板。
+
+### `plan` 表现状 — 与 Planner 解耦
+`plan` 表 schema 保留（D6a 整图 JSONB）但 v5 后已无业务消费方。`planApi.ts` 留作 TD-50「自由备注画布」语义切换的接入点。
 
 ### 文档体系 — `100%`
 `CURRENT_TASK.md`（sprint）· `AI_MEMORY.md`（本文，长期）· `TECH_DEBT.md`（backlog）· `PROJECT_OVERVIEW.md` · `ARCHITECTURE.md` · `DESIGN_SYSTEM.md` · `DATA_MODEL.md` · `ARCHITECTURE_AUDIT.md`（一次性深度审计）。
@@ -183,16 +187,15 @@ HTML5 规范禁止 button 内含 interactive content。React 不报错但 a11y /
 ## 8. 下一阶段方向
 
 ### 短期（当前 sprint）
-- **排队 10 阶段 4** — `docs/ecnu_process_rules.md`（过程类规则精炼版 ~500 行内）喂排队 13 的 `gradPathAdvisorPrompt`
-- **排队 11** — `course` 表接 API + UI 入口（db.ts 已重 gen 解锁）
-- **排队 12** — 画布改造（思维导图体验，主线 = 横向排列 track_category）
-- **排队 13** — AI 接 track + user_progress + course（schema 锁逻辑；mock provider 继续）
+- ✅ 排队 10 阶段 4（`ecnu_process_rules.md` 已落）/ 排队 11（course 表接通）/ 排队 12（v5 Track Workspace 闭环）
+- **排队 13** — AI 接 track + user_progress + course mock（`gradPathAdvisorPrompt` + zod schema；mock provider 沿用）
 
-### 中期
-- **TD-1 拍板 LLM 上游** — DeepSeek / Qwen / Zhipu / Anthropic 任一家 → 写 `src/routes/api/ai.chat.ts` server route（详见 `AI_PROXY_SPEC.md`）
-- **TD-2 解析 pipeline** — 依赖 TD-1，跟 RAG 公告一起做（推进 rag_source.parsed_status pending → parsed/failed）
+### 中期（按主线顺序）
+- **排队 13.2 / TD-1 拍板 LLM 上游** — DeepSeek / Qwen / Zhipu / Anthropic 任一家 → 写 `src/routes/api/ai.chat.ts` server route（详见 `AI_PROXY_SPEC.md`）
+- **排队 12.5 workspace 二次重构** — requirement 加 shortcut 层 + AI 现算捷径 + 兴趣 input（依赖 13 + 13.2）
+- **排队 13.8 / TD-2 解析 pipeline** — 依赖 TD-1，跟 RAG 公告一起做（推进 rag_source.parsed_status pending → parsed/failed）
 - **TD-6 多 tab realtime 订阅** — profile / rag_source 等表 supabase channel 订阅
-- **排队 14 UI 重设计** — 五个功能页对齐 DESIGN_SYSTEM（触发条件：排队 12 完成后）
+- **排队 14 UI 重设计** — 五个功能页对齐 DESIGN_SYSTEM（触发条件：12.5 完成后）
 
 ### 长期
 - 中国高校文案本地化（Hero / Explain 仍是美式选课词汇）
@@ -205,6 +208,18 @@ HTML5 规范禁止 button 内含 interactive content。React 不报错但 a11y /
 ---
 
 ## 9. 项目时间线（按 commit 倒序，5-15 行/里程碑）
+
+### 2026-05-20 · 排队 12 v5 — Workspace 大改（commit `974c21b` + merge `c9efedd` 从 `auth-system` 分支）
+- **核心转向**：从"AI 高亮 1 条主路径"转到"展示**所有捷径**+ 高亮当前目标最优 + 选了看影响"。用户口述：学生要两件事 —— 一是一眼看到所有学校规则之间能找到的捷径（捷径对不同目标不同，要标注），二是做选择能看到影响。推荐路径不能只展示 3 条挤掉其他可能性。
+- **抛 React Flow**：`src/pages/Planner/index.tsx` 重写为自绘 SVG path + 绝对定位 DIV 卡（1121 行；buildGraph / edgePath / GraphNodeButton），不再走 reactflow MiniMap / Controls
+- **三层导图**：root → milestone(上课/第二课堂/论文项目，3 个) → bucket(公必/通识/专必/专选/任选) → requirement；`expandedMilestones` / `expandedBuckets` 两 Set 控制展开
+- **`strategyForItem()`**：requirement 卡 title 从"课名"切到"可执行策略短句"，按 bucket + keyword 9 档（公必 + 体育/英语/其他 / 通识 / 专必 / 专选 / 任选 / second / thesis）。例：公必体育 →「把体育与体测放进低冲突学期 · 不和核心课、实习周抢精力」；公必其他 →「公必按低负担组合完成 · 优先选不额外占用整天的安排」
+- **`FocusMode` toggle**："全部路径 / 只看推荐" 圆角药丸；"全部"模式非推荐边 slate dashed `5 7`（弱化但仍可见）；"只看推荐" 过滤到 `isOnPath`。回应用户"不能只展示 3 条 其他依然要可见"
+- **`GOAL_COPY` 8 档**：每 `goal_mode` 一句话在头卡 pill 下方显示当前高亮逻辑（实习优先 →「不挤压连续实习时间」/ 保研 →「排名、核心课与科研时间取舍」等）
+- **右侧 `ImpactPanel` 选择模拟器**：选中 requirement 后 take/delay/switch 三 action 圆角分段 + before/after credits delta + category delta + target，接 `simulatePick`
+- **视觉**：推荐边 amber `#d97706` 实线 strokeWidth 2.4；非推荐边 slate dashed；完成态 emerald-50/200；选中态 ring-2 ring-slate-950
+- **`.playwright-mcp/page-2026-05-20T*.yml` × 4** 入 commit：开发期 Playwright MCP 浏览器实测过
+- **延伸需求 → 排队 13.5**：(A) requirement 卡再下钻"多条并列具体捷径变体"（"塞已有课的那天" / "公必不计 APF 任选" 等），(B) 每条捷径标"对哪种目标最优"chip；依赖排队 13 AI 真推荐落地
 
 ### 2026-05-17 · 文档漂移大同步 + uuid bug 修
 - `useChatMessages.ts` / `ragSourceApi.ts` 兜底分支生成非合法 UUID（base36 串），DB `uuid` 列拒收。抽 `src/lib/uuid.ts` `randomUUID()` 三层兜底（`crypto.randomUUID` → `crypto.getRandomValues` → `Math.random`），两处调用 import；tsc 干净

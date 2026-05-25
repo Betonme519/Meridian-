@@ -124,7 +124,7 @@
 - 推迟（v5 后明确）：
   - **捷径变体下钻**：requirement 卡再点开一层"多条并列具体策略"（"公必塞已有课的那天" / "公必不计 APF 任选课" / "体育放在轻量学期" 等并列变体），目前 requirement 是叶子节点
   - **捷径 × 目标适配标签**：单卡显式标"此捷径对 实习优先 最优 / 对 保研 一般"，目前只有整路径按当前 goal 高亮，没在单卡上写匹配度
-  - 上两条都依赖 AI 真推荐（排队 13）才能给出具体变体 → 见 **排队 13.5**
+  - 上两条 + 兴趣维度全部并入 **排队 12.5**（2026-05-25 用户重新思考核心呈现方式后）
   - plan 表语义切换 → TD-50；track 选择器；option seed 补录；展开状态持久化
 
 #### 排队 13 — AI 接 track + user_progress + course（schema 锁逻辑）
@@ -133,28 +133,86 @@
 - `src/ai/schema.ts` 加 zod 类型：`PathSuggestion` / `OptionRanking` / `RequirementGap`。
 - mock provider 沿用模板化 rationale，**还不接真 Anthropic**。
 
-#### 排队 13.5 — 捷径变体下钻 + 目标适配标签（v5 workspace 延伸）
+#### 排队 13.2 — TD-1 接真 LLM provider（13 mock 落地后顺位接上）
 
-**起因**：2026-05-20 v5 重写后用户反馈，requirement 卡目前是"一卡一策略"的叶子节点，但学生真正想看的是"一条要求下有多种并列的可执行捷径"，并且要知道"此捷径对自己目标是否最优"。两条延伸需求都依赖排队 13 AI 真推荐先落地（启发式占位无法给出"塞已有课的那天"这种结合用户课表的具体变体）。
+- 用户拍板 LLM 上游：DeepSeek / Qwen / Zhipu / Anthropic 任一家
+- 写 `src/routes/api/ai.chat.ts` server route，按 `docs/AI_PROXY_SPEC.md` 4 家 SSE 协议骨架转发
+- providers/remote.ts 已就绪，只需把 mock 换成真 SSE
+- 解锁 13.5（"塞已有课的那天"这种结合用户课表的具体变体需要真 AI）
 
-- **A · 捷径变体下钻**
-  - requirement 卡从叶子改为可展开节点：点开后展示同一 requirement 下的**多条并列具体策略变体**
-  - 示例（公共必修体育）：
-    - 变体 1：塞进已经有专必课的那天，不多占用整块日
-    - 变体 2：放进最轻松学期（GPA 不计 APF 时）一次冲完
-    - 变体 3：与体测合并选课，单次出勤双覆盖
-  - 数据源：排队 13 `gradPathAdvisorPrompt` 输出 `PathSuggestion.variants[]`（zod schema 加 variants 字段）；AI 看 `course`（已修课表）+ `track_requirement` + `ecnu_process_rules.md` 综合生成
-  - UI：新增第 4 层节点 `variant`，x 轴接 requirement 右侧；推荐变体 amber 高亮，其他 slate dashed
-  - 文件：`src/lib/trackRecommendation.ts` 函数签名扩 `variants[]`；`src/pages/Planner/index.tsx` `buildGraph` 加 variant 层；`strategyForItem` 复用到变体节点
+#### 排队 12.5 — workspace 二次重构（核心呈现层换思路）
 
-- **B · 捷径 × 目标适配标签**
-  - 每个 requirement 卡 / 变体卡显式标"对哪些目标最优 / 一般 / 不推荐"
-  - 视觉：卡片右下角放 3-5 个目标 chip（实习 ✓ / 保研 — / 留学 ✗ 等），用 lucide 小图标 + slate/amber/emerald 三色
-  - 数据源：排队 13 AI 输出 `OptionRanking.goalFit: Record<GoalMode, "best" | "ok" | "bad">`；启发式占位可以先按 bucket × goalMode 矩阵硬编码（保研 → 专必 best / 公必 ok；实习 → 专选 best / thesis best）
-  - 文件：`src/ai/schema.ts` 加 `goalFit` 字段；`src/pages/Planner/index.tsx` `GraphNodeButton` 加 chip 区域
+**起因**：2026-05-25 用户重新思考画布的核心价值。v5（commit `974c21b`）做完后用户发现**当前呈现并不直接 ——「学生要的不是 9 档启发式策略短句，而是 AI 看完学校全部规章 + 个人课表 + 兴趣后给出的、针对该条规则的、具体可执行的多条捷径」**。这把原排队 13.5（捷径变体下钻 + goalFit 标签）从延伸需求提到主线核心，并新增**兴趣维度**作为第三个输入信号。
 
-- **顺序**：排队 13 AI 接通先 → 13.5 跟做；启发式部分（goalFit 矩阵）可与排队 13 并行
-- **不在 13.5 范围**：UI 大改（留排队 14）；track 选择器；多 track 跨校对比
+##### 核心思路差距
+
+| 层 | v5 现在 | 12.5 目标 |
+|---|---|---|
+| requirement 卡 title | `strategyForItem()` 9 档硬编码策略短句 | 就显规则名（"公共必修"四个字） |
+| requirement 下一级 | 叶子（点了进 ImpactPanel） | **可展开** → 2-4 条 AI 生成捷径 |
+| 捷径来源 | 关键词匹配 | AI 看 `track_requirement` × `course`（已修） × `ecnu_process_rules.md` × **用户兴趣** 现算 |
+| 候选课 | `track_option` 表 hardcode（且 seed 未录） | AI 输出 chips，藏在捷径下 |
+| 兴趣维度 | ❌ 无 | **点开捷径那一层时 AI 问"你对什么感兴趣？"**（不进 onboarding，按需触发） |
+| ImpactPanel / EvidencePanel / FocusMode | ✅ 已有 | ✅ 全部保留不动 |
+
+##### 用户讲的形态（"公共必修"示例）
+
+```
+[公共必修] ← 点击展开
+  ├─ 💡 不计 APF → 不为分数选，挑你感兴趣的
+  │   └─ "你对什么感兴趣？" → AI 列 3 门兴趣命中 + 时段空闲
+  ├─ 💡 周二有专必 + 周五实习意向 → 公必塞周二下午
+  │   └─ AI 列该时段可选公共课
+  ├─ 💡 大三下轻量学期一次冲完
+  │   └─ AI 算届时学分对齐组合
+  └─ 💡 体育 + 体测合并选课，单次出勤双覆盖
+```
+
+##### 实施清单
+
+- **A · 画布加第 4 层 `shortcut`（捷径）**
+  - root → milestone → bucket → requirement → **shortcut** →（兴趣 input + 候选课 chips）
+  - 删 `strategyForItem()` 9 档硬编码（AI 接通后整体被替代）
+  - requirement 卡 title 改回规则原名
+
+- **B · 捷径数据契约（排队 13 zod schema 同步扩）**
+  - `PathSuggestion.shortcuts[]: { id, oneLiner, goalFit: Record<GoalMode, "best" | "ok" | "bad">, candidates?: { code, name, reason }[] }`
+  - `oneLiner` = 一句可执行话（"公必塞已有课的那天"）
+  - `goalFit` = 对各 goal_mode 的适配度（实习 ✓ / 保研 — / 留学 ✗）
+  - `candidates[]` = AI 列的具体课程 chips，可空（兴趣 input 触发后填）
+
+- **C · 兴趣 input（点开捷径那一层触发）**
+  - 不收集到 profile 表（按用户拍板）
+  - 点开某条捷径 → 该 shortcut 内嵌兴趣 textarea + "AI 推荐" 按钮 → 调 AI 用兴趣 + 当前 shortcut + 已修课表 现算 candidates
+  - 兴趣文本不持久化（session 内有效），下次重选重问
+
+- **D · goalFit 标签**
+  - 单卡（requirement / shortcut）右下角放 3-5 目标 chip（lucide 图标 + slate/amber/emerald 三色）
+  - 视觉：实习 ✓ / 保研 — / 留学 ✗ 等
+  - 数据源：AI 输出（启发式占位可按 bucket × goalMode 矩阵硬编码兜底）
+
+- **E · `computeRecommendation` 函数体替换**
+  - 签名稳定，函数体启发式 → AI 调用
+  - 输出 `paths[]` 结构改为含 `shortcuts[]`
+
+##### 落地前提
+
+- **排队 13 + 13.2 必须先通**：启发式生不出"不计 APF 所以任选兴趣"这种动态推理，必须等真 LLM 接入
+- AI 提示词加兴趣槽位（`gradPathAdvisorPrompt` 扩 `userInterest?: string` 参数）
+- mock provider 阶段用模板化 shortcuts（每 requirement 出 2-3 条固定文案），UI 先跑通
+
+##### 不在 12.5 范围
+
+- UI 视觉大改（留排队 14）
+- track 选择器 / 多 track 跨校对比
+- 兴趣持久化（用户拍板暂不进 profile）
+- option seed 0007 补录（AI 接通后 track_option 表降级为兜底）
+
+#### 排队 13.8 — TD-2 解析 pipeline + RAG 公告（12.5 后接）
+
+- 依赖 TD-1（真 LLM）已落地
+- 非结构化数据（公告 / 手册细节）入口，挂到 requirement 上做 RAG 增强
+- 跟「公告 RAG」一起做
 
 ---
 
@@ -174,14 +232,7 @@
 
 ## 并行/穿插（不阻塞主线，但要做）
 
-- **TD-2 解析 pipeline** — 非结构化数据（公告/手册细节）入口，挂到 requirement 上做 RAG 增强。**主线不依赖**，依赖 TD-1。
-
----
-
-## 已推迟（先不做）
-
-- **TD-1 接真 LLM provider** — 2026-05-17 用户拍板 "可能接 DeepSeek / Qwen / Zhipu / Anthropic 任一家"，骨架已升级为 provider-agnostic（`/api/ai.chat` 走本地 server proxy）；具体 server route 等用户决定上游再写。详见 `docs/AI_PROXY_SPEC.md`。
-- **TD-2 解析 pipeline** — 依赖 TD-1，跟 RAG 公告一起做。
+- 暂无（TD-1 / TD-2 已挪入主线 13.2 / 13.8）
 
 ---
 
@@ -191,8 +242,9 @@
 
 1. **排队 13** AI 接 track + user_progress + course（`gradPathAdvisorPrompt`，两个数据源：198 条 track_requirement + `ecnu_process_rules.md`；Planner 页 `pickRecommendedOption` 启发式占位等 AI 接入替换）。
 2. **TD-10** target_gpa / goal_weights UI（需用户拍板：放 Upload 设置区还是新建 Settings 页 / weights 是 8 个 slider 还是简化）。
-3. **TD-1 余尾** 拍板 LLM 上游（DeepSeek / Qwen / Zhipu / Anthropic）→ 写 `src/routes/api/ai.chat.ts` server route，详见 `docs/AI_PROXY_SPEC.md`。
-4. **TD-50** plan 表语义切换（"自由备注画布"模式，决定 plan.nodes 新 shape）。
+3. **TD-50** plan 表语义切换（"自由备注画布"模式，决定 plan.nodes 新 shape）。
+
+> **新主线顺序（2026-05-25 调整）**：13 mock → 13.2 TD-1 真 provider → **12.5 workspace 二次重构（核心呈现层换思路 + 兴趣维度）** → 13.8 TD-2 RAG → 14 UI 重设计
 
 ### ⏳ 已采纳决策（不再追问，留备份）
 
