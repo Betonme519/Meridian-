@@ -135,6 +135,21 @@ export default function AIAdvisorPage() {
     remove: removeConversation,
   } = useChatMessages();
 
+  // 接收从 AI Feed (/dashboard) 顶部「你今天想问点什么」入口传来的草稿。
+  // mount 时读一次、立刻清掉,避免下次再进页面又被自动填上旧内容。
+  // 用 sessionStorage 而非 search params:不改 route 配置 + 关页就清。
+  useEffect(() => {
+    try {
+      const draft = sessionStorage.getItem("meridian.ai-feed.ask-draft");
+      if (draft && draft.trim()) {
+        setProfileText(draft);
+        sessionStorage.removeItem("meridian.ai-feed.ask-draft");
+      }
+    } catch {
+      // private mode / quota 静默吞
+    }
+  }, []);
+
   // 选中历史会话后，把 user msg 灌进 textarea + assistant msg 灌进 parsedNote，
   // 让用户直接看到那次推荐的内容。切走（clearActive）时由对应 handler 清空。
   useEffect(() => {
@@ -285,7 +300,7 @@ export default function AIAdvisorPage() {
                       active
                         ? "bg-white/10"
                         : mode.pro
-                          ? "bg-amber-50 text-amber-700 group-hover:bg-amber-100/70"
+                          ? "bg-gold/10 text-gold group-hover:bg-gold/20"
                           : "bg-slate-100 group-hover:bg-slate-200/70"
                     }`}
                   >
@@ -296,18 +311,18 @@ export default function AIAdvisorPage() {
                       <span
                         className={`rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] ${
                           active
-                            ? "border-amber-300/40 bg-amber-300/10 text-amber-200"
-                            : "border-amber-300 bg-amber-50 text-amber-700"
+                            ? "border-gold/40 bg-gold/10 text-gold/80"
+                            : "border-gold/50 bg-gold/10 text-gold"
                         }`}
                       >
                         Pro
                       </span>
                     )}
                     {active ? (
-                      <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                      <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-maya">
                         <span className="relative flex h-1.5 w-1.5">
-                          <span className="animate-pulse-halo absolute inset-0 rounded-full bg-emerald-300" />
-                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-300" />
+                          <span className="animate-pulse-halo absolute inset-0 rounded-full bg-maya" />
+                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-maya" />
                         </span>
                         Active
                       </span>
@@ -387,7 +402,7 @@ export default function AIAdvisorPage() {
               {streaming ? "分析中…" : "让 AI 选择模式"}
             </button>
             {parsedNote ? (
-              <p className="mt-3 flex items-start gap-1.5 whitespace-pre-wrap text-sm font-medium text-emerald-700">
+              <p className="mt-3 flex items-start gap-1.5 whitespace-pre-wrap text-sm font-medium text-slate-700">
                 <CheckCircle2 className="mt-1 h-3.5 w-3.5 shrink-0" />
                 <span>
                   {parsedNote}
@@ -476,7 +491,7 @@ export default function AIAdvisorPage() {
                               </span>
                             )}
                             {c.aborted && (
-                              <span className="flex items-center gap-1 text-rose-600">
+                              <span className="flex items-center gap-1 text-flame">
                                 <XCircle className="h-3 w-3" />
                                 中断
                               </span>
@@ -497,7 +512,7 @@ export default function AIAdvisorPage() {
                               );
                             }
                           }}
-                          className="text-slate-400 opacity-0 transition-opacity hover:text-rose-500 group-hover:opacity-100"
+                          className="text-slate-400 opacity-0 transition-opacity hover:text-flame group-hover:opacity-100"
                           aria-label="删除对话"
                         >
                           <Trash2 className="h-3.5 w-3.5" />

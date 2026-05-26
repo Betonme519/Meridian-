@@ -61,6 +61,19 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /*
+   * Functional pages accent palette (2026-05-26)
+   * 仅功能页用,落地页保持 amber/rose/emerald/violet 原 class 不动。
+   * 命名直接用色名,避免和 Tailwind 原色板冲突。Tailwind v4 自动生成
+   *   bg-flame / text-gold / border-maya / bg-sapphire/10 等工具类。
+   * 取色来自桌面参考图「多彩色」(Tiger Flame / Sunflower Gold /
+   * Maya Blue / Electric Sapphire)。
+   */
+  --color-flame: #FE6237;
+  --color-gold: #FFB62E;
+  --color-maya: #7CC3FF;
+  --color-sapphire: #4164FF;
 }
 
 @layer base {

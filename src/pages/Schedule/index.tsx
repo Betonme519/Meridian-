@@ -120,30 +120,30 @@ export default function SchedulePage() {
     <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
       {/* Status banners */}
       {isGuest && (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs text-slate-600">
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs text-slate-600">
           <span>访客预览 · 登录后即可录入并保存你的规则知识库。</span>
           <span className="text-slate-400">示例数据</span>
         </div>
       )}
       {!isGuest && isEmpty && (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800">
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-gold/50 bg-white px-4 py-2.5 text-xs text-slate-700">
           <span>以下为示例规则，点右上「+ 新建规则」录入你的内容。</span>
           <button
             type="button"
             onClick={() => setRuleFormOpen(true)}
-            className="rounded-md bg-amber-900/90 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-amber-900"
+            className="rounded-md bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-slate-700"
           >
             立即新建
           </button>
         </div>
       )}
       {error && (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs text-rose-800">
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-flame/40 bg-white px-4 py-2.5 text-xs text-flame">
           <span>{error}</span>
           <button
             type="button"
             onClick={() => void refresh()}
-            className="inline-flex items-center gap-1 rounded-md bg-rose-900/90 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-rose-900"
+            className="inline-flex items-center gap-1 rounded-md bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-slate-700"
           >
             <RefreshCcw className="h-3 w-3" /> 重试
           </button>
@@ -247,7 +247,7 @@ export default function SchedulePage() {
                                   void removeRule(leaf.id);
                                 }
                               }}
-                              className="invisible mt-0.5 rounded p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 group-hover:visible"
+                              className="invisible mt-0.5 rounded p-1 text-slate-400 transition-colors hover:bg-flame/10 hover:text-flame group-hover:visible"
                               aria-label="删除"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -331,7 +331,7 @@ export default function SchedulePage() {
                                     void removeRule(it.id);
                                   }
                                 }}
-                                className="invisible rounded p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 group-hover:visible"
+                                className="invisible rounded p-1 text-slate-400 transition-colors hover:bg-flame/10 hover:text-flame group-hover:visible"
                                 aria-label="删除"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -365,7 +365,7 @@ export default function SchedulePage() {
       {/* Section 3 · Conflicts */}
       <div className="mt-12">
         <div className="flex items-center gap-2">
-          <ShieldAlert className="h-5 w-5 text-rose-500" />
+          <ShieldAlert className="h-5 w-5 text-flame" />
           <h2 className="font-semibold tracking-tight">冲突规则</h2>
           <span className="ml-auto text-xs text-slate-400 tabular-nums">
             {displayConflicts.length} 条需要人工确认
@@ -375,7 +375,7 @@ export default function SchedulePage() {
               type="button"
               onClick={() => setConflictFormOpen((v) => !v)}
               disabled={rules.length < 2}
-              className="inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="inline-flex items-center gap-1 rounded-md bg-flame px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-flame/90 disabled:cursor-not-allowed disabled:bg-slate-300"
               title={rules.length < 2 ? "至少有 2 条规则才能新建冲突" : ""}
             >
               <Plus className="h-3 w-3" />
@@ -407,11 +407,11 @@ export default function SchedulePage() {
             return (
               <article
                 key={c.id}
-                className="group animate-fade-in-up-soft relative rounded-2xl border border-rose-200 bg-white p-5"
+                className="group animate-fade-in-up-soft relative rounded-2xl border border-flame/40 bg-white p-5"
                 style={{ animationDelay: `${60 + i * 60}ms` }}
               >
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex h-5 items-center rounded-full bg-rose-100 px-2 text-[11px] font-semibold text-rose-800">
+                  <span className="inline-flex h-5 items-center rounded-full bg-flame/15 px-2 text-[11px] font-semibold text-flame">
                     冲突
                   </span>
                   <h3 className="text-sm font-semibold text-slate-900">
@@ -430,7 +430,7 @@ export default function SchedulePage() {
                           void removeConflict(c.id);
                         }
                       }}
-                      className="invisible ml-auto rounded p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 group-hover:visible"
+                      className="invisible ml-auto rounded p-1 text-slate-400 transition-colors hover:bg-flame/10 hover:text-flame group-hover:visible"
                       aria-label="删除冲突"
                     >
                       <X className="h-4 w-4" />
@@ -522,7 +522,7 @@ function ConflictSide({
 }) {
   return (
     <div
-      className={`rounded-xl border p-3 ${highlighted ? "border-emerald-300 bg-emerald-50/60" : "border-slate-200 bg-slate-50/60"}`}
+      className={`rounded-xl border p-3 ${highlighted ? "border-maya/50 bg-white" : "border-slate-200 bg-white"}`}
     >
       <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">
         {side} 方{highlighted && " · 已采纳"}
@@ -711,7 +711,7 @@ function NewConflictForm({
   };
 
   return (
-    <div className="mt-3 space-y-2 rounded-xl border border-rose-200 bg-rose-50/50 p-3">
+    <div className="mt-3 space-y-2 rounded-xl border border-flame/40 bg-white p-3">
       <div className="grid grid-cols-2 gap-2">
         <label className="text-[11px] font-medium text-slate-600">
           A 方规则
@@ -774,7 +774,7 @@ function NewConflictForm({
         </select>
       </label>
       {aId === bId && (
-        <p className="text-[11px] text-rose-600">A / B 方不能是同一条规则</p>
+        <p className="text-[11px] text-flame">A / B 方不能是同一条规则</p>
       )}
       <div className="flex justify-end gap-2 pt-1">
         <button
@@ -789,7 +789,7 @@ function NewConflictForm({
           type="button"
           onClick={() => void submit()}
           disabled={busy || !title.trim() || aId === bId}
-          className="rounded-md bg-rose-600 px-3 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+          className="rounded-md bg-flame px-3 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-flame/90 disabled:cursor-not-allowed disabled:bg-slate-400"
         >
           {busy ? "保存中…" : "保存"}
         </button>

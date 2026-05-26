@@ -104,10 +104,10 @@ const STATUS_LABEL: Record<ParsedStatus, string> = {
 };
 
 const STATUS_CLS: Record<ParsedStatus, string> = {
-  pending: "bg-amber-50 text-amber-800",
-  parsing: "bg-amber-50 text-amber-800",
-  parsed: "bg-emerald-50 text-emerald-700",
-  failed: "bg-rose-50 text-rose-700",
+  pending: "bg-gold/10 text-slate-700",
+  parsing: "bg-gold/10 text-slate-700",
+  parsed: "bg-maya/15 text-slate-700",
+  failed: "bg-flame/10 text-flame",
 };
 
 /** ISO timestamptz → YYYY-MM-DD，避开 locale 差异 */
@@ -263,7 +263,7 @@ export default function UploadPage() {
         </div>
 
         {sourcesError && (
-          <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          <p className="mt-3 rounded-lg border border-flame/40 bg-white px-3 py-2 text-xs text-flame">
             {sourcesError}
           </p>
         )}
@@ -444,7 +444,7 @@ export default function UploadPage() {
                   <span
                     className={`ml-auto inline-flex h-5 items-center rounded-full px-2 text-[11px] font-semibold ${
                       m.status === "已连接"
-                        ? "bg-emerald-50 text-emerald-700"
+                        ? "bg-maya/15 text-slate-700"
                         : "bg-slate-100 text-slate-500"
                     }`}
                   >
@@ -516,7 +516,7 @@ export default function UploadPage() {
               <button
                 type="button"
                 onClick={() => void handleRemove(r.id)}
-                className="inline-flex h-8 w-fit items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-medium text-slate-700 transition-colors hover:border-rose-300 hover:text-rose-700"
+                className="inline-flex h-8 w-fit items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-medium text-slate-700 transition-colors hover:border-flame/50 hover:text-flame"
               >
                 <Trash2 className="h-3 w-3" />
                 删除

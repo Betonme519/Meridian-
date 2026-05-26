@@ -28,10 +28,10 @@ const STATUS_LABEL: Record<CourseStatus, string> = {
 
 const STATUS_CLS: Record<CourseStatus, string> = {
   planned: "bg-slate-100 text-slate-600",
-  enrolled: "bg-amber-50 text-amber-800",
-  completed: "bg-emerald-50 text-emerald-700",
+  enrolled: "bg-gold/10 text-slate-700",
+  completed: "bg-maya/15 text-slate-700",
   dropped: "bg-slate-100 text-slate-500",
-  failed: "bg-rose-50 text-rose-700",
+  failed: "bg-flame/10 text-flame",
 };
 
 interface DraftRow {
@@ -111,7 +111,7 @@ export default function CourseManager() {
       </p>
 
       {error && (
-        <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <p className="mt-3 rounded-lg border border-flame/40 bg-white px-3 py-2 text-xs text-flame">
           {error}
         </p>
       )}
@@ -242,7 +242,7 @@ export default function CourseManager() {
             <button
               type="button"
               onClick={() => void handleRemove(c.id)}
-              className="inline-flex h-8 w-fit items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-medium text-slate-700 transition-colors hover:border-rose-300 hover:text-rose-700"
+              className="inline-flex h-8 w-fit items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-medium text-slate-700 transition-colors hover:border-flame/50 hover:text-flame"
             >
               <Trash2 className="h-3 w-3" />
               删除

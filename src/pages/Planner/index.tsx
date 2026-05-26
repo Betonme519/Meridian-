@@ -12,7 +12,6 @@ import {
   GraduationCap,
   Layers3,
   Lightbulb,
-  Loader2,
   MousePointer2,
   PanelRightOpen,
   Search,
@@ -46,6 +45,7 @@ import { useRequirementAdvice, LINK_KIND_LABELS } from "@/hooks/useRequirementAd
 import type { RequirementLink, AdviceShortcut, GoalFit } from "@/api/requirementAdviceApi";
 import { GOAL_MODES } from "@/api/profileApi";
 import { useUserRequirementDone } from "@/hooks/useUserRequirementDone";
+import PathLoader from "@/components/effects/PathLoader";
 
 type ActionMode = "take" | "delay" | "switch";
 type FocusMode = "all" | "recommended";
@@ -131,9 +131,9 @@ const GOAL_CHIP_LABEL: Record<(typeof GOAL_MODES)[number], string> = {
 };
 
 const GOAL_FIT_TONE: Record<GoalFit, string> = {
-  best: "bg-emerald-100 text-emerald-800 ring-emerald-200",
+  best: "bg-maya/15 text-maya ring-maya/40",
   ok: "bg-slate-100 text-slate-600 ring-slate-200",
-  bad: "bg-rose-50 text-rose-700 ring-rose-200",
+  bad: "bg-flame/15 text-flame ring-flame/40",
 };
 
 export default function PlannerPage() {
@@ -399,11 +399,8 @@ export default function PlannerPage() {
 
   if (trackLoading) {
     return (
-      <section className="flex min-h-[70vh] items-center justify-center px-5">
-        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          正在计算你的毕业路径
-        </div>
+      <section className="flex min-h-[70vh] items-center justify-center px-5 pt-[1vh] pr-[3vw]">
+        <PathLoader caption="正在计算学业路径" />
       </section>
     );
   }
@@ -411,7 +408,7 @@ export default function PlannerPage() {
   if (trackError || !track) {
     return (
       <section className="mx-auto max-w-3xl px-5 py-16">
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-800">
+        <div className="rounded-2xl border border-flame/40 bg-flame/10 p-6 text-slate-700">
           <h1 className="text-xl font-semibold">没有读到培养方案</h1>
           <p className="mt-2 text-sm leading-6">
             {trackError ?? "公共 track 数据为空。请先确认学校规则 seed 已经落库。"}
@@ -496,63 +493,64 @@ function WorkbenchHeader({
       : 0;
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
-              {goalMode}
-            </span>
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600">
-              {school} · {year} 级
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-slate-400">
-            推荐路径 amber 高亮 · 来自 8 goal × {summary?.visible ?? 0} requirement 静态库
+    <header className="px-1">
+      {/* 第 1 行:裸标题 + 副标题 | 右侧 focus toggle (浮在 layout 浅灰底上) */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs text-slate-500">
+            毕业路径 · 点击节点逐层展开 · 上课 → 类别 → 选项
           </p>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <MetricChip icon={Sparkles} label="推荐" value={`${summary?.paths ?? 0} 条`} />
-          <MetricChip icon={GitBranchPlus} label="可见节点" value={`${summary?.visible ?? 0}`} />
-          <MetricChip icon={Search} label="待处理" value={`${summary?.unmet ?? 0}`} />
-          <div className="flex h-9 items-center rounded-full border border-slate-200 bg-slate-50 p-1">
-            <button
-              type="button"
-              onClick={() => onFocusModeChange("all")}
-              className={`h-7 rounded-full px-3 text-xs font-medium transition-colors ${
-                focusMode === "all" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"
-              }`}
-            >
-              全部路径
-            </button>
-            <button
-              type="button"
-              onClick={() => onFocusModeChange("recommended")}
-              className={`h-7 rounded-full px-3 text-xs font-medium transition-colors ${
-                focusMode === "recommended" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"
-              }`}
-            >
-              只看推荐
-            </button>
-          </div>
+        <div className="flex h-9 items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm">
+          <button
+            type="button"
+            onClick={() => onFocusModeChange("all")}
+            className={`h-7 rounded-full px-3 text-xs font-medium transition-colors ${
+              focusMode === "all" ? "bg-slate-950 text-white" : "text-slate-500"
+            }`}
+          >
+            全部路径
+          </button>
+          <button
+            type="button"
+            onClick={() => onFocusModeChange("recommended")}
+            className={`h-7 rounded-full px-3 text-xs font-medium transition-colors ${
+              focusMode === "recommended" ? "bg-slate-950 text-white" : "text-slate-500"
+            }`}
+          >
+            只看推荐
+          </button>
         </div>
       </div>
 
-      <div className="mt-3 grid gap-2 lg:grid-cols-[240px_1fr] lg:items-center">
+      {/* 第 2 行:chip 横排 goal + school + 3 个 KPI */}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <span className="inline-flex h-7 items-center rounded-full border border-gold/50 bg-white px-2.5 text-xs font-medium text-gold">
+          {goalMode}
+        </span>
+        <span className="inline-flex h-7 items-center rounded-full border border-slate-200 bg-white px-2.5 text-xs text-slate-600">
+          {school} · {year} 级
+        </span>
+        <MetricChip icon={Sparkles} label="推荐" value={`${summary?.paths ?? 0} 条`} />
+        <MetricChip icon={GitBranchPlus} label="可见节点" value={`${summary?.visible ?? 0}`} />
+        <MetricChip icon={Search} label="待处理" value={`${summary?.unmet ?? 0}`} />
+      </div>
+
+      {/* 第 3 行:进度文字 + bar 裸露行 */}
+      <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_260px] sm:items-center">
         <div className="text-xs text-slate-500">
           已匹配 {summary?.completedMatches ?? 0} 个已修课程，当前学分{" "}
           <span className="font-semibold text-slate-900">{fmtCredits(summary?.earned ?? 0)}</span>
           {summary?.target != null && ` / ${fmtCredits(summary.target)}`}
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200/70">
           <div
             className="h-full rounded-full bg-slate-900 transition-all"
             style={{ width: `${progress}%` }}
           />
         </div>
       </div>
-    </section>
+    </header>
   );
 }
 
@@ -566,10 +564,10 @@ function MetricChip({
   value: string;
 }) {
   return (
-    <span className="inline-flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-xs text-slate-600">
+    <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-xs text-slate-600">
       <Icon className="h-3.5 w-3.5 text-slate-400" />
       {label}
-      <strong className="font-semibold text-slate-950">{value}</strong>
+      <strong className="font-semibold text-slate-950 tabular-nums">{value}</strong>
     </span>
   );
 }
@@ -671,8 +669,8 @@ function PathGraph({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-          <LegendDot className="bg-amber-500" label="推荐路径" />
-          <LegendDot className="bg-emerald-500" label="已满足" />
+          <LegendDot className="bg-gold" label="推荐路径" />
+          <LegendDot className="bg-maya" label="已满足" />
           <LegendDot className="bg-slate-300" label="其他路径" />
           <span className="inline-flex items-center gap-1">
             <MousePointer2 className="h-3.5 w-3.5" />
@@ -736,11 +734,11 @@ function GraphNodeButton({ node, onClick }: { node: GraphNode; onClick: () => vo
   const isStructure = node.kind === "root" || node.kind === "milestone" || node.kind === "bucket";
   const tone =
     node.kind === "shortcut"
-      ? "border-amber-200 bg-amber-50/70 text-amber-950"
+      ? "border-gold/60 bg-white text-slate-900"
       : node.isRecommended
-        ? "border-amber-300 bg-amber-50 text-amber-950 shadow-[0_0_0_1px_rgba(217,119,6,0.12)]"
+        ? "border-gold/60 bg-white text-slate-900 shadow-[0_0_0_1px_rgba(217,119,6,0.12)]"
         : node.isComplete
-          ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+          ? "border-maya/60 bg-white text-slate-900"
           : "border-slate-200 bg-white text-slate-900";
   const active = node.isActive ? "ring-2 ring-slate-950 ring-offset-2" : "";
 
@@ -762,7 +760,15 @@ function GraphNodeButton({ node, onClick }: { node: GraphNode; onClick: () => vo
     >
       <div className="flex items-center gap-2">
         <LeadIcon
-          className={`h-3.5 w-3.5 flex-none ${node.kind === "shortcut" ? "text-amber-600" : "text-slate-400"}`}
+          className={`h-3.5 w-3.5 flex-none ${
+            node.kind === "shortcut"
+              ? "text-gold"
+              : node.isRecommended
+                ? "text-gold"
+                : node.isComplete
+                  ? "text-maya"
+                  : "text-slate-400"
+          }`}
         />
         <span
           className={`min-w-0 text-xs font-semibold ${
@@ -1026,7 +1032,7 @@ function ImpactPanel({
           <h2 className="font-semibold text-slate-950">选择模拟器</h2>
         </div>
         {selected.isOnPath && (
-          <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-800">
+          <span className="rounded-full bg-gold/15 px-2 py-1 text-[11px] font-medium text-slate-700">
             推荐路径
           </span>
         )}
@@ -1039,19 +1045,19 @@ function ImpactPanel({
       </p>
 
       {selected.pathReason && (
-        <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50/60 p-3">
+        <div className="mt-4 rounded-xl border border-sapphire/40 bg-white p-3">
           <div className="flex items-center gap-1.5">
-            <Sparkles className="h-3.5 w-3.5 text-violet-600" />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-700">
+            <Sparkles className="h-3.5 w-3.5 text-sapphire" />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sapphire">
               AI 理由
             </span>
           </div>
-          <p className="mt-1.5 text-xs leading-5 text-violet-900">{selected.pathReason}</p>
+          <p className="mt-1.5 text-xs leading-5 text-slate-700">{selected.pathReason}</p>
         </div>
       )}
 
       {selected.shortcuts.length > 0 && (
-        <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800 ring-1 ring-inset ring-amber-200">
+        <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-gold/15 px-2.5 py-1 text-[11px] font-medium text-slate-700 ring-1 ring-inset ring-gold/40">
           <Lightbulb className="h-3 w-3" />有 {selected.shortcuts.length} 条路径建议 ·
           在画布上点开此卡查看
         </p>
@@ -1114,14 +1120,14 @@ function ImpactPanel({
       </div>
 
       {impact.option && (
-        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-emerald-700">
+        <div className="mt-4 rounded-xl border border-maya/50 bg-white p-4">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-maya">
             可执行选项
           </p>
-          <h3 className="mt-2 text-sm font-semibold text-emerald-950">
+          <h3 className="mt-2 text-sm font-semibold text-slate-950">
             {impact.option.code} · {impact.option.name}
           </h3>
-          <p className="mt-1 text-xs text-emerald-800">
+          <p className="mt-1 text-xs text-slate-600">
             {impact.option.credits != null
               ? `${fmtCredits(impact.option.credits)} 学分`
               : "学分待定"}
@@ -1130,7 +1136,7 @@ function ImpactPanel({
             type="button"
             onClick={onMarkDone}
             disabled={isGuest}
-            className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-full bg-emerald-700 px-3 text-xs font-medium text-white transition-colors hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-full bg-slate-950 px-3 text-xs font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <CheckCircle2 className="h-3.5 w-3.5" />
             标为已完成
@@ -1148,7 +1154,7 @@ function ImpactPanel({
       {isGuest && (
         <p className="mt-3 text-xs text-slate-400">访客模式可看模拟，登录后才能保存进度。</p>
       )}
-      {error && <p className="mt-3 text-xs text-rose-600">{error}</p>}
+      {error && <p className="mt-3 text-xs text-flame">{error}</p>}
     </section>
   );
 }
@@ -1165,10 +1171,10 @@ function ShortcutDetail({
 }) {
   const candidates = shortcut.candidates ?? [];
   return (
-    <section className="rounded-xl border border-amber-200 bg-white p-5 shadow-sm">
+    <section className="rounded-xl border border-gold/50 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Lightbulb className="h-5 w-5 text-amber-600" />
+          <Lightbulb className="h-5 w-5 text-gold" />
           <h2 className="font-semibold text-slate-950">路径建议详情</h2>
         </div>
         <button
@@ -1182,7 +1188,7 @@ function ShortcutDetail({
 
       <p className="mt-1 text-[11px] text-slate-500">所属规则：{selected.requirement.title}</p>
 
-      <h3 className="mt-3 rounded-xl bg-amber-50/70 p-3 text-sm font-semibold leading-6 text-amber-950">
+      <h3 className="mt-3 rounded-xl border border-gold/50 bg-white p-3 text-sm font-semibold leading-6 text-slate-950">
         {shortcut.oneLiner ?? "未命名建议"}
       </h3>
 
@@ -1222,7 +1228,7 @@ function ShortcutDetail({
           type="button"
           disabled
           title="排队 13.2 接真 LLM 后启用"
-          className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-full bg-amber-700 px-3 text-[11px] font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+          className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-full bg-slate-950 px-3 text-[11px] font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           <Sparkles className="h-3 w-3" />
           AI 推荐
@@ -1377,11 +1383,11 @@ function RelatedRulesBlock({
 }
 
 const KIND_PILL_CLASS: Record<RequirementLink["kind"], string> = {
-  substitute: "bg-emerald-100 text-emerald-800",
-  prerequisite: "bg-blue-100 text-blue-800",
-  excludes: "bg-rose-100 text-rose-800",
-  cross_ref: "bg-slate-200 text-slate-700",
-  triggers: "bg-amber-100 text-amber-800",
+  substitute: "bg-maya/15 text-maya",
+  prerequisite: "bg-sapphire/15 text-sapphire",
+  excludes: "bg-flame/15 text-flame",
+  cross_ref: "bg-slate-100 text-slate-700",
+  triggers: "bg-gold/15 text-gold",
 };
 
 function EvidenceLine({

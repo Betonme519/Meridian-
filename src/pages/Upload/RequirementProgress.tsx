@@ -72,16 +72,16 @@ export default function RequirementProgress() {
           </p>
           <h2 className="mt-1 font-semibold tracking-tight">毕业要求完成情况</h2>
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            默认所有要求视为已完成。<strong className="text-rose-600">取消勾选</strong>
+            默认所有要求视为已完成。<strong className="text-flame">取消勾选</strong>
             =这条还没做，下次完成后再勾回即可。
           </p>
         </div>
         <div className="flex flex-col items-end gap-1 text-xs">
-          <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700">
+          <span className="rounded-full bg-maya/15 px-2.5 py-1 font-medium text-slate-700">
             已完成 {completedCount} / {totalCount}
           </span>
           {incompleteCount > 0 && (
-            <span className="rounded-full bg-rose-50 px-2.5 py-1 font-medium text-rose-700">
+            <span className="rounded-full bg-flame/10 px-2.5 py-1 font-medium text-flame">
               待完成 {incompleteCount}
             </span>
           )}
@@ -89,13 +89,13 @@ export default function RequirementProgress() {
       </header>
 
       {isGuest && (
-        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+        <p className="mt-4 rounded-xl border border-gold/50 bg-white p-3 text-xs leading-5 text-slate-700">
           访客模式只看不存。登录后勾选状态会保存到你的账号。
         </p>
       )}
 
       {error && (
-        <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-5 text-rose-700">
+        <p className="mt-4 rounded-xl border border-flame/40 bg-white p-3 text-xs leading-5 text-flame">
           {error}
         </p>
       )}
@@ -140,13 +140,13 @@ export default function RequirementProgress() {
                       title={incomplete ? "未完成 · 点击标记完成" : "已完成 · 点击取消勾选"}
                     >
                       {incomplete ? (
-                        <Circle className="mt-0.5 h-4 w-4 flex-none text-rose-500" />
+                        <Circle className="mt-0.5 h-4 w-4 flex-none text-flame" />
                       ) : (
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none text-emerald-600" />
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none text-maya" />
                       )}
                       <span className="flex-1 leading-5">
                         <span className="font-mono text-[10px] text-slate-400">{r.code}</span>{" "}
-                        <span className={incomplete ? "text-rose-700" : "text-slate-700"}>
+                        <span className={incomplete ? "text-flame" : "text-slate-700"}>
                           {r.title}
                         </span>
                       </span>
