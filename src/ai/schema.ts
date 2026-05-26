@@ -73,7 +73,7 @@ export const AdvisorMilestoneSchema = z.enum(["course", "second", "thesis"]);
 export type AdvisorMilestone = z.infer<typeof AdvisorMilestoneSchema>;
 
 /**
- * Shortcut —— 排队 12.5 「捷径策略卡」一条。
+ * Shortcut —— 排队 12.5 「路径建议卡」一条。
  * 13 阶段 mock 输出空数组占位；12.5 真接入时填 oneLiner + goalFit + candidates。
  */
 export const ShortcutSchema = z.object({

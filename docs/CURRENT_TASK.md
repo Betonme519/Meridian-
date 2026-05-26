@@ -3,14 +3,15 @@
 > 短期工作内存。**AI 接手优先读这份**，再按需查 `AI_MEMORY.md` / `TECH_DEBT.md`。
 > 铁律：只做下方「排队」里的事，做完停下汇报。「不要修改」当只读。
 
-> Last updated: **2026-05-25**
+> Last updated: **2026-05-26**
 
 ---
 
 ## 目标
 
-**已闭环**：排队 5/6/7/8/9 + 10 全部 + 11 + 12 + 13 mock + **13.5 静态路径库**。详见下方「最近完成」+ AI_MEMORY § 9 + 各 commit。
-**当前推进**：无主线在跑。候选下一步：12.5 workspace 二次重构（shortcut 层用 link 数据填）/ 13.2 TD-1 真 LLM（推迟，先看静态库够不够）/ 14 UI 重设计。
+**已闭环**：排队 5/6/7/8/9 + 10 全部 + 11 + 12 + 13 mock + **13.5 静态路径库** + **12.5 全部子任务 0-E**。详见下方「最近完成」+ AI_MEMORY § 9 + 各 commit。
+**当前推进**：无主线在跑。下一条等用户挑：13.2（真 LLM provider）/ 13.8（解析 pipeline + RAG）/ 14（UI 重设计）。
+**最近 commit**：`3e2f832` 反向勾选式进度收集器（2026-05-25）；待提交：12.5 A-E shortcut 层 + goalFit chip + 兴趣 input 占位（2026-05-26）。
 **架构转向（2026-05-25）**：用户拍板"静态路径库 + AI 连接"。改原 AI runtime 生成 reason 为 Claude 预编译 (goal × req) → 280 advice + 40 link 关系，DB 查询替代 runtime AI 调用。
 **UI 重设计（排队 14）**：等排队 12 跑通后启动。
 
@@ -231,36 +232,38 @@
   - ✅ Planner isUnmet 改语义：`incompleteReqIds.has(id)` 为单一真相（不再依赖 calcRequirementProgress 推导，因为 option seed 永远没有）
   - ✅ 改 Planner amber 提示语 → slate 提示"去 Upload 页 Section 8 反向勾选"
 
-- **A · 画布加第 4 层 `shortcut`（捷径）**
-  - root → milestone → bucket → requirement → **shortcut** →（兴趣 input + 候选课 chips）
-  - 删 `strategyForItem()` 9 档硬编码（AI 接通后整体被替代）
-  - requirement 卡 title 改回规则原名
+- **A · 画布加第 4 层 `shortcut`（路径建议）** ✅ 2026-05-26
+  - root → milestone → bucket → requirement → **shortcut**（第 5 列 x=1050 w=320 h=52）
+  - canvas 总宽改 1400；PathGraph 加 `expandedRequirements` Set + toggleRequirement
+  - 点 requirement → 同时 select + 展开 shortcut 子节点；点 shortcut → onShortcutSelect
+  - GraphNodeButton 加 shortcut 视觉：Lightbulb 图标 + amber-50/70 弱填充 + line-clamp-2
 
-- **B · 捷径数据契约（排队 13 zod schema 同步扩）**
-  - `PathSuggestion.shortcuts[]: { id, oneLiner, goalFit: Record<GoalMode, "best" | "ok" | "bad">, candidates?: { code, name, reason }[] }`
-  - `oneLiner` = 一句可执行话（"公必塞已有课的那天"）
-  - `goalFit` = 对各 goal_mode 的适配度（实习 ✓ / 保研 — / 留学 ✗）
-  - `candidates[]` = AI 列的具体课程 chips，可空（兴趣 input 触发后填）
+- **B · 路径建议数据契约 + 静态库 seed** ✅ 2026-05-26
+  - 复用 `requirement_advice.shortcut_oneliners` jsonb（13.5 已预留）—— 不新建表
+  - `scripts/genRequirementShortcuts.ts`：15 用户可见 req × 2-3 shortcut = 45 entries
+  - `supabase/migrations/0010_seed_requirement_shortcuts.sql`：15 UPDATE（一条覆盖 8 个 goal 行）
+  - `supabase/migrations/0010_verify.sql`：4 段校验 SQL
+  - `RecommendedPath` + `VisibleRequirement` 加 `shortcuts: AdviceShortcut[]` 字段
 
-- **C · 兴趣 input（点开捷径那一层触发）**
-  - 不收集到 profile 表（按用户拍板）
-  - 点开某条捷径 → 该 shortcut 内嵌兴趣 textarea + "AI 推荐" 按钮 → 调 AI 用兴趣 + 当前 shortcut + 已修课表 现算 candidates
-  - 兴趣文本不持久化（session 内有效），下次重选重问
+- **C · 兴趣 input（占位模式）** ✅ 2026-05-26
+  - 不收集到 profile（按用户拍板）
+  - `ShortcutDetail` 组件内置兴趣 textarea + "AI 推荐" 按钮 **disabled**，hover 提示「13.2 接真 LLM 后启用」
+  - 真接入留 13.2（启发式生不出"不计 APF 任选兴趣"动态推理）
 
-- **D · goalFit 标签**
-  - 单卡（requirement / shortcut）右下角放 3-5 目标 chip（lucide 图标 + slate/amber/emerald 三色）
-  - 视觉：实习 ✓ / 保研 — / 留学 ✗ 等
-  - 数据源：AI 输出（启发式占位可按 bucket × goalMode 矩阵硬编码兜底）
+- **D · goalFit 标签** ✅ 2026-05-26
+  - `ShortcutDetail` 内 8 个 goal chip 阵列（GOAL_CHIP_LABEL：GPA / 轻松 / 保研 / 留学 / 实习 / 时间 / 低压 / 自定）
+  - 三色：emerald(best ✓) / slate(ok —) / rose(bad ✗)
+  - 数据源：`shortcut.goalFit[goalMode]`，每条 shortcut 自带全 8 goal 适配 map
+  - ImpactPanel 顶层在 selected 有 shortcut 时显示一个「N 条路径建议 · 点击查看」chip 提示
 
-- **E · `computeRecommendation` 函数体替换**
-  - 签名稳定，函数体启发式 → AI 调用
-  - 输出 `paths[]` 结构改为含 `shortcuts[]`
+- **E · `RecommendedPath.shortcuts` 字段** ✅ 2026-05-26
+  - `trackRecommendation.RecommendedPath` 加 `shortcuts?: AdviceShortcut[]`
+  - `computeRecommendation` 启发式不动（13.5 已替代了原 E 的"函数体替换"）
+  - Planner advice merge useMemo 把 `adviceByReqId.get(reqId).shortcut_oneliners` 注入 VisibleRequirement
 
-##### 落地前提
+##### 落地前提（已重新决策）
 
-- **排队 13 + 13.2 必须先通**：启发式生不出"不计 APF 所以任选兴趣"这种动态推理，必须等真 LLM 接入
-- AI 提示词加兴趣槽位（`gradPathAdvisorPrompt` 扩 `userInterest?: string` 参数）
-- mock provider 阶段用模板化 shortcuts（每 requirement 出 2-3 条固定文案），UI 先跑通
+- ~~排队 13 + 13.2 必须先通~~ → **改：静态库 jsonb 填真数据**（用户 2026-05-26 拍板），UI 框架 + chip + 兴趣占位先跑，等 13.2 接真 LLM 后填动态 candidates
 
 ##### 不在 12.5 范围
 
@@ -357,6 +360,16 @@
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
 > 早于 2026-05-14 的里程碑（排队 5 / 2 / 4b / 4a / profiles / DATA_MODEL）已挪到 `docs/AI_MEMORY.md` § 9。
+
+- **2026-05-26** — 排队 12.5 子任务 A-E ✅ shortcut 第 4 层 + goalFit chip + 兴趣 input 占位
+  - **数据**：`scripts/genRequirementShortcuts.ts` 15 用户可见 req × 2-3 shortcut = 45 entries；每条 shortcut 自带全 8 goal 适配 map（与 goal_mode 解耦：同一 req 的 shortcut 池对 8 goal 都展示，各 shortcut 内嵌 goalFit）
+  - **SQL**：0010_seed_requirement_shortcuts.sql 15 UPDATE（一条覆盖 8 行 goal × req，WHERE 仅 requirement_id）+ 0010_verify.sql 4 段校验
+  - **架构选择**：复用 13.5 已建的 advice.shortcut_oneliners jsonb 字段（不新建表）；不接 mock provider（用户路径走 13.5 DB 库）
+  - **类型**：`RecommendedPath.shortcuts?: AdviceShortcut[]` + `VisibleRequirement.shortcuts: AdviceShortcut[]`
+  - **画布**：canvas 1080 → 1400；buildGraph 加 shortcut 列（x=1050 w=320 h=52）；PathGraph 加 expandedRequirements + toggleRequirement；点 requirement 同时 select + 展开 shortcut；shortcut 视觉 amber-50/70 + Lightbulb
+  - **ImpactPanel**：selected 有 shortcut 时显示「N 条路径建议」chip；shortcut 选中切换到 ShortcutDetail：标题 oneLiner + 8 goal chip（GPA / 轻松 / 保研 / 留学 / 实习 / 时间 / 低压 / 自定，emerald/slate/rose 三色）+ 兴趣 textarea disabled + 「AI 推荐」按钮 disabled（hover 提示 13.2 启用）+ 「返回 requirement 视图」链接
+  - **待跑**：用户 Supabase Dashboard 跑 0010 seed + verify
+  - **下一条**：13.2 / 13.8 / 14 三选一
 
 - **2026-05-25** — 排队 12.5 sub-task 0 ✅ 反向勾选式进度收集器（用户洞察 + 同日落地）
   - **设计动机**：学校 ingest 不现实（无 API / 无爬虫），让学生填"还差几学分"颗粒度太细。**反向打勾**：默认全 requirement 视为已完成，取消勾选 = 还没做 → 写一行入表。心智从"我做了什么"翻转到"我还差什么"。高年级 95% 已完成只需取消 1-2 条；新生全部取消一次性勾几下。

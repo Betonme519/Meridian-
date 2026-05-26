@@ -26,6 +26,7 @@
 import type { TrackCategory, TrackRequirement, TrackOption } from "@/api/trackApi";
 import type { UserProgress } from "@/api/userProgressApi";
 import type { GoalMode } from "@/api/profileApi";
+import type { AdviceShortcut } from "@/api/requirementAdviceApi";
 import { classifyCategory, type UserMilestoneCode, type CourseBucket } from "./trackUserView";
 import { calcRequirementProgress, pickRecommendedOption } from "./trackSimulation";
 import { chat, collect } from "@/ai";
@@ -41,6 +42,8 @@ export interface RecommendedPath {
   optionId?: string;
   /** 一句话解释为什么推荐这条 */
   reason: string;
+  /** 排队 12.5：路径建议变体，来自 advice.shortcut_oneliners；Planner merge 时注入 */
+  shortcuts?: AdviceShortcut[];
 }
 
 export interface RecommendationBadges {

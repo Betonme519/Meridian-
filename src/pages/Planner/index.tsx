@@ -43,12 +43,13 @@ import {
 } from "@/lib/trackUserView";
 import { computeRecommendation, type RecommendedPath } from "@/lib/trackRecommendation";
 import { useRequirementAdvice, LINK_KIND_LABELS } from "@/hooks/useRequirementAdvice";
-import type { RequirementLink } from "@/api/requirementAdviceApi";
+import type { RequirementLink, AdviceShortcut, GoalFit } from "@/api/requirementAdviceApi";
+import { GOAL_MODES } from "@/api/profileApi";
 import { useUserRequirementDone } from "@/hooks/useUserRequirementDone";
 
 type ActionMode = "take" | "delay" | "switch";
 type FocusMode = "all" | "recommended";
-type GraphNodeKind = "root" | "milestone" | "bucket" | "requirement";
+type GraphNodeKind = "root" | "milestone" | "bucket" | "requirement" | "shortcut";
 
 interface VisibleRequirement {
   category: TrackCategory;
@@ -62,6 +63,8 @@ interface VisibleRequirement {
   isUnmet: boolean;
   isOnPath: boolean;
   pathReason?: string;
+  /** 排队 12.5：从 adviceByReqId.get(reqId).shortcut_oneliners 注入，可空数组 */
+  shortcuts: AdviceShortcut[];
 }
 
 interface ImpactData {
@@ -88,6 +91,8 @@ interface GraphNode {
   meta: string;
   count?: number;
   item?: VisibleRequirement;
+  /** shortcut 节点的路径建议数据 + 父 req id（其他 kind 时 undefined） */
+  shortcut?: { reqId: string; index: number; data: AdviceShortcut };
   isRecommended: boolean;
   isActive: boolean;
   isCollapsed?: boolean;
@@ -111,6 +116,24 @@ const ACTION_LABEL: Record<ActionMode, string> = {
   take: "选择它",
   delay: "推迟它",
   switch: "换目标",
+};
+
+/** 排队 12.5 D：goal_mode → 2-3 字简称，用于 shortcut 卡上 goalFit chip 阵列 */
+const GOAL_CHIP_LABEL: Record<(typeof GOAL_MODES)[number], string> = {
+  "高 GPA": "GPA",
+  最轻松毕业: "轻松",
+  保研路线: "保研",
+  留学路线: "留学",
+  实习优先: "实习",
+  时间自由: "时间",
+  低压力模式: "低压",
+  个性化定制: "自定",
+};
+
+const GOAL_FIT_TONE: Record<GoalFit, string> = {
+  best: "bg-emerald-100 text-emerald-800 ring-emerald-200",
+  ok: "bg-slate-100 text-slate-600 ring-slate-200",
+  bad: "bg-rose-50 text-rose-700 ring-rose-200",
 };
 
 export default function PlannerPage() {
@@ -211,6 +234,8 @@ export default function PlannerPage() {
         // 用户在 Import 页取消勾选才会进 incompleteReqIds。
         // 不在集合 = 默认已完成（不再依赖 calcRequirementProgress 推导）。
         const isUnmet = incompleteReqIds.has(requirement.id);
+        const advice = adviceByReqId.get(requirement.id);
+        const shortcuts = advice?.shortcut_oneliners ?? [];
         out.push({
           category,
           requirement,
@@ -223,6 +248,7 @@ export default function PlannerPage() {
           isUnmet,
           isOnPath: Boolean(path),
           pathReason: path?.reason,
+          shortcuts,
         });
       }
     }
@@ -244,11 +270,16 @@ export default function PlannerPage() {
     progressByOptionId,
     recommendation.paths,
     incompleteReqIds,
+    adviceByReqId,
   ]);
 
   const [selectedReqId, setSelectedReqId] = useState<string | null>(null);
   const [actionMode, setActionMode] = useState<ActionMode>("take");
   const [focusMode, setFocusMode] = useState<FocusMode>("all");
+  // 排队 12.5：路径建议选中态 —— { reqId, index } 或 null。selected 切 req 时清掉。
+  const [selectedShortcut, setSelectedShortcut] = useState<{ reqId: string; index: number } | null>(
+    null,
+  );
 
   const selected = useMemo(
     () =>
@@ -262,6 +293,22 @@ export default function PlannerPage() {
   useEffect(() => {
     if (!selected && selectedReqId) setSelectedReqId(null);
   }, [selected, selectedReqId]);
+
+  // selected 变了清掉 shortcut 选中（避免 cross-req 残留）
+  useEffect(() => {
+    setSelectedShortcut(null);
+  }, [selected?.requirement.id]);
+
+  // 解析 selectedShortcut → 真实 AdviceShortcut 对象
+  const resolvedShortcut = useMemo<AdviceShortcut | null>(() => {
+    if (!selectedShortcut || !selected) return null;
+    if (selected.requirement.id !== selectedShortcut.reqId) return null;
+    return selected.shortcuts[selectedShortcut.index] ?? null;
+  }, [selectedShortcut, selected]);
+
+  const selectedShortcutKey = selectedShortcut
+    ? `${selectedShortcut.reqId}:${selectedShortcut.index}`
+    : null;
 
   const progressSummary = useMemo(() => {
     if (!track) return null;
@@ -393,6 +440,8 @@ export default function PlannerPage() {
             selectedId={selected?.requirement.id ?? null}
             focusMode={focusMode}
             onSelect={setSelectedReqId}
+            onShortcutSelect={(reqId, index) => setSelectedShortcut({ reqId, index })}
+            selectedShortcutKey={selectedShortcutKey}
           />
         </main>
 
@@ -403,12 +452,14 @@ export default function PlannerPage() {
             impact={impact}
             isGuest={isGuest}
             error={progressError}
+            shortcut={resolvedShortcut}
             onActionChange={setActionMode}
             onMarkDone={() => void handleMarkDone()}
+            onClearShortcut={() => setSelectedShortcut(null)}
           />
           <EvidencePanel
             selected={selected}
-            links={selected ? linksByReqId.get(selected.requirement.id) ?? [] : []}
+            links={selected ? (linksByReqId.get(selected.requirement.id) ?? []) : []}
             reqMetaById={reqMetaById}
           />
         </aside>
@@ -529,12 +580,16 @@ function PathGraph({
   selectedId,
   focusMode,
   onSelect,
+  onShortcutSelect,
+  selectedShortcutKey,
 }: {
   goalMode: GoalMode;
   items: VisibleRequirement[];
   selectedId: string | null;
   focusMode: FocusMode;
   onSelect: (id: string) => void;
+  onShortcutSelect: (reqId: string, index: number) => void;
+  selectedShortcutKey: string | null;
 }) {
   const defaultMilestones = useMemo(
     () => new Set<UserMilestoneCode>(USER_MILESTONES.map((m) => m.code)),
@@ -543,6 +598,7 @@ function PathGraph({
   const [expandedMilestones, setExpandedMilestones] =
     useState<Set<UserMilestoneCode>>(defaultMilestones);
   const [expandedBuckets, setExpandedBuckets] = useState<Set<string>>(new Set(["course:专业必修"]));
+  const [expandedRequirements, setExpandedRequirements] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const next = new Set<string>();
@@ -558,10 +614,19 @@ function PathGraph({
       buildGraph({
         items: filteredItems,
         selectedId,
+        selectedShortcutKey,
         expandedMilestones,
         expandedBuckets,
+        expandedRequirements,
       }),
-    [filteredItems, selectedId, expandedMilestones, expandedBuckets],
+    [
+      filteredItems,
+      selectedId,
+      selectedShortcutKey,
+      expandedMilestones,
+      expandedBuckets,
+      expandedRequirements,
+    ],
   );
 
   function toggleMilestone(code: UserMilestoneCode) {
@@ -578,6 +643,15 @@ function PathGraph({
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
+      return next;
+    });
+  }
+
+  function toggleRequirement(reqId: string) {
+    setExpandedRequirements((prev) => {
+      const next = new Set(prev);
+      if (next.has(reqId)) next.delete(reqId);
+      else next.add(reqId);
       return next;
     });
   }
@@ -636,7 +710,19 @@ function PathGraph({
                   toggleBucket(node.id.replace("bucket:", ""));
                   return;
                 }
-                if (node.item) onSelect(node.item.requirement.id);
+                if (node.kind === "requirement") {
+                  if (node.item) {
+                    onSelect(node.item.requirement.id);
+                    if (node.item.shortcuts.length > 0) {
+                      toggleRequirement(node.item.requirement.id);
+                    }
+                  }
+                  return;
+                }
+                if (node.kind === "shortcut" && node.shortcut) {
+                  onShortcutSelect(node.shortcut.reqId, node.shortcut.index);
+                  return;
+                }
               }}
             />
           ))}
@@ -648,12 +734,24 @@ function PathGraph({
 
 function GraphNodeButton({ node, onClick }: { node: GraphNode; onClick: () => void }) {
   const isStructure = node.kind === "root" || node.kind === "milestone" || node.kind === "bucket";
-  const tone = node.isRecommended
-    ? "border-amber-300 bg-amber-50 text-amber-950 shadow-[0_0_0_1px_rgba(217,119,6,0.12)]"
-    : node.isComplete
-      ? "border-emerald-200 bg-emerald-50 text-emerald-950"
-      : "border-slate-200 bg-white text-slate-900";
+  const tone =
+    node.kind === "shortcut"
+      ? "border-amber-200 bg-amber-50/70 text-amber-950"
+      : node.isRecommended
+        ? "border-amber-300 bg-amber-50 text-amber-950 shadow-[0_0_0_1px_rgba(217,119,6,0.12)]"
+        : node.isComplete
+          ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+          : "border-slate-200 bg-white text-slate-900";
   const active = node.isActive ? "ring-2 ring-slate-950 ring-offset-2" : "";
+
+  const LeadIcon =
+    node.kind === "shortcut"
+      ? Lightbulb
+      : isStructure
+        ? node.isCollapsed
+          ? ChevronRight
+          : ChevronDown
+        : CircleDot;
 
   return (
     <button
@@ -663,18 +761,14 @@ function GraphNodeButton({ node, onClick }: { node: GraphNode; onClick: () => vo
       style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
     >
       <div className="flex items-center gap-2">
-        {isStructure ? (
-          node.isCollapsed ? (
-            <ChevronRight className="h-3.5 w-3.5 flex-none text-slate-400" />
-          ) : (
-            <ChevronDown className="h-3.5 w-3.5 flex-none text-slate-400" />
-          )
-        ) : (
-          <CircleDot className="h-3.5 w-3.5 flex-none text-slate-400" />
-        )}
+        <LeadIcon
+          className={`h-3.5 w-3.5 flex-none ${node.kind === "shortcut" ? "text-amber-600" : "text-slate-400"}`}
+        />
         <span
           className={`min-w-0 text-xs font-semibold ${
-            node.kind === "requirement" ? "line-clamp-2 leading-4" : "truncate"
+            node.kind === "requirement" || node.kind === "shortcut"
+              ? "line-clamp-2 leading-4"
+              : "truncate"
           }`}
         >
           {node.title}
@@ -704,19 +798,23 @@ function LegendDot({ className, label }: { className: string; label: string }) {
 function buildGraph({
   items,
   selectedId,
+  selectedShortcutKey,
   expandedMilestones,
   expandedBuckets,
+  expandedRequirements,
 }: {
   items: VisibleRequirement[];
   selectedId: string | null;
+  selectedShortcutKey: string | null;
   expandedMilestones: Set<UserMilestoneCode>;
   expandedBuckets: Set<string>;
+  expandedRequirements: Set<string>;
 }) {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
   const reqRows = Math.max(1, items.length);
   const height = Math.max(620, reqRows * 74 + 170);
-  const width = 1080;
+  const width = 1400;
 
   const root: GraphNode = {
     id: "root",
@@ -805,7 +903,7 @@ function buildGraph({
 
       if (expandedBuckets.has(key)) {
         for (const item of bucketItems) {
-          const node: GraphNode = {
+          const reqNode: GraphNode = {
             id: `requirement:${item.requirement.id}`,
             kind: "requirement",
             x: 650,
@@ -818,15 +916,50 @@ function buildGraph({
             isRecommended: item.isOnPath,
             isActive: item.requirement.id === selectedId,
             isComplete: !item.isUnmet,
+            isCollapsed:
+              item.shortcuts.length > 0
+                ? !expandedRequirements.has(item.requirement.id)
+                : undefined,
           };
-          nodes.push(node);
+          nodes.push(reqNode);
           edges.push({
-            id: `${bucketNode.id}-${node.id}`,
+            id: `${bucketNode.id}-${reqNode.id}`,
             from: bucketNode,
-            to: node,
+            to: reqNode,
             isRecommended: item.isOnPath,
           });
           requirementY += 88;
+
+          // 排队 12.5：requirement 展开后渲染 shortcut 子节点
+          if (expandedRequirements.has(item.requirement.id) && item.shortcuts.length > 0) {
+            for (let i = 0; i < item.shortcuts.length; i += 1) {
+              const sc = item.shortcuts[i];
+              const scKey = `${item.requirement.id}:${i}`;
+              const scNode: GraphNode = {
+                id: `shortcut:${scKey}`,
+                kind: "shortcut",
+                x: 1050,
+                y: requirementY - 88 + i * 60,
+                w: 320,
+                h: 52,
+                title: sc.oneLiner ?? "未命名建议",
+                meta: sc.id ? `路径建议 · ${sc.id}` : "路径建议",
+                shortcut: { reqId: item.requirement.id, index: i, data: sc },
+                isRecommended: item.isOnPath,
+                isActive: selectedShortcutKey === scKey,
+              };
+              nodes.push(scNode);
+              edges.push({
+                id: `${reqNode.id}-${scNode.id}`,
+                from: reqNode,
+                to: scNode,
+                isRecommended: item.isOnPath,
+              });
+            }
+            // 给后续 requirement 让出空间：每条 shortcut 60px，加 12px 间隔
+            const shortcutBlock = item.shortcuts.length * 60 + 12;
+            requirementY = Math.max(requirementY, requirementY - 88 + shortcutBlock);
+          }
         }
         bucketY = Math.max(bucketY + 82, requirementY - bucketItems.length * 8);
       } else {
@@ -857,16 +990,20 @@ function ImpactPanel({
   impact,
   isGuest,
   error,
+  shortcut,
   onActionChange,
   onMarkDone,
+  onClearShortcut,
 }: {
   selected: VisibleRequirement | null;
   actionMode: ActionMode;
   impact: ImpactData | null;
   isGuest: boolean;
   error: string | null;
+  shortcut: AdviceShortcut | null;
   onActionChange: (mode: ActionMode) => void;
   onMarkDone: () => void;
+  onClearShortcut: () => void;
 }) {
   if (!selected || !impact) {
     return (
@@ -874,6 +1011,11 @@ function ImpactPanel({
         <p className="text-sm text-slate-500">选择左侧一个节点后，这里会显示后果分析。</p>
       </section>
     );
+  }
+
+  // 排队 12.5：路径建议视图 —— shortcut 非空时切换为路径建议详情卡
+  if (shortcut) {
+    return <ShortcutDetail selected={selected} shortcut={shortcut} onClear={onClearShortcut} />;
   }
 
   return (
@@ -906,6 +1048,13 @@ function ImpactPanel({
           </div>
           <p className="mt-1.5 text-xs leading-5 text-violet-900">{selected.pathReason}</p>
         </div>
+      )}
+
+      {selected.shortcuts.length > 0 && (
+        <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800 ring-1 ring-inset ring-amber-200">
+          <Lightbulb className="h-3 w-3" />有 {selected.shortcuts.length} 条路径建议 ·
+          在画布上点开此卡查看
+        </p>
       )}
 
       <div className="mt-4 grid grid-cols-3 gap-1 rounded-full bg-slate-100 p-1">
@@ -1000,6 +1149,109 @@ function ImpactPanel({
         <p className="mt-3 text-xs text-slate-400">访客模式可看模拟，登录后才能保存进度。</p>
       )}
       {error && <p className="mt-3 text-xs text-rose-600">{error}</p>}
+    </section>
+  );
+}
+
+/** 排队 12.5：路径建议详情视图 —— shortcut 选中时替换 ImpactPanel 主体 */
+function ShortcutDetail({
+  selected,
+  shortcut,
+  onClear,
+}: {
+  selected: VisibleRequirement;
+  shortcut: AdviceShortcut;
+  onClear: () => void;
+}) {
+  const candidates = shortcut.candidates ?? [];
+  return (
+    <section className="rounded-xl border border-amber-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Lightbulb className="h-5 w-5 text-amber-600" />
+          <h2 className="font-semibold text-slate-950">路径建议详情</h2>
+        </div>
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-[11px] font-medium text-slate-500 underline-offset-2 hover:text-slate-800 hover:underline"
+        >
+          ← 返回 requirement 视图
+        </button>
+      </div>
+
+      <p className="mt-1 text-[11px] text-slate-500">所属规则：{selected.requirement.title}</p>
+
+      <h3 className="mt-3 rounded-xl bg-amber-50/70 p-3 text-sm font-semibold leading-6 text-amber-950">
+        {shortcut.oneLiner ?? "未命名建议"}
+      </h3>
+
+      <div className="mt-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+          对各目标的适配
+        </p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {GOAL_MODES.map((g) => {
+            const fit = shortcut.goalFit?.[g] ?? "ok";
+            return (
+              <span
+                key={g}
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${GOAL_FIT_TONE[fit]}`}
+                title={`${g} · ${fit}`}
+              >
+                {GOAL_CHIP_LABEL[g]}
+                <span className="text-[10px] opacity-70">
+                  {fit === "best" ? "✓" : fit === "bad" ? "✗" : "—"}
+                </span>
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+          兴趣 → AI 推荐课程（待启用）
+        </p>
+        <textarea
+          disabled
+          placeholder="想做什么方向？（接通真 LLM 后启用，会按你的兴趣 + 已修课表 + 学校规则推荐具体课）"
+          className="mt-2 h-20 w-full resize-none rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs leading-5 text-slate-500 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50"
+        />
+        <button
+          type="button"
+          disabled
+          title="排队 13.2 接真 LLM 后启用"
+          className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-full bg-amber-700 px-3 text-[11px] font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+        >
+          <Sparkles className="h-3 w-3" />
+          AI 推荐
+        </button>
+        <p className="mt-2 text-[11px] leading-5 text-slate-500">
+          目前是 mock 占位；接通真 LLM provider（13.2）后会按你的兴趣 + 已修课 +
+          学校规则现算具体课程。
+        </p>
+      </div>
+
+      {candidates.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            候选课程
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {candidates.map((c, i) => (
+              <span
+                key={`${c.code}-${i}`}
+                className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700"
+                title={c.reason}
+              >
+                {c.code}
+                {c.name ? ` · ${c.name}` : ""}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -1109,9 +1361,7 @@ function RelatedRulesBlock({
               <span className="font-mono text-[11px] text-slate-500">
                 {it.direction === "out" ? "→" : "←"} {it.otherCode}
               </span>
-              {it.bidirectional && (
-                <span className="text-[10px] text-slate-400">（双向）</span>
-              )}
+              {it.bidirectional && <span className="text-[10px] text-slate-400">（双向）</span>}
             </div>
             <p className="mt-1 text-slate-600">{it.note ?? it.otherTitle}</p>
             {it.metadata && Object.keys(it.metadata).length > 0 && (
