@@ -3,7 +3,7 @@
 > 短期工作内存。**AI 接手优先读这份**，再按需查 `AI_MEMORY.md` / `TECH_DEBT.md`。
 > 铁律：只做下方「排队」里的事，做完停下汇报。「不要修改」当只读。
 
-> Last updated: **2026-05-26**
+> Last updated: **2026-05-27**
 
 ---
 
@@ -15,7 +15,7 @@
 1. **排队 14** UI 重设计（主线推进中）
 2. **排队 13.2** 真 LLM provider（等用户拍上游 + 充值，再启动）
 3. **排队 13.8** 解析 pipeline + RAG（卡 13.2）
-**最近 commit**：`58b09cc` 12.5 A-E 路径建议层 + UI 文案禁词入册（2026-05-26）；`3e2f832` 反向勾选式进度收集器（2026-05-25）。
+**最近 commit**：`b626a4b` 排队 14 第一批：功能页配色重置 + Dashboard 收敛 + PathLoader（2026-05-27）；`58b09cc` 12.5 A-E 路径建议层 + UI 文案禁词入册（2026-05-26）。
 **架构转向（2026-05-25）**：用户拍板"静态路径库 + AI 连接"。改原 AI runtime 生成 reason 为 Claude 预编译 (goal × req) → 280 advice + 40 link 关系，DB 查询替代 runtime AI 调用。
 **UI 重设计（排队 14）**：等排队 12 跑通后启动。
 
@@ -297,6 +297,17 @@
   - 排队 8 完成（schema 锁了）后可以画 Figma 稿，但**不要动代码**。
 - 完成标准：五个功能页对齐新视觉；保持 CLAUDE.md 的 "low saturation / Apple-like / clean academic"；mobile responsive。
 
+##### 第一批已闭环（2026-05-27, commit `b626a4b`）
+
+- ✅ **新色板（用户拍板）**：参考桌面图「深浅色」(MOODY BLUES) + 「多彩色」(4 点缀)。`globals.css @theme inline` 加 4 token：`--color-flame: #FE6237` / `--color-gold: #FFB62E` / `--color-maya: #7CC3FF` / `--color-sapphire: #4164FF`。仅功能页用，落地页保持原 slate/amber/rose 不动。
+- ✅ **统一替换规则**：amber→gold（warn 推荐）/ rose→flame（error 冲突）/ emerald→maya（good 完成，**非中性化**，用户中途改方向）/ blue→sapphire（prerequisite）/ violet→sapphire（AI 理由）。文字色统一 `text-slate-700` 保对比度，点缀色只在 chip 底 / icon / border。
+- ✅ **大块底色全部降级**：所有 50/100/200 系大块底色 → 白底 + colored border。`scheduleSeed.ts TRUST_META` head 字段三档都改成 `bg-white + border-{maya/gold/slate}/50`（之前漏，用户指出"官方规则那一大块还是绿的"才发现 grep 没覆盖此文件）。
+- ✅ **Dashboard 收敛**：删 Section 1「信息导入」（Import 页 fileSlots/Connectors/MiniApps 已覆盖）+ Section 3「模拟动作」（Workspace ImpactPanel take/delay/switch 已覆盖）。顶部加 GPT-style 提问输入框「你今天想问点什么?」+ 大圆角 textarea + 右下 `ArrowUp` 提交按钮 + Cmd/Ctrl+Enter 快捷。**跨页机制**：`sessionStorage["meridian.ai-feed.ask-draft"]` 暂存 → `navigate({ to: "/ai-advisor" })`；AIAdvisor mount-only useEffect 读出来填进 `profileText` 后立刻 removeItem。复用现有 stream 能力，不接新 LLM。
+- ✅ **Planner WorkbenchHeader 拆裸**：从"白底大卡含一切"拆成三段裸露行（参考桌面图`界面颜色风格.png`）：① 副标题 + 右侧 focus toggle ② chip 横排（goal/school/3 KPI）③ 进度文字 + 1.5px bar。去掉 outer card 让 layout 浅灰底 `#f6f7f9` 自然漏出。MetricChip 缩 `h-7` 视觉对齐其他 chip。
+- ✅ **GraphNodeButton 节点 tone**：全白底 + colored border + 染色 leadIcon（shortcut/recommended → gold；isComplete → maya；default → slate）；KIND_PILL_CLASS 5 档关系标签按 maya/sapphire/flame/slate/gold 5 色区分。
+- ✅ **新组件 PathLoader**（`src/components/effects/PathLoader.tsx`）：SVG cross + diagonal + dot + GSAP timeline 循环（pull → send → pause），用 `useGSAP({ scope })` 自动清理避免 StrictMode 双 mount 残留。原型来自桌面 `index.html`，颜色用 `currentColor` 让父级 text-* 控制，`prefers-reduced-motion` 时静态显示。替换 Planner `Loader2` spinner，文字「正在计算学业路径」横向布局在 SVG 右侧。
+- ⚠️ **未做**：5 页 layout 结构重排（仅 Dashboard 收敛 + Planner header 裸化），其他 3 页仍是原结构只换色；Schedule 顶部"规则结构树"/"Trust 三列"/"冲突规则" section 仍是大白卡风。下一轮按页推进。
+
 ---
 
 ## 并行/穿插（不阻塞主线，但要做）
@@ -367,6 +378,14 @@
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
 > 早于 2026-05-14 的里程碑（排队 5 / 2 / 4b / 4a / profiles / DATA_MODEL）已挪到 `docs/AI_MEMORY.md` § 9。
+
+- **2026-05-27** — 排队 14 第一批 ✅ 功能页配色重置 + Dashboard 收敛 + PathLoader（commit `b626a4b`）
+  - **色板**：globals.css @theme 加 4 点缀 token（flame/gold/maya/sapphire）+ 5 页 + 子组件 + TRUST_META amber→gold / rose→flame / emerald→maya / blue/violet→sapphire 批量替换；大块 50/100 底色全部 → 白底 + border
+  - **Dashboard**：定位收敛为「AI Feed 决策状态快报」。删 Section 1 信息导入（Import 已覆盖）+ Section 3 模拟动作（Workspace ImpactPanel 已覆盖）；顶部加 GPT-style 提问输入框 + sessionStorage 跨页传草稿到 AIAdvisor
+  - **Planner**：WorkbenchHeader 拆三行裸标题（去 outer card 漏 layout 浅灰底）；GraphNodeButton 节点 tone 全白 + colored border + 染色 icon；MetricChip 缩 h-7
+  - **PathLoader**：新组件 `src/components/effects/PathLoader.tsx` SVG + GSAP timeline，替换 Planner Loader2，文案「正在计算学业路径」
+  - **要点**：emerald 中途改方向（初版中性灰 → 用户问"原本绿色的呢"后改 Maya Blue 接手"完成"语义）；TRUST_META 在 scheduleSeed.ts 漏 grep 第一轮，用户指"官方规则那一大块还是绿的"才补
+  - **未做**：5 页 layout 结构重排只完成 Dashboard + Planner header；Schedule/Upload/AIAdvisor 仍是原结构只换色
 
 - **2026-05-26** — 排队 12.5 子任务 A-E ✅ shortcut 第 4 层 + goalFit chip + 兴趣 input 占位
   - **数据**：`scripts/genRequirementShortcuts.ts` 15 用户可见 req × 2-3 shortcut = 45 entries；每条 shortcut 自带全 8 goal 适配 map（与 goal_mode 解耦：同一 req 的 shortcut 池对 8 goal 都展示，各 shortcut 内嵌 goalFit）

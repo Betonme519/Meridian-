@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpen,
   CheckCircle2,
@@ -8,13 +8,11 @@ import {
   ClipboardList,
   Clock3,
   Compass,
-  GitBranchPlus,
   GraduationCap,
   Layers3,
   Lightbulb,
   MousePointer2,
   PanelRightOpen,
-  Search,
   Sparkles,
   Target,
 } from "lucide-react";
@@ -419,9 +417,9 @@ export default function PlannerPage() {
   }
 
   return (
-    <section className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_370px]">
-        <main className="min-w-0 space-y-4">
+    <section className="mx-auto flex max-w-[1500px] flex-col px-4 py-4 sm:px-6 lg:px-8 xl:h-[calc(100vh-5rem)]">
+      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_370px]">
+        <main className="flex min-w-0 min-h-0 flex-col gap-3">
           <WorkbenchHeader
             school={track.school}
             year={track.year}
@@ -432,7 +430,6 @@ export default function PlannerPage() {
           />
 
           <PathGraph
-            goalMode={goalMode}
             items={visibleRequirements}
             selectedId={selected?.requirement.id ?? null}
             focusMode={focusMode}
@@ -442,7 +439,7 @@ export default function PlannerPage() {
           />
         </main>
 
-        <aside className="space-y-4 xl:sticky xl:top-5 xl:self-start">
+        <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white xl:overflow-y-auto">
           <ImpactPanel
             selected={selected}
             actionMode={actionMode}
@@ -454,6 +451,7 @@ export default function PlannerPage() {
             onMarkDone={() => void handleMarkDone()}
             onClearShortcut={() => setSelectedShortcut(null)}
           />
+          <div className="h-px bg-slate-200" />
           <EvidencePanel
             selected={selected}
             links={selected ? (linksByReqId.get(selected.requirement.id) ?? []) : []}
@@ -493,87 +491,80 @@ function WorkbenchHeader({
       : 0;
 
   return (
-    <header className="px-1">
-      {/* 第 1 行:裸标题 + 副标题 | 右侧 focus toggle (浮在 layout 浅灰底上) */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs text-slate-500">
-            毕业路径 · 点击节点逐层展开 · 上课 → 类别 → 选项
-          </p>
-        </div>
-        <div className="flex h-9 items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm">
-          <button
-            type="button"
-            onClick={() => onFocusModeChange("all")}
-            className={`h-7 rounded-full px-3 text-xs font-medium transition-colors ${
-              focusMode === "all" ? "bg-slate-950 text-white" : "text-slate-500"
-            }`}
-          >
-            全部路径
-          </button>
-          <button
-            type="button"
-            onClick={() => onFocusModeChange("recommended")}
-            className={`h-7 rounded-full px-3 text-xs font-medium transition-colors ${
-              focusMode === "recommended" ? "bg-slate-950 text-white" : "text-slate-500"
-            }`}
-          >
-            只看推荐
-          </button>
-        </div>
-      </div>
+    <header className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1">
+      {/* 主信息：goal 强调 + 进度 bar 占主轴（视觉主体） */}
+      <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-gold/60 bg-white px-3 text-sm font-semibold text-slate-900">
+        <Target className="h-3.5 w-3.5 text-gold" />
+        {goalMode}
+      </span>
 
-      {/* 第 2 行:chip 横排 goal + school + 3 个 KPI */}
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <span className="inline-flex h-7 items-center rounded-full border border-gold/50 bg-white px-2.5 text-xs font-medium text-gold">
-          {goalMode}
-        </span>
-        <span className="inline-flex h-7 items-center rounded-full border border-slate-200 bg-white px-2.5 text-xs text-slate-600">
-          {school} · {year} 级
-        </span>
-        <MetricChip icon={Sparkles} label="推荐" value={`${summary?.paths ?? 0} 条`} />
-        <MetricChip icon={GitBranchPlus} label="可见节点" value={`${summary?.visible ?? 0}`} />
-        <MetricChip icon={Search} label="待处理" value={`${summary?.unmet ?? 0}`} />
-      </div>
-
-      {/* 第 3 行:进度文字 + bar 裸露行 */}
-      <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_260px] sm:items-center">
-        <div className="text-xs text-slate-500">
-          已匹配 {summary?.completedMatches ?? 0} 个已修课程，当前学分{" "}
+      <div className="flex min-w-[220px] flex-1 items-center gap-2">
+        <span className="text-xs tabular-nums text-slate-500">
           <span className="font-semibold text-slate-900">{fmtCredits(summary?.earned ?? 0)}</span>
-          {summary?.target != null && ` / ${fmtCredits(summary.target)}`}
-        </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200/70">
+          {summary?.target != null && ` / ${fmtCredits(summary.target)} 学分`}
+        </span>
+        <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-200/70">
           <div
             className="h-full rounded-full bg-slate-900 transition-all"
             style={{ width: `${progress}%` }}
           />
         </div>
       </div>
+
+      {/* 次要信息：学校 + KPI 计数 muted 小号（下沉次级） */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
+        <span>
+          {school} · {year} 级
+        </span>
+        <span className="text-slate-300">·</span>
+        <span>
+          推荐{" "}
+          <strong className="font-semibold text-slate-700 tabular-nums">
+            {summary?.paths ?? 0}
+          </strong>
+        </span>
+        <span className="text-slate-300">·</span>
+        <span>
+          可见{" "}
+          <strong className="font-semibold text-slate-700 tabular-nums">
+            {summary?.visible ?? 0}
+          </strong>
+        </span>
+        <span className="text-slate-300">·</span>
+        <span>
+          待处理{" "}
+          <strong className="font-semibold text-slate-700 tabular-nums">
+            {summary?.unmet ?? 0}
+          </strong>
+        </span>
+      </div>
+
+      {/* 操作：focus toggle 右对齐 */}
+      <div className="flex h-8 items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm">
+        <button
+          type="button"
+          onClick={() => onFocusModeChange("all")}
+          className={`h-6 rounded-full px-3 text-xs font-medium transition-colors ${
+            focusMode === "all" ? "bg-slate-950 text-white" : "text-slate-500"
+          }`}
+        >
+          全部路径
+        </button>
+        <button
+          type="button"
+          onClick={() => onFocusModeChange("recommended")}
+          className={`h-6 rounded-full px-3 text-xs font-medium transition-colors ${
+            focusMode === "recommended" ? "bg-slate-950 text-white" : "text-slate-500"
+          }`}
+        >
+          只看推荐
+        </button>
+      </div>
     </header>
   );
 }
 
-function MetricChip({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-}) {
-  return (
-    <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-xs text-slate-600">
-      <Icon className="h-3.5 w-3.5 text-slate-400" />
-      {label}
-      <strong className="font-semibold text-slate-950 tabular-nums">{value}</strong>
-    </span>
-  );
-}
-
 function PathGraph({
-  goalMode,
   items,
   selectedId,
   focusMode,
@@ -581,7 +572,6 @@ function PathGraph({
   onShortcutSelect,
   selectedShortcutKey,
 }: {
-  goalMode: GoalMode;
   items: VisibleRequirement[];
   selectedId: string | null;
   focusMode: FocusMode;
@@ -597,6 +587,11 @@ function PathGraph({
     useState<Set<UserMilestoneCode>>(defaultMilestones);
   const [expandedBuckets, setExpandedBuckets] = useState<Set<string>>(new Set(["course:专业必修"]));
   const [expandedRequirements, setExpandedRequirements] = useState<Set<string>>(new Set());
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // 点击跟踪滚动：存被点节点 id + 可选 revealRight（展开时下一层右边界）
+  // useEffect 用新 graph 节点坐标决定双向滚动（左/右/上/下）
+  const pendingScrollRef = useRef<{ srcId: string; revealRight?: number } | null>(null);
 
   useEffect(() => {
     const next = new Set<string>();
@@ -627,47 +622,92 @@ function PathGraph({
     ],
   );
 
+  function queueScroll(srcId: string, revealRight?: number) {
+    pendingScrollRef.current = { srcId, revealRight };
+  }
+
   function toggleMilestone(code: UserMilestoneCode) {
+    const willExpand = !expandedMilestones.has(code);
     setExpandedMilestones((prev) => {
       const next = new Set(prev);
       if (next.has(code)) next.delete(code);
       else next.add(code);
       return next;
     });
+    // 展开：露出 bucket 层（x=410 w=170 → 右边界 580）；折叠：只保证 milestone 本身可见
+    queueScroll(`milestone:${code}`, willExpand ? 580 : undefined);
   }
 
   function toggleBucket(key: string) {
+    const willExpand = !expandedBuckets.has(key);
     setExpandedBuckets((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
+    // 展开：露出 requirement 层（x=650 w=360 → 右边界 1010）
+    queueScroll(`bucket:${key}`, willExpand ? 1010 : undefined);
   }
 
   function toggleRequirement(reqId: string) {
+    const willExpand = !expandedRequirements.has(reqId);
     setExpandedRequirements((prev) => {
       const next = new Set(prev);
       if (next.has(reqId)) next.delete(reqId);
       else next.add(reqId);
       return next;
     });
+    // 展开：露出 shortcut 层（x=1050 w=320 → 右边界 1370）
+    queueScroll(`requirement:${reqId}`, willExpand ? 1370 : undefined);
   }
 
+  // graph 变化（展开/折叠/选中切换）后跟随滚动：
+  // - 横向：被点节点若跑出视口左 → 左滚到它；wantRight 若跑出视口右 → 右滚露出
+  // - 纵向：节点在视口外 → 滚到视口偏上 1/4
+  useEffect(() => {
+    const pending = pendingScrollRef.current;
+    const container = scrollRef.current;
+    if (!pending || !container) return;
+    pendingScrollRef.current = null;
+
+    const src = graph.nodes.find((n) => n.id === pending.srcId);
+    if (!src) return;
+
+    const srcLeft = src.x;
+    const srcRight = src.x + src.w;
+    const srcY = src.y;
+    const wantRight = pending.revealRight ?? srcRight;
+    const margin = 40;
+
+    let targetLeft = container.scrollLeft;
+    let targetTop = container.scrollTop;
+
+    const visibleLeft = container.scrollLeft;
+    const visibleRight = visibleLeft + container.clientWidth;
+    if (srcLeft < visibleLeft + margin) {
+      // 被点节点在视口左侧外 → 往左滚显示节点
+      targetLeft = Math.max(0, srcLeft - margin);
+    } else if (wantRight > visibleRight - margin) {
+      // 需要露出右边新层级（或节点自身右边界）
+      targetLeft = Math.max(0, wantRight - container.clientWidth + 60);
+    }
+
+    const visibleTop = container.scrollTop;
+    const visibleBottom = visibleTop + container.clientHeight;
+    if (srcY < visibleTop + 40 || srcY > visibleBottom - 200) {
+      targetTop = Math.max(0, srcY - container.clientHeight / 4);
+    }
+
+    if (targetLeft !== container.scrollLeft || targetTop !== container.scrollTop) {
+      container.scrollTo({ left: targetLeft, top: targetTop, behavior: "smooth" });
+    }
+  }, [graph]);
+
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
-            <GitBranchPlus className="h-4 w-4 text-slate-600" />
-          </span>
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-slate-950">路径画布</h2>
-            <p className="truncate text-xs text-slate-500">
-              点击节点展开下一层；金色线表示当前 {goalMode} 下最值得先看的路径。
-            </p>
-          </div>
-        </div>
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-none flex-col gap-2 border-b border-slate-200 px-4 py-2 lg:flex-row lg:items-center lg:justify-between">
+        <h2 className="text-sm font-semibold text-slate-950">路径画布</h2>
         <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
           <LegendDot className="bg-gold" label="推荐路径" />
           <LegendDot className="bg-maya" label="已满足" />
@@ -679,7 +719,10 @@ function PathGraph({
         </div>
       </div>
 
-      <div className="relative h-[680px] overflow-auto bg-[linear-gradient(#f8fafc_1px,transparent_1px),linear-gradient(90deg,#f8fafc_1px,transparent_1px)] bg-[size:28px_28px]">
+      <div
+        ref={scrollRef}
+        className="relative min-h-[420px] flex-1 overflow-auto bg-[linear-gradient(#f8fafc_1px,transparent_1px),linear-gradient(90deg,#f8fafc_1px,transparent_1px)] bg-[size:28px_28px]"
+      >
         <div className="relative" style={{ width: graph.width, height: graph.height }}>
           <svg className="absolute inset-0 h-full w-full" aria-hidden="true">
             {graph.edges.map((edge) => (
@@ -712,13 +755,18 @@ function PathGraph({
                   if (node.item) {
                     onSelect(node.item.requirement.id);
                     if (node.item.shortcuts.length > 0) {
+                      // toggleRequirement 内部已 queueScroll
                       toggleRequirement(node.item.requirement.id);
+                    } else {
+                      // 仅选中：也跟随到节点，避免视口卡在别处
+                      queueScroll(node.id);
                     }
                   }
                   return;
                 }
                 if (node.kind === "shortcut" && node.shortcut) {
                   onShortcutSelect(node.shortcut.reqId, node.shortcut.index);
+                  queueScroll(node.id);
                   return;
                 }
               }}
@@ -1013,7 +1061,7 @@ function ImpactPanel({
 }) {
   if (!selected || !impact) {
     return (
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="px-5 py-4">
         <p className="text-sm text-slate-500">选择左侧一个节点后，这里会显示后果分析。</p>
       </section>
     );
@@ -1025,7 +1073,7 @@ function ImpactPanel({
   }
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="px-5 py-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <PanelRightOpen className="h-5 w-5 text-slate-500" />
@@ -1045,7 +1093,7 @@ function ImpactPanel({
       </p>
 
       {selected.pathReason && (
-        <div className="mt-4 rounded-xl border border-sapphire/40 bg-white p-3">
+        <div className="mt-4 border-l-2 border-sapphire/50 pl-3">
           <div className="flex items-center gap-1.5">
             <Sparkles className="h-3.5 w-3.5 text-sapphire" />
             <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sapphire">
@@ -1057,8 +1105,8 @@ function ImpactPanel({
       )}
 
       {selected.shortcuts.length > 0 && (
-        <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-gold/15 px-2.5 py-1 text-[11px] font-medium text-slate-700 ring-1 ring-inset ring-gold/40">
-          <Lightbulb className="h-3 w-3" />有 {selected.shortcuts.length} 条路径建议 ·
+        <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-600">
+          <Lightbulb className="h-3 w-3 text-gold" />有 {selected.shortcuts.length} 条路径建议 ·
           在画布上点开此卡查看
         </p>
       )}
@@ -1078,14 +1126,12 @@ function ImpactPanel({
         ))}
       </div>
 
-      <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-4">
+      <div className="mt-4 border-t border-slate-200 pt-4">
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs font-medium text-slate-500">判断</span>
-          <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-900">
-            {impact.status}
-          </span>
+          <span className="text-xs font-semibold text-slate-900">{impact.status}</span>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
           <ImpactMetric
             icon={GraduationCap}
             label="学分影响"
@@ -1120,10 +1166,8 @@ function ImpactPanel({
       </div>
 
       {impact.option && (
-        <div className="mt-4 rounded-xl border border-maya/50 bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-maya">
-            可执行选项
-          </p>
+        <div className="mt-4 border-t border-slate-200 pt-4">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-maya">可执行选项</p>
           <h3 className="mt-2 text-sm font-semibold text-slate-950">
             {impact.option.code} · {impact.option.name}
           </h3>
@@ -1145,9 +1189,9 @@ function ImpactPanel({
       )}
 
       {!impact.option && (
-        <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+        <p className="mt-4 border-t border-slate-200 pt-3 text-xs leading-5 text-slate-500">
           想标这条「未完成」？去 <strong className="text-slate-900">Upload 页 Section 8</strong>{" "}
-          反向勾选 —— 默认全部已完成，取消勾选即标未做。
+          反向勾选。
         </p>
       )}
 
@@ -1171,7 +1215,7 @@ function ShortcutDetail({
 }) {
   const candidates = shortcut.candidates ?? [];
   return (
-    <section className="rounded-xl border border-gold/50 bg-white p-5 shadow-sm">
+    <section className="px-5 py-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Lightbulb className="h-5 w-5 text-gold" />
@@ -1188,11 +1232,11 @@ function ShortcutDetail({
 
       <p className="mt-1 text-[11px] text-slate-500">所属规则：{selected.requirement.title}</p>
 
-      <h3 className="mt-3 rounded-xl border border-gold/50 bg-white p-3 text-sm font-semibold leading-6 text-slate-950">
+      <h3 className="mt-3 border-l-2 border-gold/60 pl-3 text-sm font-semibold leading-6 text-slate-950">
         {shortcut.oneLiner ?? "未命名建议"}
       </h3>
 
-      <div className="mt-4">
+      <div className="mt-4 border-t border-slate-200 pt-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
           对各目标的适配
         </p>
@@ -1215,7 +1259,7 @@ function ShortcutDetail({
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <div className="mt-4 border-t border-slate-200 pt-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
           兴趣 → AI 推荐课程（待启用）
         </p>
@@ -1240,7 +1284,7 @@ function ShortcutDetail({
       </div>
 
       {candidates.length > 0 && (
-        <div className="mt-4">
+        <div className="mt-4 border-t border-slate-200 pt-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
             候选课程
           </p>
@@ -1272,9 +1316,11 @@ function ImpactMetric({
   value: string;
 }) {
   return (
-    <div className="rounded-lg bg-white p-3">
-      <Icon className="h-4 w-4 text-slate-400" />
-      <p className="mt-2 text-[11px] text-slate-500">{label}</p>
+    <div>
+      <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
+        <Icon className="h-3.5 w-3.5 text-slate-400" />
+        {label}
+      </p>
       <p className="mt-1 text-sm font-semibold tabular-nums text-slate-950">{value}</p>
     </div>
   );
@@ -1290,13 +1336,13 @@ function EvidencePanel({
   reqMetaById: Map<string, { code: string; title: string }>;
 }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="px-5 py-4">
       <div className="flex items-center gap-2">
         <ClipboardList className="h-5 w-5 text-slate-500" />
         <h2 className="font-semibold text-slate-950">规则证据</h2>
       </div>
       {selected ? (
-        <div className="mt-4 space-y-3 text-sm">
+        <div className="mt-4 divide-y divide-slate-200 text-sm">
           <EvidenceLine icon={BookOpen} label="规则" value={selected.requirement.title} />
           <EvidenceLine icon={Compass} label="分类" value={selected.category.title} />
           <EvidenceLine
@@ -1304,11 +1350,11 @@ function EvidencePanel({
             label="AI 理由"
             value={selected.pathReason ?? "这项会影响当前目标下的毕业路径。"}
           />
-          <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+          <div className="pt-3">
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">
               来源
             </p>
-            <p className="mt-2 text-xs leading-5 text-slate-600">
+            <p className="mt-1.5 text-xs leading-5 text-slate-600">
               {selected.requirement.source_ref ?? "暂无 source_ref"}
             </p>
           </div>
@@ -1351,7 +1397,7 @@ function RelatedRulesBlock({
     };
   });
   return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+    <div className="pt-3">
       <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">
         相关规则 · {items.length}
       </p>
@@ -1400,7 +1446,7 @@ function EvidenceLine({
   value: string;
 }) {
   return (
-    <div className="flex gap-3 rounded-xl border border-slate-100 p-3">
+    <div className="flex gap-3 pb-3 first:pt-0 [&:not(:first-child)]:pt-3">
       <Icon className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
       <div>
         <p className="text-[11px] text-slate-400">{label}</p>

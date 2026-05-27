@@ -270,11 +270,9 @@ export default function AIAdvisorPage() {
   useEffect(() => () => abortRef.current?.abort(), []);
 
   return (
-    <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
-      {/* Hero */}
-
-      <div className="mt-8 grid gap-5 xl:grid-cols-[1fr_380px]">
-        <main className="grid gap-3 sm:grid-cols-2">
+    <section className="mx-auto flex max-w-7xl flex-col px-5 py-5 sm:px-8 sm:py-6 xl:h-[calc(100vh-5rem)]">
+      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[1fr_380px]">
+        <main className="grid min-h-0 gap-3 sm:grid-cols-2 sm:grid-rows-4">
           {modes.map((mode, i) => {
             const Icon = mode.icon;
             const active = mode.title === selectedMode;
@@ -287,7 +285,7 @@ export default function AIAdvisorPage() {
                   setParsedNote("");
                 }}
                 aria-pressed={active}
-                className={`group animate-fade-in-up-soft relative overflow-hidden rounded-2xl border p-5 text-left transition-colors duration-300 ${
+                className={`group animate-fade-in-up-soft relative overflow-hidden rounded-2xl border p-4 text-left transition-colors duration-300 ${
                   active
                     ? "border-slate-950 bg-slate-950 text-white"
                     : "border-slate-200 bg-white text-slate-950 hover:border-slate-400"
@@ -296,7 +294,7 @@ export default function AIAdvisorPage() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${
+                    className={`flex h-9 w-9 items-center justify-center rounded-xl transition-colors ${
                       active
                         ? "bg-white/10"
                         : mode.pro
@@ -304,7 +302,7 @@ export default function AIAdvisorPage() {
                           : "bg-slate-100 group-hover:bg-slate-200/70"
                     }`}
                   >
-                    <Icon className="h-5 w-5" strokeWidth={1.7} />
+                    <Icon className="h-4 w-4" strokeWidth={1.7} />
                   </div>
                   <div className="flex items-center gap-1.5">
                     {mode.pro && (
@@ -331,9 +329,9 @@ export default function AIAdvisorPage() {
                     ) : null}
                   </div>
                 </div>
-                <h2 className="mt-5 text-lg font-semibold tracking-tight">{mode.title}</h2>
+                <h2 className="mt-3 text-base font-semibold tracking-tight">{mode.title}</h2>
                 <p
-                  className={`mt-2 text-sm leading-6 ${
+                  className={`mt-1 text-xs leading-5 ${
                     active ? "text-slate-300" : "text-slate-600"
                   }`}
                 >
@@ -344,17 +342,17 @@ export default function AIAdvisorPage() {
           })}
         </main>
 
-        <aside className="space-y-5">
+        <aside className="flex min-h-0 flex-col gap-3">
           {/* Voice input */}
           <div
-            className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-5"
+            className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-4"
             style={{ animationDelay: "120ms" }}
           >
             <div className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-slate-500" />
               <h2 className="font-semibold">描述你的情况</h2>
             </div>
-            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-1 transition-colors focus-within:border-slate-400">
+            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-1 transition-colors focus-within:border-slate-400">
               <textarea
                 id="ai-advisor-profile-text"
                 name="profileText"
@@ -364,16 +362,16 @@ export default function AIAdvisorPage() {
                   // 用户开始编辑 = 退出"查看历史"态，下次 parse 自然是新会话
                   if (activeConversationId) selectConversation(null);
                 }}
-                className="block min-h-32 w-full resize-none bg-transparent px-3 py-2.5 text-sm leading-6 text-slate-800 outline-none placeholder:text-slate-400"
+                className="block min-h-20 w-full resize-none bg-transparent px-3 py-2 text-sm leading-5 text-slate-800 outline-none placeholder:text-slate-400"
                 placeholder="例：我想保研，但这学期有实习，不能让 workload 超过 20 小时。"
               />
-              <div className="flex items-center justify-between border-t border-slate-200/70 px-3 py-2 text-[11px] text-slate-400 tabular-nums">
+              <div className="flex items-center justify-between border-t border-slate-200/70 px-3 py-1.5 text-[11px] text-slate-400 tabular-nums">
                 <span>{profileText.length} 字</span>
                 <span className="uppercase tracking-[0.18em]">中文 · 自然语言</span>
               </div>
             </div>
             {activeConversationId && (
-              <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+              <div className="mt-2 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-600">
                 <span className="flex items-center gap-1.5">
                   <History className="h-3.5 w-3.5" />
                   正在查看历史会话
@@ -392,17 +390,17 @@ export default function AIAdvisorPage() {
               type="button"
               onClick={handleParse}
               disabled={streaming || !profileText.trim()}
-              className="group mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-slate-950"
+              className="group mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-slate-950"
             >
               <Sparkles
                 className={`h-4 w-4 transition-transform duration-500 ease-out ${
                   streaming ? "animate-spin" : "group-hover:rotate-12"
                 }`}
               />
-              {streaming ? "分析中…" : "让 AI 选择模式"}
+              {streaming ? "分析中…" : "让系统听听你的想法"}
             </button>
             {parsedNote ? (
-              <p className="mt-3 flex items-start gap-1.5 whitespace-pre-wrap text-sm font-medium text-slate-700">
+              <p className="mt-2 flex items-start gap-1.5 whitespace-pre-wrap text-sm font-medium text-slate-700">
                 <CheckCircle2 className="mt-1 h-3.5 w-3.5 shrink-0" />
                 <span>
                   {parsedNote}
@@ -416,32 +414,32 @@ export default function AIAdvisorPage() {
 
           {/* Active logic — emphasized dark card */}
           <div
-            className="animate-fade-in-up-soft relative overflow-hidden rounded-2xl border border-slate-900 bg-slate-950 p-6 text-white"
+            className="animate-fade-in-up-soft relative overflow-hidden rounded-2xl border border-slate-900 bg-slate-950 p-4 text-white"
             style={{ animationDelay: "180ms" }}
           >
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.22em] text-slate-400">
               当前启用逻辑
             </div>
-            <p className="mt-4 text-3xl font-semibold tracking-tight">
+            <p className="mt-2 text-2xl font-semibold tracking-tight">
               {activeMode.title}
             </p>
-            <p className="mt-3 text-sm leading-7 text-slate-300">{activeMode.logic}</p>
+            <p className="mt-2 text-xs leading-5 text-slate-300">{activeMode.logic}</p>
           </div>
 
           {/* Example */}
           <div
-            className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-5"
+            className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-4"
             style={{ animationDelay: "240ms" }}
           >
             <h2 className="font-semibold">推荐变化示例</h2>
-            <p className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+            <p className="mt-2 rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs leading-5 text-slate-700">
               {activeMode.example}
             </p>
           </div>
 
           {/* Conversation history */}
           <div
-            className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-5"
+            className="animate-fade-in-up-soft flex min-h-0 flex-1 flex-col rounded-2xl border border-slate-200 bg-white p-4"
             style={{ animationDelay: "300ms" }}
           >
             <div className="flex items-center justify-between">
@@ -457,13 +455,13 @@ export default function AIAdvisorPage() {
             </div>
 
             {loadingConversations ? (
-              <p className="mt-4 text-sm text-slate-400">加载中…</p>
+              <p className="mt-3 text-sm text-slate-400">加载中…</p>
             ) : conversations.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-400">
-                暂无历史。让 AI 跑一次推荐，就会出现在这里。
+              <p className="mt-3 text-sm text-slate-400">
+                暂无历史。跑一次推荐就会出现在这里。
               </p>
             ) : (
-              <ul className="mt-3 space-y-2">
+              <ul className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
                 {conversations.map((c) => {
                   const active = c.conversation_id === activeConversationId;
                   return (

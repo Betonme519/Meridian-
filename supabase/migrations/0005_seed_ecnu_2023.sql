@@ -1386,7 +1386,7 @@ BEGIN
      '{"scope":"general_required_sub","labor":{"credits":2,"normal_student_exemption":"教育实习"},"mental_health":{"credits":2,"exemption_majors":["psychology","education","normal_majors"]}}'::jsonb),
 
     -- E3 通识教育课程 (4 条)
-    (v_school_track_id, v_cat_e3_id, 'E3-1', '通识教育总学分 (8 学分 / 3 模块)', 1, 'credits', 8,
+    (v_school_track_id, v_cat_e3_id, 'E3-1', '通识教育总学分 (8 学分)', 1, 'credits', 8,
      '通识教育课程包含 3 个模块: 人类思维与学科史论 / 经典阅读 / 模块课程. 一般要求修满 8 学分, 具体以专业培养方案为准.',
      '华东师范大学2025年本科生学习指南.md §一、培养方案 / 05',
      '{"scope":"general_education_total","credits":8,"modules":["人类思维与学科史论","经典阅读","模块课程"],"specialty_override":true}'::jsonb),
