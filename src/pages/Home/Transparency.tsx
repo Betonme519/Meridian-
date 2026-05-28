@@ -142,10 +142,15 @@ export default function Transparency() {
     },
   ];
 
+  // 4 个 chip 走项目 accent palette (flame / gold / maya / sapphire):
+  //   来源 → maya (浅蓝 + sapphire 文字)
+  //   规则 → sapphire (深电蓝,与 maya 拉开层次)
+  //   风险 → gold (沿用黄/橙系警示语义,文字用 flame 加强对比)
+  //   估算 → slate (中性,保留)
   const CHIPS = [
-    { tag: "来源", value: "学校手册 §4.2", tone: "border-blue-200/70 text-blue-700 bg-blue-50/60" },
-    { tag: "规则", value: "学分 ≥ 12", tone: "border-violet-200/70 text-violet-700 bg-violet-50/60" },
-    { tag: "风险", value: "中", tone: "border-amber-200/70 text-amber-800 bg-amber-50/60" },
+    { tag: "来源", value: "学校手册 §4.2", tone: "border-maya/40 text-sapphire bg-maya/15" },
+    { tag: "规则", value: "学分 ≥ 12", tone: "border-sapphire/30 text-sapphire bg-sapphire/10" },
+    { tag: "风险", value: "中", tone: "border-gold/40 text-flame bg-gold/15" },
     { tag: "估算", value: "30% 置信", tone: "border-slate-200 text-slate-700 bg-slate-50" },
   ];
 

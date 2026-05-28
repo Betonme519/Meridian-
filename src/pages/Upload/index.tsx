@@ -245,146 +245,22 @@ export default function UploadPage() {
   };
 
   return (
-    <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
-      {/* Hero */}
+    <section className="mx-auto max-w-7xl space-y-8 px-5 py-5 sm:px-8 sm:py-6">
+      {/* 1 · 毕业要求完成情况（排队 12.5 sub-task 0） */}
+      <RequirementProgress />
 
-      {/* Section 2 · File slots */}
-      <div className="mt-10">
-        <div className="flex items-center gap-2">
-          <UploadIcon className="h-5 w-5 text-slate-500" />
-          <h2 className="font-semibold tracking-tight">文件导入</h2>
-          {uploading > 0 && (
-            <span className="ml-3 inline-flex items-center gap-1 text-xs text-slate-500">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              上传中 {uploading}
-            </span>
-          )}
-          <span className="ml-auto text-xs text-slate-400">PDF · Excel · 图片</span>
-        </div>
-
-        {sourcesError && (
-          <p className="mt-3 rounded-lg border border-flame/40 bg-white px-3 py-2 text-xs text-flame">
-            {sourcesError}
-          </p>
-        )}
-
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {fileSlots.map((s, i) => {
-            const Icon = s.icon;
-            const isHover = dragHover === i;
-            // 用 <label> 包 <input>：点击 label 自动触发 input 文件选择，
-            // 无需 ref + stopPropagation；符合 HTML 规范、a11y 友好。
-            return (
-              <label
-                key={s.title}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragHover(i);
-                }}
-                onDragLeave={() => setDragHover((curr) => (curr === i ? null : curr))}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragHover(null);
-                  void handleFiles(i, e.dataTransfer.files);
-                }}
-                className={`animate-fade-in-up-soft flex cursor-pointer flex-col items-start rounded-2xl border-2 border-dashed p-5 text-left transition-colors ${
-                  isHover
-                    ? "border-slate-950 bg-slate-50"
-                    : "border-slate-300 bg-white hover:border-slate-500"
-                }`}
-                style={{ animationDelay: `${60 + i * 60}ms` }}
-              >
-                <input
-                  type="file"
-                  multiple
-                  accept={s.accept}
-                  className="hidden"
-                  onChange={(e) => {
-                    void handleFiles(i, e.target.files);
-                    // 重置 value：下次再选同一个文件名也能触发 onChange
-                    e.target.value = "";
-                  }}
-                />
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100">
-                  <Icon className="h-5 w-5 text-slate-700" strokeWidth={1.7} />
-                </div>
-                <p className="mt-3 text-sm font-semibold text-slate-900">{s.title}</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">{s.desc}</p>
-                <p className="mt-3 text-[11px] text-slate-400">{s.formats}</p>
-                <span className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-slate-700">
-                  拖拽文件到此 / 点击上传
-                </span>
-              </label>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Section 3 · Connectors */}
-      <div className="mt-12 grid gap-5 lg:grid-cols-[1fr_360px]">
-        <div className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-6">
-          <div className="flex items-center gap-2">
-            <Link2 className="h-5 w-5 text-slate-500" />
-            <h2 className="font-semibold tracking-tight">教务系统连接器</h2>
-          </div>
-          <p className="mt-2 text-xs text-slate-500">
-            授权登录后会按周自动同步成绩、课表、培养方案变更。
-          </p>
-
-          <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-            <label className="block">
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">
-                所在学校
-              </span>
-              <select
-                value={school}
-                onChange={(e) => handleSchoolChange(e.target.value)}
-                className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 transition-colors hover:border-slate-400 focus:border-slate-950 focus:outline-none"
-              >
-                {schoolOptions.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="button"
-              disabled={!connected}
-              className={`inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors ${
-                connected
-                  ? "bg-slate-950 text-white hover:bg-slate-800"
-                  : "cursor-not-allowed bg-slate-200 text-slate-400"
-              }`}
-            >
-              <ShieldCheck className="h-4 w-4" />
-              {connected ? "授权登录" : "先选学校"}
-            </button>
-          </div>
-
-          <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">
-              当前连接状态
-            </p>
-            <p className="mt-1.5 text-sm text-slate-800">
-              {connected ? `${school} · 等待授权` : "尚未连接任何教务系统"}
-            </p>
-            <p className="mt-1 text-[11px] text-slate-500">
-              所有 OAuth token 加密保存在你本地，不会上传到服务端。
-            </p>
-          </div>
-        </div>
-
+      {/* 2 · 个人设置（左） + 教务系统连接（右） */}
+      <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
         {/* Personal settings */}
         <aside
-          className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-6"
+          className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-5"
           style={{ animationDelay: "60ms" }}
         >
           <div className="flex items-center gap-2">
             <Settings2 className="h-5 w-5 text-slate-500" />
             <h2 className="font-semibold tracking-tight">个人设置</h2>
           </div>
-          <div className="mt-5 space-y-3">
+          <div className="mt-4 space-y-3">
             <Field label="显示名">
               <input
                 value={name}
@@ -413,33 +289,217 @@ export default function UploadPage() {
           </div>
           <button
             type="button"
-            className="mt-5 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:border-slate-400 hover:text-slate-950"
+            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:border-slate-400 hover:text-slate-950"
           >
             <Download className="h-3.5 w-3.5" />
             导出我的所有数据
           </button>
         </aside>
+
+        {/* Connector */}
+        <div className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="flex items-center gap-2">
+            <Link2 className="h-5 w-5 text-slate-500" />
+            <h2 className="font-semibold tracking-tight">教务系统连接器</h2>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            授权登录后会按周自动同步成绩、课表、培养方案变更。
+          </p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+            <label className="block">
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">
+                所在学校
+              </span>
+              <select
+                value={school}
+                onChange={(e) => handleSchoolChange(e.target.value)}
+                className="mt-1.5 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition-colors hover:border-slate-400 focus:border-slate-950 focus:outline-none"
+              >
+                {schoolOptions.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              disabled={!connected}
+              className={`inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors ${
+                connected
+                  ? "bg-slate-950 text-white hover:bg-slate-800"
+                  : "cursor-not-allowed bg-slate-200 text-slate-400"
+              }`}
+            >
+              <ShieldCheck className="h-4 w-4" />
+              {connected ? "授权登录" : "先选学校"}
+            </button>
+          </div>
+
+          {/* 当前连接状态 · 用细线分隔，不嵌套框 */}
+          <div className="mt-4 border-t border-slate-200 pt-3">
+            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">
+              当前连接状态
+            </p>
+            <p className="mt-1 text-sm text-slate-800">
+              {connected ? `${school} · 等待授权` : "尚未连接任何教务系统"}
+            </p>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              所有 OAuth token 加密保存在你本地，不会上传到服务端。
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* Section 4 · Mini apps */}
-      <div className="mt-12">
-        <div className="flex items-center gap-2">
+      {/* 3 · 文件导入 */}
+      <div>
+        <div className="flex items-center gap-2 px-1">
+          <UploadIcon className="h-5 w-5 text-slate-500" />
+          <h2 className="font-semibold tracking-tight">文件导入</h2>
+          {uploading > 0 && (
+            <span className="ml-3 inline-flex items-center gap-1 text-xs text-slate-500">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              上传中 {uploading}
+            </span>
+          )}
+          <span className="ml-auto text-xs text-slate-400">PDF · Excel · 图片</span>
+        </div>
+
+        {sourcesError && (
+          <p className="mt-3 rounded-lg border border-flame/40 bg-white px-3 py-2 text-xs text-flame">
+            {sourcesError}
+          </p>
+        )}
+
+        <div className="mt-3 grid gap-3 md:grid-cols-3">
+          {fileSlots.map((s, i) => {
+            const Icon = s.icon;
+            const isHover = dragHover === i;
+            return (
+              <label
+                key={s.title}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragHover(i);
+                }}
+                onDragLeave={() => setDragHover((curr) => (curr === i ? null : curr))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragHover(null);
+                  void handleFiles(i, e.dataTransfer.files);
+                }}
+                className={`animate-fade-in-up-soft flex cursor-pointer flex-col items-start rounded-2xl border-2 border-dashed p-4 text-left transition-colors ${
+                  isHover
+                    ? "border-slate-950 bg-slate-50"
+                    : "border-slate-300 bg-white hover:border-slate-500"
+                }`}
+                style={{ animationDelay: `${60 + i * 60}ms` }}
+              >
+                <input
+                  type="file"
+                  multiple
+                  accept={s.accept}
+                  className="hidden"
+                  onChange={(e) => {
+                    void handleFiles(i, e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100">
+                  <Icon className="h-5 w-5 text-slate-700" strokeWidth={1.7} />
+                </div>
+                <p className="mt-2.5 text-sm font-semibold text-slate-900">{s.title}</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">{s.desc}</p>
+                <p className="mt-2 text-[11px] text-slate-400">{s.formats}</p>
+                <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-slate-700">
+                  拖拽文件到此 / 点击上传
+                </span>
+              </label>
+            );
+          })}
+        </div>
+
+        {/* 已导入数据 —— 文件导入下方紧跟，单层 card + divide 行 */}
+        <div className="mt-4">
+          <div className="flex items-center gap-2 px-1">
+            <Database className="h-4 w-4 text-slate-500" />
+            <h3 className="text-sm font-semibold text-slate-800">已导入的数据</h3>
+            <span className="ml-auto text-[11px] text-slate-400 tabular-nums">
+              {sourcesLoading ? "加载中…" : `${sources.length} 条记录`}
+            </span>
+          </div>
+          <div
+            className="animate-fade-in-up-soft mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white"
+            style={{ animationDelay: "60ms" }}
+          >
+            <div className="grid grid-cols-[1.4fr_120px_140px_120px_120px] gap-4 border-b border-slate-100 bg-slate-50/40 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 max-md:hidden">
+              <span>文件</span>
+              <span>类型</span>
+              <span>导入日期</span>
+              <span>状态</span>
+              <span />
+            </div>
+
+            {sources.length === 0 && !sourcesLoading && (
+              <p className="px-5 py-8 text-center text-sm text-slate-500">
+                还没有导入任何文件 —— 点击上方任一卡片开始
+              </p>
+            )}
+
+            {sources.map((r) => (
+              <article
+                key={r.id}
+                className="grid gap-2 border-b border-slate-100 px-5 py-3 transition-colors last:border-b-0 hover:bg-slate-50/60 md:grid-cols-[1.4fr_120px_140px_120px_120px] md:items-center md:gap-4"
+              >
+                <div>
+                  <p className="text-sm font-medium text-slate-900">{r.name}</p>
+                  <p className="text-[11px] text-slate-400 md:hidden">
+                    {r.kind} · {formatDate(r.created_at)}
+                  </p>
+                </div>
+                <span className="text-xs text-slate-700 max-md:hidden">{r.kind}</span>
+                <span className="text-xs tabular-nums text-slate-500 max-md:hidden">
+                  {formatDate(r.created_at)}
+                </span>
+                <span
+                  className={`inline-flex h-5 w-fit items-center rounded-full px-2 text-[11px] font-semibold ${STATUS_CLS[r.parsed_status]}`}
+                >
+                  {STATUS_LABEL[r.parsed_status]}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void handleRemove(r.id)}
+                  className="inline-flex h-8 w-fit items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-medium text-slate-700 transition-colors hover:border-flame/50 hover:text-flame"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  删除
+                </button>
+              </article>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 4 · 小程序 / 社区接入 */}
+      <div>
+        <div className="flex items-center gap-2 px-1">
           <Smartphone className="h-5 w-5 text-slate-500" />
           <h2 className="font-semibold tracking-tight">小程序 / 社区接入</h2>
           <span className="ml-auto text-xs text-slate-400">{miniApps.length} 个数据源</span>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {miniApps.map((m, i) => {
             const Icon = m.icon;
             return (
               <article
                 key={m.title}
-                className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-5"
+                className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-4"
                 style={{ animationDelay: `${60 + i * 50}ms` }}
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100">
-                    <Icon className="h-5 w-5 text-slate-700" strokeWidth={1.7} />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100">
+                    <Icon className="h-4 w-4 text-slate-700" strokeWidth={1.7} />
                   </div>
                   <span
                     className={`ml-auto inline-flex h-5 items-center rounded-full px-2 text-[11px] font-semibold ${
@@ -451,11 +511,11 @@ export default function UploadPage() {
                     {m.status}
                   </span>
                 </div>
-                <p className="mt-3 text-sm font-semibold text-slate-900">{m.title}</p>
+                <p className="mt-2.5 text-sm font-semibold text-slate-900">{m.title}</p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">{m.desc}</p>
                 <button
                   type="button"
-                  className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-slate-700 transition-colors hover:text-slate-950"
+                  className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-slate-700 transition-colors hover:text-slate-950"
                 >
                   连接
                   <ExternalLink className="h-3 w-3" />
@@ -466,71 +526,8 @@ export default function UploadPage() {
         </div>
       </div>
 
-      {/* Section 6 · Imported data list */}
-      <div className="mt-12">
-        <div className="flex items-center gap-2">
-          <Database className="h-5 w-5 text-slate-500" />
-          <h2 className="font-semibold tracking-tight">已导入的数据</h2>
-          <span className="ml-auto text-xs text-slate-400 tabular-nums">
-            {sourcesLoading ? "加载中…" : `${sources.length} 条记录`}
-          </span>
-        </div>
-        <div
-          className="animate-fade-in-up-soft mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white"
-          style={{ animationDelay: "60ms" }}
-        >
-          <div className="grid grid-cols-[1.4fr_120px_140px_120px_120px] gap-4 border-b border-slate-100 bg-slate-50/40 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 max-md:hidden">
-            <span>文件</span>
-            <span>类型</span>
-            <span>导入日期</span>
-            <span>状态</span>
-            <span />
-          </div>
-
-          {sources.length === 0 && !sourcesLoading && (
-            <p className="px-5 py-10 text-center text-sm text-slate-500">
-              还没有导入任何文件 —— 点击上方任一卡片开始
-            </p>
-          )}
-
-          {sources.map((r) => (
-            <article
-              key={r.id}
-              className="grid gap-2 border-b border-slate-100 px-5 py-4 transition-colors last:border-b-0 hover:bg-slate-50/60 md:grid-cols-[1.4fr_120px_140px_120px_120px] md:items-center md:gap-4"
-            >
-              <div>
-                <p className="text-sm font-medium text-slate-900">{r.name}</p>
-                <p className="text-[11px] text-slate-400 md:hidden">
-                  {r.kind} · {formatDate(r.created_at)}
-                </p>
-              </div>
-              <span className="text-xs text-slate-700 max-md:hidden">{r.kind}</span>
-              <span className="text-xs tabular-nums text-slate-500 max-md:hidden">
-                {formatDate(r.created_at)}
-              </span>
-              <span
-                className={`inline-flex h-5 w-fit items-center rounded-full px-2 text-[11px] font-semibold ${STATUS_CLS[r.parsed_status]}`}
-              >
-                {STATUS_LABEL[r.parsed_status]}
-              </span>
-              <button
-                type="button"
-                onClick={() => void handleRemove(r.id)}
-                className="inline-flex h-8 w-fit items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-medium text-slate-700 transition-colors hover:border-flame/50 hover:text-flame"
-              >
-                <Trash2 className="h-3 w-3" />
-                删除
-              </button>
-            </article>
-          ))}
-        </div>
-      </div>
-
-      {/* Section 7 · 我已修的课（排队 11） */}
+      {/* 5 · 我已修的课（排队 11） */}
       <CourseManager />
-
-      {/* Section 8 · 毕业要求完成情况 反向勾选（排队 12.5 sub-task 0） */}
-      <RequirementProgress />
     </section>
   );
 }

@@ -36,7 +36,7 @@ const ITEMS: Item[] = [
   },
   {
     tone: "正面反馈",
-    toneClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    toneClass: "bg-maya/15 text-sapphire border-maya/40",
     stars: 5,
     quote:
       "第一次有人把我学校那本 80 页的手册讲清楚。选课前看了一遍，避开两门高风险课。",
@@ -45,7 +45,7 @@ const ITEMS: Item[] = [
   },
   {
     tone: "中性反馈",
-    toneClass: "bg-amber-50 text-amber-700 border-amber-200",
+    toneClass: "bg-gold/15 text-flame border-gold/40",
     stars: 4,
     quote:
       "课程难度估算偏乐观了，我那门 ECON 实际比预测难得多。但绩点公式和先修课检查很准。",
@@ -63,7 +63,7 @@ const ITEMS: Item[] = [
   },
   {
     tone: "正面反馈",
-    toneClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    toneClass: "bg-maya/15 text-sapphire border-maya/40",
     stars: 5,
     quote:
       "作为国际学生最怕错过 prerequisite。这里把链路画得很清楚，不用再追导师 office hour。",
@@ -230,7 +230,7 @@ function FeedbackCard({
       onMouseLeave={() => setHovered(false)}
       className={`relative bg-white rounded-2xl border flex flex-col cursor-default overflow-hidden ${
         highlight
-          ? "border-amber-300 ring-2 ring-amber-100"
+          ? "border-gold/60 ring-2 ring-gold/20"
           : "border-gray-200"
       }`}
       style={{
@@ -268,8 +268,9 @@ function FeedbackCard({
                   className="w-3.5 h-3.5"
                   strokeWidth={1.5}
                   style={{
-                    fill: isLit ? "#f59e0b" : "#e5e7eb",
-                    color: isLit ? "#f59e0b" : "#e5e7eb",
+                    // 用项目 palette gold (#FFB62E) 替代 Tailwind amber-500
+                    fill: isLit ? "#FFB62E" : "#e5e7eb",
+                    color: isLit ? "#FFB62E" : "#e5e7eb",
                     transition:
                       "fill 0.4s cubic-bezier(0.22,0.61,0.36,1), color 0.4s cubic-bezier(0.22,0.61,0.36,1)",
                   }}
@@ -297,7 +298,7 @@ function FeedbackCard({
       </div>
 
       {highlight && (
-        <div className="flex items-start gap-2 bg-amber-50 border-t border-amber-100 px-6 py-3 text-xs leading-relaxed text-amber-700">
+        <div className="flex items-start gap-2 bg-gold/10 border-t border-gold/30 px-6 py-3 text-xs leading-relaxed text-flame">
           <AlertTriangle
             className="w-3.5 h-3.5 flex-shrink-0 mt-0.5"
             strokeWidth={1.6}

@@ -22,12 +22,12 @@
 
 | 维度 | 状态 |
 |---|---|
-| 阶段 | 数据层接通收尾，主线推进毕业路径结构化 + 画布改造 + AI 落地学校 |
-| 已接通业务表 | `profiles` ✅ · `rag_source` ✅ · `plan` ✅ · `rule` ✅ · `rule_conflict` ✅ · `chat_message` ✅ |
-| 公共 track 表 | 5 张 track_* + `user_progress` schema 落地（0002-0006 migration）+ 0005 华师大 2023 级 seed 198 条 track_requirement 跑通 |
-| AI 抽象层 | provider-agnostic 骨架 ✅（mock + remote + anthropic 三 provider）；真 LLM 上游待用户拍板（TD-1） |
-| 下一里程碑 | 排队 13（AI mock 接 track，gradPathAdvisorPrompt + zod）→ 13.2（TD-1 拍板 LLM 上游，写 ai.chat server route）→ 12.5（workspace 二次重构：requirement 加 shortcut 层 + AI 现算捷径 + 兴趣 input）→ 13.8（TD-2 RAG）→ 14（UI 重设计） |
-| 主要风险 | 中国高校本地化文案未做；解析 pipeline 未建（TD-2，依赖 TD-1）；多 tab realtime 未上（TD-6） |
+| 阶段 | 排队 14 UI 重设计主线推进中（第一批配色 ✅ / 第二批 layout + 去嵌套 ✅ / 第三批 UI 微调 ✅ 2026-05-28） |
+| 已接通业务表 | `profiles` ✅ · `rag_source` ✅ · `plan` ✅ · `rule` ✅ · `rule_conflict` ✅ · `chat_message` ✅ · `course` ✅ · `user_progress` ✅ · `user_requirement_done` ✅ · `requirement_advice` ✅ · `requirement_link` ✅ |
+| 公共 track 表 | 5 张 track_* + `user_progress` schema 落地（0002-0006 migration）+ 0005 华师大 2023 级 seed 198 条 track_requirement 跑通 + 0007/0008 静态路径库（280 advice + 40 link）+ 0009 user_requirement_done + 0010 shortcut seed + 0011 E3-1 标题清理（待跑） |
+| AI 抽象层 | provider-agnostic 骨架 ✅（mock + remote + anthropic 三 provider）；真 LLM 上游待用户拍板（TD-1）。静态路径库已接管 (goal × req) reason 生成，runtime 只查表 |
+| 下一里程碑 | 14（UI 重设计，当前主线）→ 13.2（TD-1 拍板 LLM 上游，写 ai.chat server route）→ 13.8（TD-2 RAG）。14 已完成三批：第一批配色重置 + Dashboard 收敛 + PathLoader（commit `b626a4b`）；第二批五页 layout 单屏 + 去嵌套（commit `6155a0e`）；第三批 UI 微调（Dashboard 改名 Home + hero card row-span-2 + 卡片交互 + 首页 chip 换 palette + 文案精简，2026-05-28）|
+| 主要风险 | 中国高校本地化文案未做；解析 pipeline 未建（TD-2，依赖 TD-1）；多 tab realtime 未上（TD-6）；Schedule PDF 渲染 + 跳转目录定位仍是占位（功能预留位置） |
 
 ---
 

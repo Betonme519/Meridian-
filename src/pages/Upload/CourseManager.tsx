@@ -98,15 +98,15 @@ export default function CourseManager() {
   };
 
   return (
-    <div className="mt-12">
-      <div className="flex items-center gap-2">
+    <div>
+      <div className="flex items-center gap-2 px-1">
         <BookOpen className="h-5 w-5 text-slate-500" />
         <h2 className="font-semibold tracking-tight">我已修的课</h2>
         <span className="ml-auto text-xs text-slate-400 tabular-nums">
           {loading ? "加载中…" : `${courses.length} 条记录`}
         </span>
       </div>
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="mt-1 px-1 text-xs text-slate-500">
         手动录入你的修课记录。画布判断「哪些 option 已完成」时会按课程代码匹配命中。
       </p>
 

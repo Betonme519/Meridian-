@@ -4,26 +4,21 @@ import {
   ArrowRight,
   ChevronDown,
   ChevronRight,
-  ExternalLink,
   FileText,
   Globe2,
   Plus,
   RefreshCcw,
   ShieldAlert,
+  ShieldCheck,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRules } from "@/hooks/useRules";
 import type { Rule, TrustLevel } from "@/api/ruleApi";
-import { TRUST_LEVELS } from "@/api/ruleApi";
 import type { ConfidenceLevel } from "@/api/ruleConflictApi";
-import {
-  SEED_RULES,
-  SEED_CONFLICTS,
-  SEED_POLICIES,
-  TRUST_META,
-} from "./scheduleSeed";
+import { SEED_RULES, SEED_CONFLICTS, SEED_POLICIES } from "./scheduleSeed";
 
 /**
  * Schedule 页 —— 用户规则知识库 + 冲突 + 学校特殊政策。
@@ -48,12 +43,10 @@ export default function SchedulePage() {
     rules,
     conflicts,
     rulesByBranch,
-    rulesByTrust,
     ruleMap,
     loading,
     error,
     createRule,
-    updateRule,
     removeRule,
     createConflict,
     removeConflict,
@@ -70,7 +63,6 @@ export default function SchedulePage() {
    */
   const showSeed = isResolving || isGuest || isEmpty;
 
-  const displayRules = showSeed ? SEED_RULES : rules;
   const displayConflicts = showSeed ? SEED_CONFLICTS : conflicts;
   const displayRulesByBranch = useMemo(() => {
     if (!showSeed) return rulesByBranch;
@@ -82,12 +74,6 @@ export default function SchedulePage() {
     }
     return Array.from(map, ([branch, items]) => ({ branch, items }));
   }, [showSeed, rulesByBranch]);
-  const displayRulesByTrust = useMemo(() => {
-    if (!showSeed) return rulesByTrust;
-    const out: Record<TrustLevel, Rule[]> = { high: [], med: [], low: [] };
-    for (const r of SEED_RULES) out[r.trust].push(r);
-    return out;
-  }, [showSeed, rulesByTrust]);
   const displayRuleMap = useMemo(() => {
     if (!showSeed) return ruleMap;
     const m = new Map<string, Rule>();
@@ -109,12 +95,6 @@ export default function SchedulePage() {
   const [conflictFormOpen, setConflictFormOpen] = useState(false);
 
   const canEdit = !isGuest && !authLoading;
-
-  /** trust 三档循环切换（点 chip 切档） */
-  const nextTrust = (t: TrustLevel): TrustLevel => {
-    const idx = TRUST_LEVELS.indexOf(t);
-    return TRUST_LEVELS[(idx + 1) % TRUST_LEVELS.length];
-  };
 
   return (
     <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
@@ -150,14 +130,14 @@ export default function SchedulePage() {
         </div>
       )}
 
-      {/* Section 1 + 2 · Tree + Trust */}
-      <div className="mt-2 grid gap-5 lg:grid-cols-[360px_1fr]">
-        {/* Tree */}
+      {/* Top: 左结构树 + 右 PDF 原件预览 */}
+      <div className="mt-2 grid gap-4 lg:grid-cols-[360px_1fr]">
+        {/* Tree column —— 裸列表, 细线分隔；flex col 让分支卡填底对齐右栏 */}
         <aside
-          className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-5"
+          className="animate-fade-in-up-soft flex flex-col"
           style={{ animationDelay: "60ms" }}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 px-1">
             <FileText className="h-5 w-5 text-slate-500" />
             <h2 className="font-semibold tracking-tight">规则结构树</h2>
             {canEdit && (
@@ -171,7 +151,7 @@ export default function SchedulePage() {
               </button>
             )}
           </div>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 px-1 text-xs text-slate-500">
             {showSeed ? "示例 · 培养方案 v2024" : `${rules.length} 条规则`}
           </p>
 
@@ -189,19 +169,16 @@ export default function SchedulePage() {
             />
           )}
 
-          <div className="mt-4 space-y-2">
+          {/* 分支列表：单层 card + 内部 divide-y 细线，flex-1 填底与右侧 PDF 对齐 */}
+          <div className="mt-3 flex min-h-0 flex-1 flex-col divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
             {displayRulesByBranch.length === 0 && !loading && (
-              <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
-                暂无规则
-              </p>
+              <p className="p-4 text-center text-xs text-slate-400">暂无规则</p>
             )}
             {displayRulesByBranch.map((b) => {
               const open = safeOpenBranch === b.branch;
+              const highRules = b.items.filter((r) => r.trust === "high");
               return (
-                <div
-                  key={b.branch}
-                  className="rounded-xl border border-slate-200 bg-white"
-                >
+                <div key={b.branch}>
                   <button
                     type="button"
                     onClick={() => setOpenBranch(open ? null : b.branch)}
@@ -212,50 +189,68 @@ export default function SchedulePage() {
                     ) : (
                       <ChevronRight className="h-4 w-4 text-slate-400" />
                     )}
-                    <span className="text-sm font-medium text-slate-900">
-                      {b.branch}
-                    </span>
+                    <span className="text-sm font-medium text-slate-900">{b.branch}</span>
                     <span className="ml-auto text-[11px] tabular-nums text-slate-400">
                       {b.items.length}
                     </span>
                   </button>
                   {open && (
-                    <ul className="space-y-1 border-t border-slate-100 px-3 py-2">
-                      {b.items.map((leaf) => (
-                        <li
-                          key={leaf.id}
-                          className="group flex items-start justify-between gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-slate-50"
-                        >
-                          <div className="min-w-0">
-                            <p className="text-xs font-medium text-slate-800">
-                              {leaf.title}
-                            </p>
-                            <p className="mt-0.5 truncate text-[11px] text-slate-500">
-                              {leaf.source ?? "未注明来源"}
-                              {leaf.source_page && (
-                                <span className="ml-1 text-slate-400">
-                                  · {leaf.source_page}
-                                </span>
-                              )}
-                            </p>
-                          </div>
-                          {canEdit && !showSeed && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (window.confirm(`删除规则「${leaf.title}」？`)) {
-                                  void removeRule(leaf.id);
-                                }
-                              }}
-                              className="invisible mt-0.5 rounded p-1 text-slate-400 transition-colors hover:bg-flame/10 hover:text-flame group-hover:visible"
-                              aria-label="删除"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="space-y-3 border-t border-slate-100 bg-slate-50/40 px-4 py-3">
+                      {/* 当前分区官方规则 · 高可信度 */}
+                      <div>
+                        <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                          <ShieldCheck className="h-3 w-3 text-maya" />
+                          官方规则 · 高可信度
+                        </p>
+                        {highRules.length === 0 ? (
+                          <p className="mt-2 text-[11px] text-slate-400">本分区暂无官方规则</p>
+                        ) : (
+                          <ul className="mt-2 space-y-2.5">
+                            {highRules.map((leaf) => (
+                              <li key={leaf.id} className="group text-xs">
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="font-medium text-slate-900">{leaf.title}</p>
+                                  {canEdit && !showSeed && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (window.confirm(`删除规则「${leaf.title}」？`)) {
+                                          void removeRule(leaf.id);
+                                        }
+                                      }}
+                                      className="invisible flex-none rounded p-0.5 text-slate-400 transition-colors hover:bg-flame/10 hover:text-flame group-hover:visible"
+                                      aria-label="删除"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                                {leaf.body && (
+                                  <p className="mt-0.5 text-slate-600 leading-5">{leaf.body}</p>
+                                )}
+                                <p className="mt-1 text-[11px] text-slate-400">
+                                  {leaf.source ?? "未注明来源"}
+                                  {leaf.source_page && (
+                                    <span className="ml-1 text-slate-300">· {leaf.source_page}</span>
+                                  )}
+                                </p>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+
+                      {/* AI 推测 · 接通 RAG 后启用 */}
+                      <div className="border-t border-slate-200 pt-3">
+                        <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-sapphire">
+                          <Sparkles className="h-3 w-3" />
+                          AI 推测
+                        </p>
+                        <p className="mt-2 text-[11px] leading-5 text-slate-500">
+                          基于已导入资料的推测内容（接通 RAG 后启用）。
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </div>
               );
@@ -263,108 +258,31 @@ export default function SchedulePage() {
           </div>
         </aside>
 
-        {/* Trust columns */}
-        <main className="space-y-4">
-          {(["high", "med", "low"] as TrustLevel[]).map((level, idx) => {
-            const t = TRUST_META[level];
-            const Icon = t.icon;
-            const items = displayRulesByTrust[level];
-            return (
-              <article
-                key={level}
-                className={`animate-fade-in-up-soft rounded-2xl border p-5 ${t.head}`}
-                style={{ animationDelay: `${100 + idx * 80}ms` }}
-              >
-                <div className="flex items-center gap-2">
-                  <Icon className={`h-5 w-5 ${t.body}`} />
-                  <h2 className={`font-semibold tracking-tight ${t.body}`}>
-                    {t.label}
-                  </h2>
-                  <span
-                    className={`ml-auto inline-flex h-5 items-center rounded-full px-2 text-[11px] font-semibold ${t.cls}`}
-                  >
-                    可信度 {t.short} · {items.length}
-                  </span>
-                </div>
-                {items.length === 0 ? (
-                  <p className="mt-4 rounded-xl border border-dashed border-white/60 bg-white/40 p-3.5 text-center text-xs text-slate-500">
-                    该档暂无条目
-                  </p>
-                ) : (
-                  <ul className="mt-4 space-y-2.5">
-                    {items.map((it) => (
-                      <li
-                        key={it.id}
-                        className="group rounded-xl border border-white/60 bg-white/80 p-3.5"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-semibold text-slate-900">
-                            {it.title}
-                          </p>
-                          <div className="flex items-center gap-1">
-                            {canEdit && !showSeed && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  void updateRule(it.id, {
-                                    trust: nextTrust(it.trust),
-                                  })
-                                }
-                                className="inline-flex items-center gap-0.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 transition-colors hover:bg-slate-200"
-                                title="点击切换可信度档位"
-                              >
-                                ⇄ 调档
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 transition-colors hover:text-slate-900"
-                            >
-                              查看原文
-                              <ExternalLink className="h-3 w-3" />
-                            </button>
-                            {canEdit && !showSeed && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (window.confirm(`删除规则「${it.title}」？`)) {
-                                    void removeRule(it.id);
-                                  }
-                                }}
-                                className="invisible rounded p-1 text-slate-400 transition-colors hover:bg-flame/10 hover:text-flame group-hover:visible"
-                                aria-label="删除"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        {it.body && (
-                          <p className="mt-1.5 text-xs leading-5 text-slate-700">
-                            {it.body}
-                          </p>
-                        )}
-                        <p className="mt-2 text-[11px] text-slate-500">
-                          来源：{it.source ?? "未注明"}
-                          {it.source_page && (
-                            <span className="ml-1 text-slate-400">
-                              · {it.source_page}
-                            </span>
-                          )}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </article>
-            );
-          })}
+        {/* Right · PDF 原件预览（功能预留位置） */}
+        <main
+          className="animate-fade-in-up-soft flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white"
+          style={{ animationDelay: "120ms" }}
+        >
+          <div className="flex flex-none items-center gap-2 border-b border-slate-200 px-4 py-3">
+            <FileText className="h-4 w-4 text-slate-500" />
+            <h2 className="text-sm font-semibold text-slate-950">官方文件原件</h2>
+            <span className="ml-auto text-[11px] text-slate-400">点击左侧节点跳转到对应位置</span>
+          </div>
+          <div className="flex min-h-[480px] flex-1 items-center justify-center px-6 py-10">
+            <div className="max-w-xs text-center">
+              <FileText className="mx-auto h-8 w-8 text-slate-300" strokeWidth={1.5} />
+              <p className="mt-3 text-sm text-slate-500">PDF 原件预览区</p>
+              <p className="mt-2 text-[11px] leading-5 text-slate-400">
+                功能预留位置。上传培养方案后此处会渲染 PDF，并随左侧目录跳到对应位置。
+              </p>
+            </div>
+          </div>
         </main>
       </div>
 
-      {/* Section 3 · Conflicts */}
-      <div className="mt-12">
-        <div className="flex items-center gap-2">
+      {/* 冲突规则 */}
+      <div className="mt-8">
+        <div className="flex items-center gap-2 px-1">
           <ShieldAlert className="h-5 w-5 text-flame" />
           <h2 className="font-semibold tracking-tight">冲突规则</h2>
           <span className="ml-auto text-xs text-slate-400 tabular-nums">
@@ -395,9 +313,9 @@ export default function SchedulePage() {
           />
         )}
 
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
           {displayConflicts.length === 0 && !loading && (
-            <p className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400 lg:col-span-2">
+            <p className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400 lg:col-span-2">
               暂无冲突记录
             </p>
           )}
@@ -407,7 +325,7 @@ export default function SchedulePage() {
             return (
               <article
                 key={c.id}
-                className="group animate-fade-in-up-soft relative rounded-2xl border border-flame/40 bg-white p-5"
+                className="group animate-fade-in-up-soft relative rounded-xl border border-flame/40 bg-white p-4"
                 style={{ animationDelay: `${60 + i * 60}ms` }}
               >
                 <div className="flex items-center gap-2">
@@ -469,27 +387,25 @@ export default function SchedulePage() {
         </div>
       </div>
 
-      {/* Section 4 · Special policies (SEED 不入库) */}
-      <div className="mt-12">
-        <div className="flex items-center gap-2">
+      {/* 学校特殊政策 (SEED 不入库) */}
+      <div className="mt-8">
+        <div className="flex items-center gap-2 px-1">
           <Globe2 className="h-5 w-5 text-slate-500" />
           <h2 className="font-semibold tracking-tight">学校特殊政策</h2>
           <span className="ml-auto text-xs text-slate-400">留学 / 保研专项</span>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {SEED_POLICIES.map((p, i) => (
             <article
               key={p.title}
-              className="animate-fade-in-up-soft rounded-2xl border border-slate-200 bg-white p-5"
+              className="animate-fade-in-up-soft rounded-xl border border-slate-200 bg-white p-4"
               style={{ animationDelay: `${60 + i * 50}ms` }}
             >
-              <span className="inline-flex h-5 items-center rounded-full bg-indigo-50 px-2 text-[11px] font-semibold text-indigo-800">
+              <span className="inline-flex h-5 items-center rounded-full bg-sapphire/15 px-2 text-[11px] font-semibold text-sapphire">
                 {p.scope}
               </span>
-              <h3 className="mt-3 text-sm font-semibold text-slate-900">
-                {p.title}
-              </h3>
-              <p className="mt-2 text-xs leading-5 text-slate-600">{p.body}</p>
+              <h3 className="mt-3 text-sm font-semibold text-slate-900">{p.title}</h3>
+              <p className="mt-1.5 text-xs leading-5 text-slate-600">{p.body}</p>
             </article>
           ))}
         </div>

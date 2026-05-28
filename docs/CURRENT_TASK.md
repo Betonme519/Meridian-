@@ -3,7 +3,7 @@
 > 短期工作内存。**AI 接手优先读这份**，再按需查 `AI_MEMORY.md` / `TECH_DEBT.md`。
 > 铁律：只做下方「排队」里的事，做完停下汇报。「不要修改」当只读。
 
-> Last updated: **2026-05-27**
+> Last updated: **2026-05-28**
 
 ---
 
@@ -15,7 +15,7 @@
 1. **排队 14** UI 重设计（主线推进中）
 2. **排队 13.2** 真 LLM provider（等用户拍上游 + 充值，再启动）
 3. **排队 13.8** 解析 pipeline + RAG（卡 13.2）
-**最近 commit**：`b626a4b` 排队 14 第一批：功能页配色重置 + Dashboard 收敛 + PathLoader（2026-05-27）；`58b09cc` 12.5 A-E 路径建议层 + UI 文案禁词入册（2026-05-26）。
+**最近 commit**：`6155a0e` workspace UI 修改完成（2026-05-27）；`b626a4b` 排队 14 第一批：功能页配色重置 + Dashboard 收敛 + PathLoader（2026-05-27）；`58b09cc` 12.5 A-E 路径建议层 + UI 文案禁词入册（2026-05-26）。
 **架构转向（2026-05-25）**：用户拍板"静态路径库 + AI 连接"。改原 AI runtime 生成 reason 为 Claude 预编译 (goal × req) → 280 advice + 40 link 关系，DB 查询替代 runtime AI 调用。
 **UI 重设计（排队 14）**：等排队 12 跑通后启动。
 
@@ -297,16 +297,25 @@
   - 排队 8 完成（schema 锁了）后可以画 Figma 稿，但**不要动代码**。
 - 完成标准：五个功能页对齐新视觉；保持 CLAUDE.md 的 "low saturation / Apple-like / clean academic"；mobile responsive。
 
-##### 第一批已闭环（2026-05-27, commit `b626a4b`）
+##### 第一批 — 配色重置 + Dashboard 收敛 + PathLoader（2026-05-27, commit `b626a4b`）
 
-- ✅ **新色板（用户拍板）**：参考桌面图「深浅色」(MOODY BLUES) + 「多彩色」(4 点缀)。`globals.css @theme inline` 加 4 token：`--color-flame: #FE6237` / `--color-gold: #FFB62E` / `--color-maya: #7CC3FF` / `--color-sapphire: #4164FF`。仅功能页用，落地页保持原 slate/amber/rose 不动。
-- ✅ **统一替换规则**：amber→gold（warn 推荐）/ rose→flame（error 冲突）/ emerald→maya（good 完成，**非中性化**，用户中途改方向）/ blue→sapphire（prerequisite）/ violet→sapphire（AI 理由）。文字色统一 `text-slate-700` 保对比度，点缀色只在 chip 底 / icon / border。
-- ✅ **大块底色全部降级**：所有 50/100/200 系大块底色 → 白底 + colored border。`scheduleSeed.ts TRUST_META` head 字段三档都改成 `bg-white + border-{maya/gold/slate}/50`（之前漏，用户指出"官方规则那一大块还是绿的"才发现 grep 没覆盖此文件）。
-- ✅ **Dashboard 收敛**：删 Section 1「信息导入」（Import 页 fileSlots/Connectors/MiniApps 已覆盖）+ Section 3「模拟动作」（Workspace ImpactPanel take/delay/switch 已覆盖）。顶部加 GPT-style 提问输入框「你今天想问点什么?」+ 大圆角 textarea + 右下 `ArrowUp` 提交按钮 + Cmd/Ctrl+Enter 快捷。**跨页机制**：`sessionStorage["meridian.ai-feed.ask-draft"]` 暂存 → `navigate({ to: "/ai-advisor" })`；AIAdvisor mount-only useEffect 读出来填进 `profileText` 后立刻 removeItem。复用现有 stream 能力，不接新 LLM。
-- ✅ **Planner WorkbenchHeader 拆裸**：从"白底大卡含一切"拆成三段裸露行（参考桌面图`界面颜色风格.png`）：① 副标题 + 右侧 focus toggle ② chip 横排（goal/school/3 KPI）③ 进度文字 + 1.5px bar。去掉 outer card 让 layout 浅灰底 `#f6f7f9` 自然漏出。MetricChip 缩 `h-7` 视觉对齐其他 chip。
-- ✅ **GraphNodeButton 节点 tone**：全白底 + colored border + 染色 leadIcon（shortcut/recommended → gold；isComplete → maya；default → slate）；KIND_PILL_CLASS 5 档关系标签按 maya/sapphire/flame/slate/gold 5 色区分。
-- ✅ **新组件 PathLoader**（`src/components/effects/PathLoader.tsx`）：SVG cross + diagonal + dot + GSAP timeline 循环（pull → send → pause），用 `useGSAP({ scope })` 自动清理避免 StrictMode 双 mount 残留。原型来自桌面 `index.html`，颜色用 `currentColor` 让父级 text-* 控制，`prefers-reduced-motion` 时静态显示。替换 Planner `Loader2` spinner，文字「正在计算学业路径」横向布局在 SVG 右侧。
-- ⚠️ **未做**：5 页 layout 结构重排（仅 Dashboard 收敛 + Planner header 裸化），其他 3 页仍是原结构只换色；Schedule 顶部"规则结构树"/"Trust 三列"/"冲突规则" section 仍是大白卡风。下一轮按页推进。
+- 全功能页换项目 palette（`flame / gold / maya / sapphire`）;大块底色降级为白底 + colored border。
+- Dashboard 删 Section 1/3,加 GPT-style 提问入口（`sessionStorage` 跨页传草稿到 AIAdvisor）。
+- Planner WorkbenchHeader 拆三段裸行 + GraphNodeButton tone 重做 + 新组件 PathLoader 替 Loader2。
+
+##### 第二批 — 五页 layout 单屏化 + 去嵌套（2026-05-27 ~ 28, commit `6155a0e`）
+
+- Planner / AIAdvisor 单屏化（`xl:h-[calc(100vh-5rem)]`）;右栏去嵌套;Planner 加双向跟踪滚动。
+- Schedule 改两列「左树 + 右 PDF」,删 Trust 三列;Upload section 顺序重排;RequirementProgress 重写为折叠 + 内嵌滑块。
+- 整体「不要框中套着框」铁律贯穿,所有 sub-block 改 `border-t / border-l-2` 细线分层。
+- 配套 SQL 0011_clean_e3_title(待 Supabase Dashboard 跑)。
+
+##### 第三批 — UI 微调（2026-05-28）
+
+- Dashboard menu label「AI Feed」→「Home」;hover title/intro 去 "AI" 换 "系统"。
+- Dashboard 布局:hero card row-span-2(`xl` 下左 1 大 + 右 2×2);对话框居中偏上;卡片加 hover 交互(translate / 高光条 / icon scale / arrow translate)。
+- 首页 Feedback + Transparency chip 去 Tailwind emerald/amber/blue/violet,换项目 palette。
+- 文案:submit 按钮 sapphire;helper 去 "Cmd/Ctrl+Enter" + 去句号;textarea placeholder 去 "例如:";决策状态 header 去 "N 项"。
 
 ---
 
@@ -378,6 +387,22 @@
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
 > 早于 2026-05-14 的里程碑（排队 5 / 2 / 4b / 4a / profiles / DATA_MODEL）已挪到 `docs/AI_MEMORY.md` § 9。
+
+- **2026-05-28** — 排队 14 第二批 ✅ Workspace 结构重排 + AIAdvisor 单屏 + Schedule 重构 + Upload 重排（commit `6155a0e`）
+  - **Planner**：section 加 `xl:h-[calc(100vh-5rem)] flex flex-col` 单屏锁高；左 main 用 flex-col 把 WorkbenchHeader（auto）+ PathGraph（flex-1 min-h-[420px]）拼起来；右 aside `xl:overflow-y-auto` 独立滚动（不再 sticky）。PathGraph 加 `scrollRef` + `pendingScrollRef` 双向跟踪：toggleMilestone/Bucket/Requirement 展开记录目标右边界（580/1010/1370），折叠 / 纯 select 只 queue srcId；useEffect 监听 graph 重算合并 scrollTo（左/右/上/下四向），保证被点节点始终可见——解决"点前面的节点视口卡在右边"。
+  - **WorkbenchHeader 二次精简**：删「毕业路径 · 点击节点逐层展开」副标题 + 整行「已匹配 N 个已修课程，当前学分 X/Y」；单行 layout：goal pill（Target icon + gold border，强调）→ 进度 bar 占主轴 → 学校/3 KPI muted 小号 → focus toggle 右对齐。canvas 自然向上吃掉节省空间。
+  - **右栏去嵌套**（用户铁律：「不要框中套着框」）：aside 改单张白卡（rounded-xl border），ImpactPanel + EvidencePanel 各去外卡，中间一条 1px hairline；4-5 个 sub-block 从 `rounded-xl border bg-slate-50 p-3/p-4` 全部改 `border-l-2 pl-3` 或 `border-t pt-3/pt-4` 细线；ImpactMetric 去 `rounded-lg bg-white p-3` 改纯文字 grid；EvidencePanel 改 `divide-y divide-slate-200` 串联 line / 来源 / RelatedRulesBlock。
+  - **E3-1 标题清理**：seed line 1389「通识教育总学分 (8 学分 / 3 模块)」→「通识教育总学分 (8 学分)」（modules 信息留在 metadata.modules jsonb）+ 新 `0011_clean_e3_title.sql` 幂等 UPDATE + `0011_verify.sql`。**待用户跑 Supabase Dashboard**。
+  - **AIAdvisor 单屏化**：section `py-8 sm:py-10` → `py-5 sm:py-6` + `xl:h-[calc(100vh-5rem)] flex flex-col`；grid `flex-1 min-h-0` + main `sm:grid-rows-4` → 8 张 mode 卡 2×4 自动拉满主列高度；aside 改 `flex flex-col gap-3 min-h-0`，对话历史卡 `flex-1 min-h-0` + 内部 ul `flex-1 overflow-y-auto` 吃掉剩余空间。整体压紧（mode 卡 p-5→p-4，title text-lg→text-base，textarea min-h-32→min-h-20，暗卡 text-3xl→text-2xl）。
+  - **按钮去 AI 字眼**：「让 AI 选择模式」→「让系统听听你的想法」（用户：不强调 AI）；"让 AI 跑一次推荐" → "跑一次推荐"。
+  - **Schedule 重构**：删低可信度（"学生评价"）trust 列；顶部改两列「**左结构树 + 右 PDF 原件预览**」（功能预留位置，跳转目录占位）；点开分支后下方加「官方规则 · 高可信度」+「AI 推测」sub-section；分支列表单层 card + `divide-y`；冲突 / 学校特殊政策 `mt-8` / `rounded-xl p-4`，indigo→sapphire；aside flex-col + 分支卡 `flex-1 min-h-0` + main flex-col + 内容区 `flex-1` → **左树和右 PDF 底部对齐**。死代码全删（`displayRulesByTrust` / `updateRule` / `nextTrust` / `TRUST_META` / `TRUST_LEVELS` / `ExternalLink`）。
+  - **Upload section 顺序重排**：① 毕业完成情况 → ② 个人设置（左） + 教务系统连接（右） → ③ 文件导入（紧跟「已导入数据」子区）→ ④ 小程序 → ⑤ 我已修课。`space-y-8` 统一间距，CourseManager / RequirementProgress 删自挂的 `mt-12`。教务连接器内「当前连接状态」从内嵌 `bg-slate-50/60` 卡改 `border-t pt-3` 细线。
+  - **RequirementProgress 重写**：删 "Section 8 · 反向勾选式进度" kicker；标题前加 `ListTodo` icon 与其他 section 统一；整组 category 单层 card + `divide-y` 细线（删原 2 列 grid 里的每张子卡）；每个 category 默认折叠，header chip 显示 `done/total`；展开后下方原反向勾选 requirement 列表保留。
+  - **滑块粒度修正**（用户反馈"你没做吗"）：从 category 大滑块（0 → category.credit_target）改成 **per-requirement** —— 每条 requirement 行加 chevron，点开展开自己一条 0 → threshold 滑块（step 0.5），左缩进 + `border-l border-slate-200` 视觉归属那条 req；双状态 expandedCats + expandedReqs 互不干扰；creditDrafts Record<reqId, number> 每条 req 独立 local state（未持久化，待接 `user_progress.credits`）。
+  - **getCreditCap 兜底**（用户反馈"思政/计算机也要有滑块"）：新增 `getCreditCap(r)` —— `r.threshold` 优先，NULL 时 regex `(\d+(?:\.\d+)?)\s*学分` 从 title 抠第一个数字。覆盖 E2-1 思政（all_of, threshold=NULL, title "17 学分"→17）/ E2-5 国情（3）/ E2-8 通识必修（4）/ E3 全系列等。计算机 E2-3 title 是 "0/3/5/师范 4" 裸数字无 "学分" 词，regex 解不出，仍不显示——属数据复杂（学分按学生类别变），后续在 metadata.credit_cap 加权威字段再修。
+  - **tsc 0 新错**（仅 CardSwap / PathLoader 历史遗留）。
+  - **待跑**：用户 Supabase Dashboard 跑 0011 migration；其他改动都在前端。
+  - **遗留性能问题**：Upload 页同时跑 5 个 hook（profile / rag_source / track 三表 / user_requirement_done / course）= 5-7 个 Supabase REST + RLS 检查 + 198 条 requirement 网络往返，首屏感知慢。彻底改要么后端建 view 合并查询，要么前端加 skeleton；本轮不动。
 
 - **2026-05-27** — 排队 14 第一批 ✅ 功能页配色重置 + Dashboard 收敛 + PathLoader（commit `b626a4b`）
   - **色板**：globals.css @theme 加 4 点缀 token（flame/gold/maya/sapphire）+ 5 页 + 子组件 + TRUST_META amber→gold / rose→flame / emerald→maya / blue/violet→sapphire 批量替换；大块 50/100 底色全部 → 白底 + border

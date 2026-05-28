@@ -18,10 +18,10 @@ export type MenuItem = {
 
 export const MENU_ITEMS: MenuItem[] = [
   {
-    label: "AI Feed",
+    label: "Home",
     desc: "决策状态与建议",
-    title: "AI 当前正在帮你做什么",
-    intro: "先把数据接入 → 再看 AI 当前判断 → 最后用模拟动作验证选择。",
+    title: "系统正在帮你做什么",
+    intro: "先把数据接入 → 再看系统当前判断 → 最后用模拟动作验证选择。",
     to: "/dashboard",
     icon: Compass,
   },
