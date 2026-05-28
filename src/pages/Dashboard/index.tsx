@@ -224,15 +224,15 @@ export default function DashboardPage() {
               rows={3}
               className="block w-full resize-none rounded-2xl border border-slate-200 bg-white px-5 py-4 pr-14 text-sm leading-6 text-slate-900 shadow-sm outline-none transition-colors placeholder:text-slate-400 hover:border-slate-300 focus:border-slate-900"
             />
-            {/* Submit arrow:有输入时走品牌渐变 gold → maya → sapphire
-                (黄→浅蓝→蓝),to-br 斜向左上→右下,空时灰底 disabled。
-                disabled:bg-none 显式清掉渐变 background-image,让灰底色生效。 */}
+            {/* Submit arrow:走 globals.css 的 bg-brand-gradient utility
+                (品牌渐变,黄→浅蓝→蓝,to-br 斜向)。空时灰底 disabled,
+                bg-none 清掉 background-image 让灰底色生效。 */}
             <button
               type="button"
               onClick={handleAsk}
               disabled={!askInput.trim()}
               aria-label="提问"
-              className="absolute bottom-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-gold via-maya to-sapphire text-white shadow-sm transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:bg-none disabled:text-slate-400 disabled:shadow-none"
+              className="absolute bottom-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-brand-gradient text-white shadow-sm transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:bg-none disabled:text-slate-400 disabled:shadow-none"
             >
               <ArrowUp className="h-4 w-4" strokeWidth={2.2} />
             </button>

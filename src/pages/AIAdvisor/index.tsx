@@ -382,24 +382,13 @@ export default function AIAdvisorPage() {
                 </button>
               </div>
             )}
-            {/* Mesh 渐变:maya 满底,gold/sapphire 只在左右两端做小色斑,
-                让浅蓝主色保持视觉主导。disabled 时不挂 inline style,
-                className 的 bg-slate-200 接管。 */}
+            {/* 渐变走 globals.css 里的 bg-brand-gradient utility,disabled 用 bg-slate-200
+                + bg-none 覆盖(清掉 background-image,让灰底接管) */}
             <button
               type="button"
               onClick={handleParse}
               disabled={streaming || !profileText.trim()}
-              style={
-                streaming || !profileText.trim()
-                  ? undefined
-                  : {
-                      backgroundColor: "#7CC3FF",
-                      backgroundImage:
-                        "radial-gradient(circle at 0% 15%, #FFB62E 0%, rgba(255,182,46,0) 28%), " +
-                        "radial-gradient(circle at 92% 85%, #4164FF 0%, rgba(65,100,255,0) 32%)",
-                    }
-              }
-              className="mt-2 inline-flex h-9 w-full items-center justify-center rounded-full bg-slate-200 px-4 text-sm font-medium text-white shadow-sm transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:text-slate-400 disabled:shadow-none"
+              className="mt-2 inline-flex h-9 w-full items-center justify-center rounded-full bg-brand-gradient px-4 text-sm font-medium text-white shadow-sm transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:bg-none disabled:text-slate-400 disabled:shadow-none"
             >
               {streaming ? "分析中…" : "让系统听听你的想法"}
             </button>
@@ -416,18 +405,20 @@ export default function AIAdvisorPage() {
             ) : null}
           </div>
 
-          {/* Active logic — emphasized dark card */}
+          {/* Active logic —— 品牌渐变强调卡,文字色为白系半透明,适配 maya/sapphire 底。
+              不加边框:border-white/20 在渐变上会让底色透出,左侧 maya 段会显成
+              "一条很细的蓝色线"。 */}
           <div
-            className="animate-fade-in-up-soft relative overflow-hidden rounded-2xl border border-slate-900 bg-slate-950 p-4 text-white"
+            className="animate-fade-in-up-soft relative overflow-hidden rounded-2xl bg-brand-gradient p-4 text-white shadow-sm"
             style={{ animationDelay: "180ms" }}
           >
-            <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.22em] text-slate-400">
+            <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.22em] text-white/75">
               当前启用逻辑
             </div>
             <p className="mt-2 text-2xl font-semibold tracking-tight">
               {activeMode.title}
             </p>
-            <p className="mt-2 text-xs leading-5 text-slate-300">{activeMode.logic}</p>
+            <p className="mt-2 text-xs leading-5 text-white/85">{activeMode.logic}</p>
           </div>
 
           {/* Example */}

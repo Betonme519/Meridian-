@@ -38,7 +38,7 @@ type ImportSlot = {
 const fileSlots: ImportSlot[] = [
   {
     title: "培养方案 / 学生手册",
-    desc: "AI 自动解析章节、学分结构、替代规则",
+    desc: "系统自动解析章节、学分结构、替代规则",
     formats: "PDF · Word · Markdown",
     kind: "培养方案",
     accept: ".pdf,.doc,.docx,.md,application/pdf",
@@ -64,8 +64,19 @@ const fileSlots: ImportSlot[] = [
 
 /* ───────────────────────── Section 3 · Connectors ───────────────────────── */
 
+/**
+ * file slot 三色循环 —— 默认 dashed slate-300 不动,hover/拖拽时透出对应 brand 色边。
+ * 顺序对应 fileSlots:培养方案=gold / 成绩单=sapphire / 课表=maya。
+ */
+const SLOT_TONES = [
+  { hoverBorder: "hover:border-gold", activeBorder: "border-gold" },
+  { hoverBorder: "hover:border-sapphire", activeBorder: "border-sapphire" },
+  { hoverBorder: "hover:border-maya", activeBorder: "border-maya" },
+] as const;
+
 const schoolOptions = [
   "请选择学校",
+  "华东师范大学",
   "清华大学",
   "北京大学",
   "复旦大学",
@@ -134,7 +145,6 @@ export default function UploadPage() {
   const [school, setSchool] = useState(schoolOptions[0]);
   const [grade, setGrade] = useState("");
   const [major, setMajor] = useState("");
-  const [name, setName] = useState("");
   const [dragHover, setDragHover] = useState<number | null>(null);
 
   // profile 加载/变化时同步到本地草稿（包括首次加载和多 tab 同步场景）
@@ -143,8 +153,7 @@ export default function UploadPage() {
     setSchool(profile.school ?? schoolOptions[0]);
     setGrade(profile.grade != null ? String(profile.grade) : "");
     setMajor(profile.major ?? "");
-    setName(profile.name ?? "");
-  }, [profile?.school, profile?.grade, profile?.major, profile?.name]);
+  }, [profile?.school, profile?.grade, profile?.major]);
 
   // school 是 select，change 即 commit
   const handleSchoolChange = (v: string) => {
@@ -177,13 +186,6 @@ export default function UploadPage() {
     const trimmed = major.trim();
     void updateProfile({ major: trimmed === "" ? null : trimmed }).catch((e) =>
       console.warn("[Upload] 保存专业失败:", e),
-    );
-  };
-
-  const handleNameBlur = () => {
-    const trimmed = name.trim();
-    void updateProfile({ name: trimmed === "" ? null : trimmed }).catch((e) =>
-      console.warn("[Upload] 保存显示名失败:", e),
     );
   };
 
@@ -261,15 +263,6 @@ export default function UploadPage() {
             <h2 className="font-semibold tracking-tight">个人设置</h2>
           </div>
           <div className="mt-4 space-y-3">
-            <Field label="显示名">
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onBlur={handleNameBlur}
-                placeholder="留空则用邮箱前缀"
-                className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm transition-colors hover:border-slate-400 focus:border-slate-950 focus:outline-none"
-              />
-            </Field>
             <Field label="入学年份">
               <input
                 value={grade}
@@ -323,14 +316,12 @@ export default function UploadPage() {
                 ))}
               </select>
             </label>
+            {/* 渐变按钮:连接 → bg-brand-gradient;未选学校 → disabled 走灰底
+                + bg-none 清渐变 image,跟首页发送按钮 / Goal 按钮配色一致。 */}
             <button
               type="button"
               disabled={!connected}
-              className={`inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors ${
-                connected
-                  ? "bg-slate-950 text-white hover:bg-slate-800"
-                  : "cursor-not-allowed bg-slate-200 text-slate-400"
-              }`}
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand-gradient px-4 text-sm font-medium text-white shadow-sm transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:bg-none disabled:text-slate-400 disabled:shadow-none"
             >
               <ShieldCheck className="h-4 w-4" />
               {connected ? "授权登录" : "先选学校"}
@@ -363,7 +354,6 @@ export default function UploadPage() {
               上传中 {uploading}
             </span>
           )}
-          <span className="ml-auto text-xs text-slate-400">PDF · Excel · 图片</span>
         </div>
 
         {sourcesError && (
@@ -376,6 +366,9 @@ export default function UploadPage() {
           {fileSlots.map((s, i) => {
             const Icon = s.icon;
             const isHover = dragHover === i;
+            // 3 张 file slot 用 brand 色循环点缀:默认 dashed slate-300 不变,
+            // hover / 拖拽悬停时透出对应 brand 色边框,克制不抢。
+            const tone = SLOT_TONES[i % SLOT_TONES.length];
             return (
               <label
                 key={s.title}
@@ -391,8 +384,8 @@ export default function UploadPage() {
                 }}
                 className={`animate-fade-in-up-soft flex cursor-pointer flex-col items-start rounded-2xl border-2 border-dashed p-4 text-left transition-colors ${
                   isHover
-                    ? "border-slate-950 bg-slate-50"
-                    : "border-slate-300 bg-white hover:border-slate-500"
+                    ? `${tone.activeBorder} bg-slate-50`
+                    : `border-slate-300 bg-white ${tone.hoverBorder}`
                 }`}
                 style={{ animationDelay: `${60 + i * 60}ms` }}
               >

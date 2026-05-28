@@ -9,15 +9,17 @@ import type { TrackRequirement, TrackCategory } from "@/api/trackApi";
 /**
  * Upload 页 · 毕业要求完成情况
  *
- * 反向勾选式 + 折叠 + per-requirement 学分滑块
+ * 正向勾选式 + 折叠 + per-requirement 学分滑块
  *
  * 设计：
  *  - category 默认折叠，header chip 显示 done/total（快速用户只需看 chip）
  *  - 展开 category 后显示其下所有 requirement
  *  - **每条 requirement** 自带 chevron：点击展开后显示 0 → threshold 滑块
  *    （仅 kind=credits + threshold>0 时显示；其他 kind 直接显示 toggle 不带滑块）
- *  - 默认所有 requirement 视为已完成，取消勾选写入 user_requirement_done
+ *  - 默认所有 requirement 都未完成（不打勾）；用户主动勾选写入 user_requirement_done
  *  - 滑块当前是 local state 占位，后续接 user_progress.credits 时再持久化
+ *  - 注:hook 返回的 `incompleteReqIds` 字段名是历史遗留(早期是反向勾选语义),
+ *    现在 set 内成员表示"已完成"——本组件做语义翻转,不改 hook 源码
  */
 
 interface CategorySection {
@@ -72,9 +74,12 @@ export default function RequirementProgress() {
     return out;
   }, [categories, requirementsByCategoryId]);
 
+  // 翻转语义:set 内成员 = 已完成,所以 size 直接是 doneCount
   const totalCount = sections.reduce((acc, s) => acc + s.requirements.length, 0);
-  const incompleteCount = incompleteReqIds.size;
-  const completedCount = totalCount - incompleteCount;
+  const doneCount = incompleteReqIds.size;
+  const pendingCount = totalCount - doneCount;
+  // hook 还叫 isReqIncomplete 但我们当 isReqDone 用
+  const isReqDone = isReqIncomplete;
 
   const loading = authLoading || trackLoading || doneLoading;
   const error = trackError ?? doneError;
@@ -116,18 +121,17 @@ export default function RequirementProgress() {
         </div>
         <div className="flex items-center gap-1.5 text-xs">
           <span className="rounded-full bg-maya/15 px-2.5 py-1 font-medium text-slate-700">
-            已完成 {completedCount} / {totalCount}
+            已完成 {doneCount} / {totalCount}
           </span>
-          {incompleteCount > 0 && (
-            <span className="rounded-full bg-flame/10 px-2.5 py-1 font-medium text-flame">
-              待完成 {incompleteCount}
+          {pendingCount > 0 && doneCount > 0 && (
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-600">
+              待完成 {pendingCount}
             </span>
           )}
         </div>
       </header>
       <p className="mt-1 px-1 text-xs leading-5 text-slate-500">
-        默认所有要求视为已完成；<strong className="text-flame">取消勾选</strong>
-        = 这条还没做。点击每条要求可展开学分滑块快速填写已修学分。
+        完成的要求自己打勾。展开每条要求还能拖滑块填部分已修学分。
       </p>
 
       {isGuest && (
@@ -160,7 +164,8 @@ export default function RequirementProgress() {
         <div className="mt-3 divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 bg-white">
           {sections.map((s) => {
             const catOpen = expandedCats.has(s.category.id);
-            const doneInCat = s.requirements.filter((r) => !isReqIncomplete(r.id)).length;
+            // 翻转:set 内 = done,所以直接 filter set 内
+            const doneInCat = s.requirements.filter((r) => isReqDone(r.id)).length;
             const totalInCat = s.requirements.length;
 
             return (
@@ -185,16 +190,16 @@ export default function RequirementProgress() {
                 {catOpen && (
                   <ul className="divide-y divide-slate-100 border-t border-slate-100 bg-slate-50/40">
                     {s.requirements.map((r) => {
-                      const incomplete = isReqIncomplete(r.id);
+                      const done = isReqDone(r.id);
                       const reqOpen = expandedReqs.has(r.id);
-                      // 学分上限：threshold 优先，否则从 title 解 "N 学分"
-                      const threshold = getCreditCap(r);
+                      // 学分上限:threshold 优先,否则从 title 解 "N 学分"
+                      const threshold = Math.floor(getCreditCap(r));
                       const hasSlider = threshold > 0;
-                      const credit = creditDrafts[r.id] ?? (incomplete ? 0 : threshold);
+                      const credit = creditDrafts[r.id] ?? (done ? threshold : 0);
                       return (
                         <li key={r.id} className="px-3 py-1.5">
                           <div className="flex items-start gap-1">
-                            {/* 反向勾选 toggle —— 占左侧 */}
+                            {/* 正向勾选 toggle —— 默认不打勾,用户主动点 */}
                             <button
                               type="button"
                               disabled={isGuest}
@@ -204,45 +209,42 @@ export default function RequirementProgress() {
                                   ? "cursor-not-allowed opacity-60"
                                   : "hover:bg-white"
                               }`}
-                              title={
-                                incomplete ? "未完成 · 点击标记完成" : "已完成 · 点击取消勾选"
-                              }
+                              title={done ? "已完成 · 点击取消勾选" : "未完成 · 点击标记完成"}
                             >
-                              {incomplete ? (
-                                <Circle className="mt-0.5 h-4 w-4 flex-none text-flame" />
-                              ) : (
+                              {done ? (
                                 <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none text-maya" />
+                              ) : (
+                                <Circle className="mt-0.5 h-4 w-4 flex-none text-slate-300" />
                               )}
                               <span className="flex-1 leading-5">
                                 <span className="font-mono text-[10px] text-slate-400">
                                   {r.code}
                                 </span>{" "}
-                                <span className={incomplete ? "text-flame" : "text-slate-700"}>
+                                <span className={done ? "text-slate-700" : "text-slate-600"}>
                                   {r.title}
                                 </span>
                               </span>
                             </button>
 
-                            {/* 展开按钮 —— 仅 hasSlider 时显示 */}
+                            {/* 展开按钮 —— 仅 hasSlider 时显示。chevron only,文字移到滑块区 */}
                             {hasSlider && (
                               <button
                                 type="button"
                                 onClick={() => toggleReq(r.id)}
-                                className="flex flex-none items-center gap-0.5 rounded-md px-1.5 py-1 text-[10px] font-medium text-slate-500 transition-colors hover:bg-white hover:text-slate-900"
-                                aria-label={reqOpen ? "收起学分填写" : "展开学分填写"}
-                                title="展开学分滑块"
+                                className="flex flex-none items-center rounded-md p-1 text-slate-400 transition-colors hover:bg-white hover:text-slate-900"
+                                aria-label={reqOpen ? "收起学分滑块" : "展开学分滑块"}
+                                title={reqOpen ? "收起学分滑块" : "展开学分滑块"}
                               >
                                 {reqOpen ? (
-                                  <ChevronDown className="h-3.5 w-3.5" />
+                                  <ChevronDown className="h-4 w-4" />
                                 ) : (
-                                  <ChevronRight className="h-3.5 w-3.5" />
+                                  <ChevronRight className="h-4 w-4" />
                                 )}
-                                <span className="tabular-nums">{threshold} 学分</span>
                               </button>
                             )}
                           </div>
 
-                          {/* 展开后的滑块 —— 每条 requirement 自己一条 */}
+                          {/* 展开后的滑块 —— 每条 requirement 自己一条,step=1 只取整数 */}
                           {hasSlider && reqOpen && (
                             <div className="ml-7 mt-1 border-l border-slate-200 pl-3">
                               <div className="flex items-baseline justify-between">
@@ -253,20 +255,20 @@ export default function RequirementProgress() {
                                   <strong className="font-semibold text-slate-900">
                                     {credit}
                                   </strong>
-                                  <span className="text-slate-400"> / {threshold}</span>
+                                  <span className="text-slate-400"> / {threshold} 学分</span>
                                 </span>
                               </div>
                               <input
                                 type="range"
                                 min={0}
                                 max={threshold}
-                                step={0.5}
+                                step={1}
                                 value={credit}
                                 disabled={isGuest}
                                 onChange={(e) =>
                                   setCreditDraft(r.id, Number(e.target.value))
                                 }
-                                className="mt-1 block w-full accent-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="mt-1 block w-full accent-sapphire disabled:cursor-not-allowed disabled:opacity-50"
                               />
                             </div>
                           )}

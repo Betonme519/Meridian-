@@ -439,7 +439,7 @@ export default function PlannerPage() {
           />
         </main>
 
-        <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white xl:overflow-y-auto">
+        <aside className="scrollbar-thin flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white xl:overflow-y-auto">
           <ImpactPanel
             selected={selected}
             actionMode={actionMode}
@@ -485,11 +485,6 @@ function WorkbenchHeader({
   focusMode: FocusMode;
   onFocusModeChange: (mode: FocusMode) => void;
 }) {
-  const progress =
-    summary?.target && summary.target > 0
-      ? Math.min(100, Math.round((summary.earned / summary.target) * 100))
-      : 0;
-
   return (
     <header className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1">
       {/* 主信息：goal 强调 + 进度 bar 占主轴（视觉主体） */}
@@ -497,19 +492,6 @@ function WorkbenchHeader({
         <Target className="h-3.5 w-3.5 text-gold" />
         {goalMode}
       </span>
-
-      <div className="flex min-w-[220px] flex-1 items-center gap-2">
-        <span className="text-xs tabular-nums text-slate-500">
-          <span className="font-semibold text-slate-900">{fmtCredits(summary?.earned ?? 0)}</span>
-          {summary?.target != null && ` / ${fmtCredits(summary.target)} 学分`}
-        </span>
-        <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-200/70">
-          <div
-            className="h-full rounded-full bg-slate-900 transition-all"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-      </div>
 
       {/* 次要信息：学校 + KPI 计数 muted 小号（下沉次级） */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
@@ -539,13 +521,13 @@ function WorkbenchHeader({
         </span>
       </div>
 
-      {/* 操作：focus toggle 右对齐 */}
-      <div className="flex h-8 items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm">
+      {/* 操作:focus toggle —— ml-auto 真把它推到 header 最右端 */}
+      <div className="ml-auto flex h-8 items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm">
         <button
           type="button"
           onClick={() => onFocusModeChange("all")}
-          className={`h-6 rounded-full px-3 text-xs font-medium transition-colors ${
-            focusMode === "all" ? "bg-slate-950 text-white" : "text-slate-500"
+          className={`h-6 rounded-full px-3 text-xs font-medium transition-all ${
+            focusMode === "all" ? "bg-brand-gradient text-white" : "text-slate-500 hover:text-slate-900"
           }`}
         >
           全部路径
@@ -553,8 +535,8 @@ function WorkbenchHeader({
         <button
           type="button"
           onClick={() => onFocusModeChange("recommended")}
-          className={`h-6 rounded-full px-3 text-xs font-medium transition-colors ${
-            focusMode === "recommended" ? "bg-slate-950 text-white" : "text-slate-500"
+          className={`h-6 rounded-full px-3 text-xs font-medium transition-all ${
+            focusMode === "recommended" ? "bg-brand-gradient text-white" : "text-slate-500 hover:text-slate-900"
           }`}
         >
           只看推荐
@@ -706,12 +688,17 @@ function PathGraph({
 
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-none flex-col gap-2 border-b border-slate-200 px-4 py-2 lg:flex-row lg:items-center lg:justify-between">
-        <h2 className="text-sm font-semibold text-slate-950">路径画布</h2>
+      <div className="flex flex-none flex-col gap-2 border-b border-slate-200 px-4 py-2 lg:flex-row lg:items-center lg:justify-end">
         <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
           <LegendDot className="bg-gold" label="推荐路径" />
           <LegendDot className="bg-maya" label="已满足" />
           <LegendDot className="bg-slate-300" label="其他路径" />
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-sapphire px-1 text-[9px] font-semibold leading-none text-sapphire">
+              N
+            </span>
+            可展开的分支数
+          </span>
           <span className="inline-flex items-center gap-1">
             <MousePointer2 className="h-3.5 w-3.5" />
             点选后看右侧影响
@@ -721,7 +708,7 @@ function PathGraph({
 
       <div
         ref={scrollRef}
-        className="relative min-h-[420px] flex-1 overflow-auto bg-[linear-gradient(#f8fafc_1px,transparent_1px),linear-gradient(90deg,#f8fafc_1px,transparent_1px)] bg-[size:28px_28px]"
+        className="scrollbar-thin relative min-h-[420px] flex-1 overflow-auto bg-[linear-gradient(#f8fafc_1px,transparent_1px),linear-gradient(90deg,#f8fafc_1px,transparent_1px)] bg-[size:28px_28px]"
       >
         <div className="relative" style={{ width: graph.width, height: graph.height }}>
           <svg className="absolute inset-0 h-full w-full" aria-hidden="true">
@@ -799,6 +786,12 @@ function GraphNodeButton({ node, onClick }: { node: GraphNode; onClick: () => vo
           : ChevronDown
         : CircleDot;
 
+  // 红点提醒徽章:requirement 节点有 shortcuts 时,右上角浮一个圆显示分支数量。
+  // 替代 ImpactPanel 里那句"有 N 条路径建议 · 在画布上点开此卡查看"——
+  // 直接把信号挂在卡片上,所见即所得。
+  const shortcutCount =
+    node.kind === "requirement" && node.item ? node.item.shortcuts.length : 0;
+
   return (
     <button
       type="button"
@@ -830,10 +823,19 @@ function GraphNodeButton({ node, onClick }: { node: GraphNode; onClick: () => vo
       </div>
       <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-slate-500">
         <span className="min-w-0 truncate">{node.meta}</span>
-        {node.count != null && (
-          <span className="rounded-full bg-white/70 px-1.5 py-0.5 font-medium text-slate-700">
-            {node.count}
+        {shortcutCount > 0 ? (
+          <span
+            aria-label={`${shortcutCount} 条路径建议`}
+            className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-sapphire px-1 text-[10px] font-semibold leading-none text-sapphire"
+          >
+            {shortcutCount}
           </span>
+        ) : (
+          node.count != null && (
+            <span className="rounded-full bg-white/70 px-1.5 py-0.5 font-medium text-slate-700">
+              {node.count}
+            </span>
+          )
         )}
       </div>
     </button>
@@ -1081,7 +1083,7 @@ function ImpactPanel({
           <h2 className="font-semibold text-slate-950">选择模拟器</h2>
         </div>
         {selected.isOnPath && (
-          <span className="rounded-full bg-gold/15 px-2 py-1 text-[11px] font-medium text-slate-700">
+          <span className="rounded-full bg-brand-gradient px-2 py-1 text-[11px] font-medium text-white shadow-sm">
             推荐路径
           </span>
         )}
@@ -1105,13 +1107,6 @@ function ImpactPanel({
         </div>
       )}
 
-      {selected.shortcuts.length > 0 && (
-        <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-600">
-          <Lightbulb className="h-3 w-3 text-gold" />有 {selected.shortcuts.length} 条路径建议 ·
-          在画布上点开此卡查看
-        </p>
-      )}
-
       <div className="mt-4 grid grid-cols-3 gap-1 rounded-full bg-slate-100 p-1">
         {(Object.keys(ACTION_LABEL) as ActionMode[]).map((mode) => (
           <button
@@ -1128,11 +1123,7 @@ function ImpactPanel({
       </div>
 
       <div className="mt-4 border-t border-slate-200 pt-4">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-medium text-slate-500">判断</span>
-          <span className="text-xs font-semibold text-slate-900">{impact.status}</span>
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           <ImpactMetric
             icon={GraduationCap}
             label="学分影响"
@@ -1156,14 +1147,6 @@ function ImpactPanel({
             }
           />
         </div>
-        {impact.target != null && (
-          <p className="mt-3 text-xs text-slate-500">
-            目标：{fmtNum(impact.target)}
-            {impact.unit ?? ""}。分类目标：
-            {impact.categoryTarget != null ? `${fmtCredits(impact.categoryTarget)} 学分` : "未设定"}
-            。
-          </p>
-        )}
       </div>
 
       {impact.option && (

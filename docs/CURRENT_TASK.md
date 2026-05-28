@@ -317,6 +317,30 @@
 - 首页 Feedback + Transparency chip 去 Tailwind emerald/amber/blue/violet,换项目 palette。
 - 文案:submit 按钮 sapphire;helper 去 "Cmd/Ctrl+Enter" + 去句号;textarea placeholder 去 "例如:";决策状态 header 去 "N 项"。
 
+##### 第四批 — UI 微调（续）2026-05-28 commit `9961fa8` + 本次
+
+- **LogoFace 组件**（`src/components/effects/LogoFace.tsx`）：呼吸 + 变脸循环动画,挂到 Dashboard "你今天想问点什么?" 标题左侧;几何 1:1 对齐 PathLoader；useGSAP scope 自动清理 + prefers-reduced-motion；CSS `transform-box: fill-box` 修变脸时 transform-origin 缓存错位导致的闪烁。
+- **品牌渐变 utility**：`src/styles/globals.css` 加 `.bg-brand-gradient`（135° linear,gold→maya→sapphire）+ `.scrollbar-thin`（8px / slate 半透明，Firefox + WebKit 双覆盖）。统一调用点：Dashboard 发送按钮 / Goal "听听你的想法" / Workspace toggle 激活态 / Workspace "推荐路径" chip / Workspace 画布 + 模拟器 aside scrollbar / AIAdvisor "当前启用逻辑"卡 / Upload 授权登录按钮。
+- **课程码全替为华师大风格中文课名**：HIST 118 → 中国近现代史纲要 / MATH 233 → 大学英语 / CS 241 → 数据结构 / MUS 102 → 艺术导论 / CS 245 → 专业核心；"drop CS 241 模拟" → "模拟退掉数据结构后"。
+- **Phase 标签清理**：Dashboard 下一步建议卡 meta 删 "Phase N · " 内部研发阶段前缀,只留主题。
+- **Workspace 画布去 count badge**：root / milestone / bucket 三层数字 badge 全去（在"路径画布"语境下被读成"N 路径"）；改为 requirement 节点右下角 sapphire outline 圆显示 shortcuts 数；图例补一项 "N = 可展开的分支数"。
+- **ImpactPanel 精简**：删"判断 [目标重算]"行 + "目标：N 学分。分类目标：未设定。"段落 + "有 N 条路径建议 · 在画布上点开此卡查看"提示。
+- **Schedule (Rule Graph) 重构**：删用户"新建规则"全套（按钮 + 空态横幅 + 立即新建 + NewRuleForm 子组件 + per-row 删除按钮 + ruleFormOpen state + removeRule destructure）。学校官方规则是只读参考资料,不再让用户增删。
+  - 左树头部"示例 · 培养方案 v2024" → `<select>` 切换 PDF;右栏占位 → `<iframe>` 嵌真 PDF。
+  - PDF 临时方案：`docs/华师大规则文件pdf/*.pdf` 复制到 `public/docs/`（ecnu-2025-guide.pdf 5.5M + ecnu-2025-handbook.pdf 9.5M）,iframe 走浏览器原生 viewer。
+  - **待办**（写入 memory `project_rulegraph_pdf_temp`）：未来 PDF 改从 Supabase Storage 拉 + Import 页加管理员上传入口（同校共享一份）+ 结构树节点点击跳 PDF 章节。
+- **Import 页大改**：
+  - **毕业要求完成情况语义翻转**：默认全部 **不打勾**（DB 表 user_requirement_done 内成员现在表示"已完成",hook 名 isReqIncomplete 不改源码,在组件内 alias 成 isReqDone）；hint 改简短"完成的要求自己打勾"；图标态翻转（未完成 slate-300 灰圈、已完成 maya 实心打勾）；待完成 chip 走 slate-100 而不是 flame 警示色。
+  - **学分滑块**：step 0.5 → **1**（整数）；颜色 `accent-slate-950` → `accent-sapphire`；chevron 上的 "{N} 学分" 文字移到滑块展开区,折叠态只留 chevron icon（消除"N 学分"被误读成"N 路径"的可能）。
+  - **个人设置**：删「显示名」字段 + name state + handleNameBlur（不让用户填真名）。
+  - **教务系统连接器**：schoolOptions 加 **华东师范大学**（第 2 位最显眼）；授权登录按钮 `bg-slate-950` → `bg-brand-gradient`。
+  - **文件导入**：desc "AI 自动解析" → "**系统**自动解析"；删右上"PDF · Excel · 图片"角标；3 张 file slot 卡 hover 三色（培养方案 gold / 成绩单 sapphire / 课表 maya）,默认 dashed slate-300 不变。
+- **typecheck 0 新错**（CardSwap + PathLoader 历史 9 条不动）。
+
+##### 第五批 — 撤回的尝试
+
+- **"最轻松毕业" → "轻松毕业" rename**：用户提出后试过（前端 6 文件,profileApi / prompts / mock / trackRecommendation / AIAdvisor / Planner）,但 DB 那边波及 `profiles.goal_mode` CHECK + `requirement_advice.goal_mode` CHECK + `0007_seed_requirement_advice.sql` 几十条 INSERT + `0010_seed_requirement_shortcuts.sql` jsonb `goalFit` key 嵌套,用户认为改动面太大,**全部回滚**。0012 migration 文件被 Write 中断时部分写出,已 `rm`。
+
 ---
 
 ## 并行/穿插（不阻塞主线，但要做）
@@ -387,6 +411,16 @@
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线见 `AI_MEMORY.md` § 9。
 > 早于 2026-05-14 的里程碑（排队 5 / 2 / 4b / 4a / profiles / DATA_MODEL）已挪到 `docs/AI_MEMORY.md` § 9。
+
+- **2026-05-28** — 排队 14 第四批 + 第五批撤回 ✅ LogoFace + 渐变体系 + Schedule PDF + Import 大改（commit `9961fa8` + 本次）
+  - **LogoFace**（新组件）：Dashboard 标题左侧的呼吸 + 变脸动画;`transform-box: fill-box` 修变脸时 SVG transform-origin 缓存错位的闪烁
+  - **品牌渐变 utility**：`.bg-brand-gradient`（135° linear gold→maya→sapphire）单一来源 + `.scrollbar-thin`（细滚动条）;6 处 button / chip / scroll 容器统一调用
+  - **Schedule 重构**：删用户"新建规则"全套（按钮 / 横幅 / form 组件 / 删除按钮 / removeRule）;左树加 PDF select;右栏真 iframe 嵌 PDF（public/docs/ecnu-2025-{guide,handbook}.pdf 5.5M+9.5M 临时静态资源）
+  - **Import 大改**：默认全部不打勾（语义翻转,user_requirement_done 内成员现在表示"已完成"）+ 学分滑块整数 step + 删显示名 field + 加华东师范大学 + "AI 自动解析"→"系统自动解析" + 3 卡 hover 三色（gold/sapphire/maya）
+  - **Workspace 收尾**：删 root/milestone/bucket count badge（被误读成 "N 路径"）+ requirement 节点右下角加 sapphire outline 分支数徽 + 删 ImpactPanel 三段冗余文（判断行 / 目标段落 / 路径建议提示）+ "推荐路径" chip 改渐变
+  - **课程码全替**：HIST 118 / MATH 233 / CS 241 / MUS 102 / CS 245 → 华师大风格中文名（中国近现代史纲要 / 大学英语 / 数据结构 / 艺术导论 / 专业核心）+ Phase 1/2 内部研发阶段标签清掉
+  - **撤回**："最轻松毕业" → "轻松毕业" rename（DB 涉及 2 表 CHECK + 几十 seed INSERT + jsonb key 嵌套,改动面太大,前端 6 文件全回滚）
+  - **待办**（已写入 memory）：PDF 改 Supabase Storage 拉 + Import 加管理员上传入口 + 结构树点击跳 PDF 章节
 
 - **2026-05-28** — 排队 14 第二批 ✅ Workspace 结构重排 + AIAdvisor 单屏 + Schedule 重构 + Upload 重排（commit `6155a0e`）
   - **Planner**：section 加 `xl:h-[calc(100vh-5rem)] flex flex-col` 单屏锁高；左 main 用 flex-col 把 WorkbenchHeader（auto）+ PathGraph（flex-1 min-h-[420px]）拼起来；右 aside `xl:overflow-y-auto` 独立滚动（不再 sticky）。PathGraph 加 `scrollRef` + `pendingScrollRef` 双向跟踪：toggleMilestone/Bucket/Requirement 展开记录目标右边界（580/1010/1370），折叠 / 纯 select 只 queue srcId；useEffect 监听 graph 重算合并 scrollTo（左/右/上/下四向），保证被点节点始终可见——解决"点前面的节点视口卡在右边"。

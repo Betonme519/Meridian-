@@ -11,14 +11,32 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
-  Trash2,
   X,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRules } from "@/hooks/useRules";
-import type { Rule, TrustLevel } from "@/api/ruleApi";
+import type { Rule } from "@/api/ruleApi";
 import type { ConfidenceLevel } from "@/api/ruleConflictApi";
 import { SEED_RULES, SEED_CONFLICTS, SEED_POLICIES } from "./scheduleSeed";
+
+/**
+ * 学校官方 PDF 文档清单。
+ * 临时方案:PDF 直接放 public/docs/ 走静态资源。
+ * 未来:文档应从 DB 读(用户上传 → Supabase Storage → 关联 rule_source 表),
+ * 见 docs/CURRENT_TASK.md 排队记录"PDF 上传与展示"。
+ */
+const PDF_DOCS = [
+  {
+    id: "guide",
+    title: "华东师范大学 2025 年本科生学习指南",
+    url: "/docs/ecnu-2025-guide.pdf",
+  },
+  {
+    id: "handbook",
+    title: "华东师范大学 2025 年本科生手册",
+    url: "/docs/ecnu-2025-handbook.pdf",
+  },
+] as const;
 
 /**
  * Schedule 页 —— 用户规则知识库 + 冲突 + 学校特殊政策。
@@ -32,10 +50,9 @@ import { SEED_RULES, SEED_CONFLICTS, SEED_POLICIES } from "./scheduleSeed";
  * 登录用户 → 拉 hook 数据；空态用 SEED 视觉占位 + 「上方为示例」提示，鼓励新建
  *
  * CRUD 入口：
- *  - 「+ 新建规则」：inline form panel（顶部展开）
  *  - 「+ 新建冲突」：inline form panel（冲突区上方展开）
- *  - rule 项：hover 显示 trust 切换 chip + 删除 ✕
  *  - conflict 卡片：右上角 ✕
+ *  - 注:规则本身是学校官方文档,用户不再增删,所以不挂"新建规则"入口
  */
 export default function SchedulePage() {
   const { user, loading: authLoading } = useAuth();
@@ -46,12 +63,16 @@ export default function SchedulePage() {
     ruleMap,
     loading,
     error,
-    createRule,
-    removeRule,
     createConflict,
     removeConflict,
     refresh,
   } = useRules();
+
+  // 当前预览的 PDF id。一个学校规则一致,后台用同一份;有多份(指南 + 手册)时用 select 切换。
+  const [selectedDocId, setSelectedDocId] = useState<(typeof PDF_DOCS)[number]["id"]>(
+    PDF_DOCS[0].id,
+  );
+  const selectedDoc = PDF_DOCS.find((d) => d.id === selectedDocId) ?? PDF_DOCS[0];
 
   const isResolving = authLoading || loading;
   const isGuest = !authLoading && !user;
@@ -91,7 +112,6 @@ export default function SchedulePage() {
       ? openBranch
       : (displayRulesByBranch[0]?.branch ?? null);
 
-  const [ruleFormOpen, setRuleFormOpen] = useState(false);
   const [conflictFormOpen, setConflictFormOpen] = useState(false);
 
   const canEdit = !isGuest && !authLoading;
@@ -103,18 +123,6 @@ export default function SchedulePage() {
         <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs text-slate-600">
           <span>访客预览 · 登录后即可录入并保存你的规则知识库。</span>
           <span className="text-slate-400">示例数据</span>
-        </div>
-      )}
-      {!isGuest && isEmpty && (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-gold/50 bg-white px-4 py-2.5 text-xs text-slate-700">
-          <span>以下为示例规则，点右上「+ 新建规则」录入你的内容。</span>
-          <button
-            type="button"
-            onClick={() => setRuleFormOpen(true)}
-            className="rounded-md bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-slate-700"
-          >
-            立即新建
-          </button>
         </div>
       )}
       {error && (
@@ -140,34 +148,23 @@ export default function SchedulePage() {
           <div className="flex items-center gap-2 px-1">
             <FileText className="h-5 w-5 text-slate-500" />
             <h2 className="font-semibold tracking-tight">规则结构树</h2>
-            {canEdit && (
-              <button
-                type="button"
-                onClick={() => setRuleFormOpen((v) => !v)}
-                className="ml-auto inline-flex items-center gap-1 rounded-md bg-slate-900 px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-slate-700"
-              >
-                <Plus className="h-3 w-3" />
-                新建规则
-              </button>
-            )}
           </div>
-          <p className="mt-1 px-1 text-xs text-slate-500">
-            {showSeed ? "示例 · 培养方案 v2024" : `${rules.length} 条规则`}
-          </p>
-
-          {canEdit && ruleFormOpen && (
-            <NewRuleForm
-              defaultBranch={safeOpenBranch ?? "GPA 计算规则"}
-              onCancel={() => setRuleFormOpen(false)}
-              onSubmit={async (input) => {
-                const saved = await createRule(input);
-                if (saved) {
-                  setRuleFormOpen(false);
-                  setOpenBranch(input.branch);
-                }
-              }}
-            />
-          )}
+          {/* 当前预览的 PDF 文档:同一学校规则一份,有多份(指南/手册)时下拉切换。
+              学校官方 PDF 是只读参考资料,所以这里不是"新建规则"入口。 */}
+          <label className="mt-1 flex items-center gap-1 px-1 text-xs text-slate-500">
+            <span className="text-slate-400">当前文档</span>
+            <select
+              value={selectedDocId}
+              onChange={(e) => setSelectedDocId(e.target.value as typeof selectedDocId)}
+              className="min-w-0 flex-1 cursor-pointer truncate rounded-md border border-transparent bg-transparent px-1 py-0.5 text-xs text-slate-700 outline-none transition-colors hover:border-slate-200 focus:border-slate-300"
+            >
+              {PDF_DOCS.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.title}
+                </option>
+              ))}
+            </select>
+          </label>
 
           {/* 分支列表：单层 card + 内部 divide-y 细线，flex-1 填底与右侧 PDF 对齐 */}
           <div className="mt-3 flex min-h-0 flex-1 flex-col divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -207,24 +204,8 @@ export default function SchedulePage() {
                         ) : (
                           <ul className="mt-2 space-y-2.5">
                             {highRules.map((leaf) => (
-                              <li key={leaf.id} className="group text-xs">
-                                <div className="flex items-start justify-between gap-2">
-                                  <p className="font-medium text-slate-900">{leaf.title}</p>
-                                  {canEdit && !showSeed && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (window.confirm(`删除规则「${leaf.title}」？`)) {
-                                          void removeRule(leaf.id);
-                                        }
-                                      }}
-                                      className="invisible flex-none rounded p-0.5 text-slate-400 transition-colors hover:bg-flame/10 hover:text-flame group-hover:visible"
-                                      aria-label="删除"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
-                                  )}
-                                </div>
+                              <li key={leaf.id} className="text-xs">
+                                <p className="font-medium text-slate-900">{leaf.title}</p>
                                 {leaf.body && (
                                   <p className="mt-0.5 text-slate-600 leading-5">{leaf.body}</p>
                                 )}
@@ -258,25 +239,31 @@ export default function SchedulePage() {
           </div>
         </aside>
 
-        {/* Right · PDF 原件预览（功能预留位置） */}
+        {/* Right · PDF 原件预览。
+            当前临时方案:public/docs/*.pdf 静态文件,iframe 直接嵌浏览器原生 PDF
+            viewer。未来:从 Supabase Storage 拉用户上传文档(见 TD 待办)。 */}
         <main
           className="animate-fade-in-up-soft flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white"
           style={{ animationDelay: "120ms" }}
         >
           <div className="flex flex-none items-center gap-2 border-b border-slate-200 px-4 py-3">
             <FileText className="h-4 w-4 text-slate-500" />
-            <h2 className="text-sm font-semibold text-slate-950">官方文件原件</h2>
-            <span className="ml-auto text-[11px] text-slate-400">点击左侧节点跳转到对应位置</span>
+            <h2 className="truncate text-sm font-semibold text-slate-950">{selectedDoc.title}</h2>
+            <a
+              href={selectedDoc.url}
+              target="_blank"
+              rel="noreferrer"
+              className="ml-auto rounded-md px-2 py-1 text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+            >
+              新窗口打开
+            </a>
           </div>
-          <div className="flex min-h-[480px] flex-1 items-center justify-center px-6 py-10">
-            <div className="max-w-xs text-center">
-              <FileText className="mx-auto h-8 w-8 text-slate-300" strokeWidth={1.5} />
-              <p className="mt-3 text-sm text-slate-500">PDF 原件预览区</p>
-              <p className="mt-2 text-[11px] leading-5 text-slate-400">
-                功能预留位置。上传培养方案后此处会渲染 PDF，并随左侧目录跳到对应位置。
-              </p>
-            </div>
-          </div>
+          <iframe
+            key={selectedDoc.id}
+            src={selectedDoc.url}
+            title={selectedDoc.title}
+            className="min-h-[480px] flex-1 border-0"
+          />
         </main>
       </div>
 
@@ -447,140 +434,6 @@ function ConflictSide({
       <p className="mt-2 text-[11px] text-slate-500">
         来源：{source ?? "未注明"}
       </p>
-    </div>
-  );
-}
-
-/* ───────────────────────── 子组件：新建规则 inline 表单 ───────────────────────── */
-
-function NewRuleForm({
-  defaultBranch,
-  onSubmit,
-  onCancel,
-}: {
-  defaultBranch: string;
-  onSubmit: (input: {
-    branch: string;
-    title: string;
-    body: string | null;
-    trust: TrustLevel;
-    source: string | null;
-    source_page: string | null;
-  }) => Promise<void> | void;
-  onCancel: () => void;
-}) {
-  const [branch, setBranch] = useState(defaultBranch);
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [trust, setTrust] = useState<TrustLevel>("med");
-  const [source, setSource] = useState("");
-  const [sourcePage, setSourcePage] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const submit = async () => {
-    const t = title.trim();
-    const br = branch.trim();
-    if (!t || !br) return;
-    setBusy(true);
-    try {
-      await onSubmit({
-        branch: br,
-        title: t,
-        body: body.trim() || null,
-        trust,
-        source: source.trim() || null,
-        source_page: sourcePage.trim() || null,
-      });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
-      <div className="grid grid-cols-2 gap-2">
-        <label className="text-[11px] font-medium text-slate-600">
-          分组
-          <input
-            type="text"
-            value={branch}
-            onChange={(e) => setBranch(e.target.value)}
-            placeholder="如：GPA 计算规则"
-            className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 outline-none focus:border-slate-400"
-          />
-        </label>
-        <label className="text-[11px] font-medium text-slate-600">
-          可信度
-          <select
-            value={trust}
-            onChange={(e) => setTrust(e.target.value as TrustLevel)}
-            className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 outline-none focus:border-slate-400"
-          >
-            <option value="high">高 · 官方</option>
-            <option value="med">中 · AI 推测</option>
-            <option value="low">低 · 学生评价</option>
-          </select>
-        </label>
-      </div>
-      <label className="block text-[11px] font-medium text-slate-600">
-        标题
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="如：必修课全部计入 GPA"
-          className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 outline-none focus:border-slate-400"
-        />
-      </label>
-      <label className="block text-[11px] font-medium text-slate-600">
-        详情（可空）
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          rows={2}
-          className="mt-1 w-full resize-none rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 outline-none focus:border-slate-400"
-        />
-      </label>
-      <div className="grid grid-cols-2 gap-2">
-        <label className="text-[11px] font-medium text-slate-600">
-          来源（可空）
-          <input
-            type="text"
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-            placeholder="如：培养方案 v2024"
-            className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 outline-none focus:border-slate-400"
-          />
-        </label>
-        <label className="text-[11px] font-medium text-slate-600">
-          页码 / 章节（可空）
-          <input
-            type="text"
-            value={sourcePage}
-            onChange={(e) => setSourcePage(e.target.value)}
-            placeholder="如：第 6 页 §3.1"
-            className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 outline-none focus:border-slate-400"
-          />
-        </label>
-      </div>
-      <div className="flex justify-end gap-2 pt-1">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={busy}
-          className="rounded-md px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-200"
-        >
-          取消
-        </button>
-        <button
-          type="button"
-          onClick={() => void submit()}
-          disabled={busy || !title.trim() || !branch.trim()}
-          className="rounded-md bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-        >
-          {busy ? "保存中…" : "保存"}
-        </button>
-      </div>
     </div>
   );
 }
