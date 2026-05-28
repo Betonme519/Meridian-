@@ -879,7 +879,8 @@ function buildGraph({
     h: 70,
     title: "我的目标",
     meta: "规则已匹配",
-    count: items.filter((item) => item.isOnPath).length,
+    // count 留空:在"路径画布"语境下数字 badge 容易被读成"N 路径",
+    // 用户不需要知道有几条规则匹配
     isRecommended: true,
     isActive: false,
   };
@@ -897,7 +898,7 @@ function buildGraph({
       h: 64,
       title: MILESTONE_LABEL[milestone.code],
       meta: expandedMilestones.has(milestone.code) ? "已展开" : "点击展开",
-      count: milestoneItems.length,
+      // count 同 root:数字 badge 在路径画布语境下会被误读成"N 路径"
       isRecommended: milestoneItems.some((item) => item.isOnPath),
       isActive: false,
       isCollapsed: !expandedMilestones.has(milestone.code),
@@ -942,7 +943,7 @@ function buildGraph({
         h: 58,
         title: String(bucket),
         meta: expandedBuckets.has(key) ? "显示具体机会" : "点击看机会",
-        count: bucketItems.length,
+        // count 留空,同 root / milestone:避免被读成"N 路径"
         isRecommended: bucketItems.some((item) => item.isOnPath),
         isActive: false,
         isCollapsed: !expandedBuckets.has(key),

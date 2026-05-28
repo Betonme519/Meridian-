@@ -129,7 +129,7 @@ export default function CourseManager() {
             label="代码"
             value={draft.code}
             onChange={(v) => setDraft({ ...draft, code: v })}
-            placeholder="CS241"
+            placeholder="选填"
           />
           <FieldInput
             label="名称"

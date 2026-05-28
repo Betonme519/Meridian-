@@ -319,7 +319,7 @@ export default function Transparency() {
                       <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400">
                         推荐示例
                       </p>
-                      <p className="text-xs text-gray-400">CS 245 · 4 学分</p>
+                      <p className="text-xs text-gray-400">专业核心 · 4 学分</p>
                     </div>
                     <h3 className="text-xl font-semibold text-gray-950 mb-5 tracking-tight">
                       数据结构与算法

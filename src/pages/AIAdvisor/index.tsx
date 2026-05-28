@@ -54,7 +54,7 @@ const modes: Mode[] = [
     desc: "优先选择高给分、低压分风险课程",
     icon: Trophy,
     logic: "系统会优先保护绩点、避开压分风险，并把 workload 控制在可承受区间内。",
-    example: "推荐 HIST 118，历史 A 段比例高；谨慎同修 CS241 与高数。",
+    example: "推荐 中国近现代史纲要，历史 A 段比例高；谨慎同修 数据结构 与 高等数学。",
   },
   {
     title: "最轻松毕业",
@@ -72,7 +72,7 @@ const modes: Mode[] = [
   },
   {
     title: "留学路线",
-    desc: "关注 GPA、推荐信与课程 rigor",
+    desc: "关注 GPA、推荐信与课程含金量",
     icon: Plane,
     logic: "系统会平衡 GPA、课程含金量、推荐信来源与申请时间线。",
     example: "保留有推荐信价值的教授课程，即使 workload 略高。",
@@ -365,10 +365,6 @@ export default function AIAdvisorPage() {
                 className="block min-h-20 w-full resize-none bg-transparent px-3 py-2 text-sm leading-5 text-slate-800 outline-none placeholder:text-slate-400"
                 placeholder="例：我想保研，但这学期有实习，不能让 workload 超过 20 小时。"
               />
-              <div className="flex items-center justify-between border-t border-slate-200/70 px-3 py-1.5 text-[11px] text-slate-400 tabular-nums">
-                <span>{profileText.length} 字</span>
-                <span className="uppercase tracking-[0.18em]">中文 · 自然语言</span>
-              </div>
             </div>
             {activeConversationId && (
               <div className="mt-2 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-600">
@@ -386,17 +382,25 @@ export default function AIAdvisorPage() {
                 </button>
               </div>
             )}
+            {/* Mesh 渐变:maya 满底,gold/sapphire 只在左右两端做小色斑,
+                让浅蓝主色保持视觉主导。disabled 时不挂 inline style,
+                className 的 bg-slate-200 接管。 */}
             <button
               type="button"
               onClick={handleParse}
               disabled={streaming || !profileText.trim()}
-              className="group mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-slate-950"
+              style={
+                streaming || !profileText.trim()
+                  ? undefined
+                  : {
+                      backgroundColor: "#7CC3FF",
+                      backgroundImage:
+                        "radial-gradient(circle at 0% 15%, #FFB62E 0%, rgba(255,182,46,0) 28%), " +
+                        "radial-gradient(circle at 92% 85%, #4164FF 0%, rgba(65,100,255,0) 32%)",
+                    }
+              }
+              className="mt-2 inline-flex h-9 w-full items-center justify-center rounded-full bg-slate-200 px-4 text-sm font-medium text-white shadow-sm transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:text-slate-400 disabled:shadow-none"
             >
-              <Sparkles
-                className={`h-4 w-4 transition-transform duration-500 ease-out ${
-                  streaming ? "animate-spin" : "group-hover:rotate-12"
-                }`}
-              />
               {streaming ? "分析中…" : "让系统听听你的想法"}
             </button>
             {parsedNote ? (

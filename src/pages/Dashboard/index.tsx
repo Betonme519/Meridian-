@@ -8,6 +8,7 @@ import {
   Sparkles,
   TriangleAlert,
 } from "lucide-react";
+import LogoFace from "@/components/effects/LogoFace";
 
 /** sessionStorage key:Dashboard 输入框暂存,AIAdvisor mount 时读出来填进 textarea */
 const ASK_DRAFT_KEY = "meridian.ai-feed.ask-draft";
@@ -41,13 +42,13 @@ const decisionCards: DecisionCard[] = [
   },
   {
     title: "AI 最近一次推荐",
-    body: "建议本学期保留 HIST 118 与 MATH 233,谨慎同修 CS 241。",
+    body: "建议本学期保留 中国近现代史纲要 与 大学英语,谨慎同修 数据结构。",
     meta: "基于培养方案 v2024 + 你的 workload 上限",
     tone: "good",
   },
   {
     title: "最近风险变化",
-    body: "压分风险 ↓ 12%(drop CS 241 模拟)",
+    body: "压分风险 ↓ 12%(模拟退掉数据结构后)",
     meta: "近 7 天 · 含 3 次模拟",
     tone: "good",
   },
@@ -71,49 +72,49 @@ const NEXT_STEP_POOL: Array<Omit<DecisionCard, "tone">> = [
   {
     title: "下一步建议",
     body: "把还没上传的培养方案补齐,AI 才能识别出你的真实毕业要求。",
-    meta: "Phase 1 · 数据补全",
+    meta: "数据补全",
     cta: { label: "去导入", to: "/import" },
   },
   {
     title: "下一步建议",
     body: "在 Workspace 拖一节课到不同学期,看 GPA / 工作量怎么变。",
-    meta: "Phase 2 · 模拟",
+    meta: "模拟",
     cta: { label: "打开 Workspace", to: "/course-planner" },
   },
   {
     title: "下一步建议",
     body: "把目标权重调一下,看推荐排序会不会变。",
-    meta: "Phase 2 · 调权重",
+    meta: "调权重",
     cta: { label: "调权重", to: "/ai-advisor" },
   },
   {
     title: "下一步建议",
     body: "Rule Graph 里有几条规则置信度还是 'low',挑一条手动确认下。",
-    meta: "Phase 1 · 规则审计",
+    meta: "规则审计",
     cta: { label: "去规则页", to: "/schedule" },
   },
   {
     title: "下一步建议",
     body: "把上学期成绩单也传上来,GPA 计算会更准。",
-    meta: "Phase 1 · 数据补全",
+    meta: "数据补全",
     cta: { label: "去导入", to: "/import" },
   },
   {
     title: "下一步建议",
     body: "用自然语言重新描述一次你的现状,AI 帮你重新匹配目标模式。",
-    meta: "Phase 2 · 重新对齐",
+    meta: "重新对齐",
     cta: { label: "去 Goal Mode", to: "/ai-advisor" },
   },
   {
     title: "下一步建议",
     body: "Workspace 里同时打开两种排课方案,横向比较哪个更省心。",
-    meta: "Phase 2 · 模拟",
+    meta: "模拟",
     cta: { label: "打开 Workspace", to: "/course-planner" },
   },
   {
     title: "下一步建议",
     body: "查一下还有哪些 requirement 卡住,优先解决那些。",
-    meta: "Phase 1 · 毕业进度",
+    meta: "毕业进度",
     cta: { label: "查毕业进度", to: "/schedule" },
   },
 ];
@@ -201,9 +202,12 @@ export default function DashboardPage() {
           但仍保证首屏可以完整看到 5 张卡(xl 下 1 大 + 2×2 布局)。
           Cmd/Ctrl+Enter 快捷键继续生效,只是不再在 UI 文案里告知。 */}
       <div className="flex min-h-[44vh] flex-col justify-center pb-6 sm:min-h-[48vh] sm:pb-8">
-        <h1 className="text-center text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
-          你今天想问点什么?
-        </h1>
+        <div className="flex items-center justify-center gap-3 sm:gap-4">
+          <LogoFace size={48} className="text-slate-900" />
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+            你今天想问点什么?
+          </h1>
+        </div>
         <div className="mx-auto mt-7 w-full max-w-2xl">
           <div className="relative">
             <textarea
@@ -220,14 +224,15 @@ export default function DashboardPage() {
               rows={3}
               className="block w-full resize-none rounded-2xl border border-slate-200 bg-white px-5 py-4 pr-14 text-sm leading-6 text-slate-900 shadow-sm outline-none transition-colors placeholder:text-slate-400 hover:border-slate-300 focus:border-slate-900"
             />
-            {/* Submit arrow:用项目 accent palette sapphire (#4164FF) 做主色,
-                和黑色 primary 区分开。disabled 走灰底。 */}
+            {/* Submit arrow:有输入时走品牌渐变 gold → maya → sapphire
+                (黄→浅蓝→蓝),to-br 斜向左上→右下,空时灰底 disabled。
+                disabled:bg-none 显式清掉渐变 background-image,让灰底色生效。 */}
             <button
               type="button"
               onClick={handleAsk}
               disabled={!askInput.trim()}
               aria-label="提问"
-              className="absolute bottom-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-sapphire text-white shadow-sm transition-colors hover:bg-sapphire/90 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+              className="absolute bottom-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-gold via-maya to-sapphire text-white shadow-sm transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:bg-none disabled:text-slate-400 disabled:shadow-none"
             >
               <ArrowUp className="h-4 w-4" strokeWidth={2.2} />
             </button>
