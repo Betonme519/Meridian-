@@ -1,7 +1,9 @@
 # Meridian — Architecture
 
 > 文件结构 / 数据流 / API / 状态管理。新接手 AI 读这份立刻清醒。
-> Last updated: **2026-05-16**（与代码同步，删 services/ 层、补 Supabase 接入面）
+> Last updated: **2026-05-28**（前后端安全边界明确化、AI proxy 落点拍板、归档 AUDIT）
+
+> 🔒 **前端安全铁律见 §9**。任何涉及密钥 / 权限 / 数据库写的改动**先读 §9 再动手**。
 
 ---
 
@@ -11,7 +13,7 @@
 .
 ├─ public/                 静态资源
 ├─ src/                    应用代码（见下）
-├─ supabase/migrations/    schema 演进（0001..0006）
+├─ supabase/migrations/    schema 演进（0001..0011；每条配 _verify.sql）
 ├─ docs/                   项目文档
 ├─ package.json            scripts: dev / build / build:dev / preview / lint / format（bun + npm 兼容）
 ├─ tsconfig.json           strict + 路径别名 @/* → ./src/*
@@ -49,12 +51,13 @@ src/
 │                          （usePlans 已删；planApi 保留供 TD-50 plan 表语义切换）
 ├─ api/                    Supabase 薄壳，一表一文件
 │                          authApi · profileApi · ragSourceApi · ruleApi · ruleConflictApi
-│                          · planApi · chatMessageApi
+│                          · planApi · chatMessageApi · courseApi · trackApi
+│                          · userProgressApi · userRequirementDoneApi · requirementAdviceApi
 ├─ ai/                     AI 抽象层（详见 §4）
-│  ├─ index.ts                         统一入口，按 VITE_AI_PROVIDER 选 provider
-│  ├─ stream.ts                        Chat / Token / Message / collect()
+│  ├─ index.ts                              统一入口，按 VITE_AI_PROVIDER 选 provider
+│  ├─ stream.ts                             Chat / Token / Message / collect()
 │  ├─ schema.ts · prompts.ts
-│  └─ providers/{mock, anthropic}.ts   mock 默认；anthropic 仍 stub
+│  └─ providers/{mock, remote, anthropic}.ts  mock 默认；remote 走 /api/ai/chat；anthropic 弃用
 ├─ lib/                    supabase（typed client 单例 + fail-soft）· guestMode · utils
 ├─ config/                 menu.ts —— Navbar + DashboardLayout 共用单一真理
 ├─ types/                  db.ts —— `supabase gen types` 生成；**可能漂移，定期 regen**
@@ -64,7 +67,7 @@ src/
 
 ⚠️ 历史已删：services/ · UserContext · useCourses/usePlanner · aiApi/courseApi/plannerApi
    · MainLayout · PageShell · CourseAnalyzer/Courses/Profile pages · 等共 12 项死代码
-   完整变更见 docs/ARCHITECTURE_AUDIT.md §1
+   完整变更见 docs/_archive/ARCHITECTURE_AUDIT.md §1（已归档，仅历史参考）
 ```
 
 ---
@@ -129,11 +132,14 @@ src/
                     └─────────────────────┘
 
 AI 调用走另一条并行流（详见 §4）：
-   pages/AIAdvisor  →  src/ai/index.ts (chat)  →  providers/{mock, anthropic}
+   pages/AIAdvisor  →  src/ai/index.ts (chat)  →  providers/{mock, remote, anthropic}
                                                       │
-                                                      ▼ (anthropic 真接入时)
-                                            server-side proxy → Anthropic API
-                                            （proxy 位置待决：TanStack server route / Edge Function / 另起 Worker）
+                                                      ▼ (remote 时 = 默认目标态)
+                                  TanStack Start server route  src/routes/api/ai/chat.ts
+                                                      │
+                                                      ▼ (Phase 2 接真上游)
+                                  上游 LLM（DeepSeek / Qwen / Zhipu / Anthropic 之一）
+                                  key 用 wrangler secret 注入，永不进前端
 ```
 
 **单向铁律：**
@@ -141,7 +147,7 @@ AI 调用走另一条并行流（详见 §4）：
 - UI 只读 hooks / context；不直接 import `lib/supabase`
 - 跨表协调在 hook 内做（譬如 `useRules` 调 ruleApi + ruleConflictApi）
 - api 是 supabase.from(...) 的薄壳：不判业务、不缓存、不跨表 join
-- AI key 永远不能进浏览器 bundle（不放 `VITE_*`）
+- **任何密钥（AI / service_role / 第三方 secret）永远不进浏览器 bundle**（不放 `VITE_*`）—— 详见 §9
 
 ---
 
@@ -166,7 +172,7 @@ export async function listRules(userId: string): Promise<Rule[]> {
 
 - 文件：`src/api/<table>Api.ts`
 - 鉴权：浏览器侧 `supabase-js` 自管 localStorage（D3=a），RLS 在 Postgres 端把守
-- 错误：直接抛 `Error(error.message)`（暴露到 UI 仍是 TD-4，见 ARCHITECTURE_AUDIT.md §13 SB4）
+- 错误：直接抛 `Error(error.message)`（暴露到 UI 仍是 TD-4，见 `TECH_DEBT.md` TD-4）
 - 枚举（如 `TRUST_LEVELS` / `GOAL_MODES`）从对应 api 模块导出，**前端与 DB CHECK 同源**
 
 ### AI API（`src/ai/`）
@@ -177,15 +183,18 @@ import { chat } from "@/ai";
 const stream = chat({ messages, signal });
 for await (const token of stream) { /* ... */ }
 
-// Provider 切换：.env.local 设 VITE_AI_PROVIDER=mock | anthropic
+// Provider 切换：.env.local 设 VITE_AI_PROVIDER=mock | remote | anthropic
 ```
 
 - `Chat = (opts) => AsyncIterable<Token>` —— 协议核心
-- `Token = string`（**TODO**：留 union 扩展位以容纳 citation / tool_use 等，见 ARCHITECTURE_AUDIT.md AI2）
-- Provider strategy：`src/ai/providers/{mock, anthropic}.ts`，mock 默认，anthropic 仍 stub
-- 真接入路径：API key 走 server-side proxy，**不能 `VITE_*` 暴露**
+- `Token` 是 discriminated union（当前 `{ type: "text"; value: string }`；未来扩 citation / tool_use 按同 union）
+- Provider strategy：`src/ai/providers/{mock, remote, anthropic}.ts`
+  - `mock` 默认；`remote` 走 server route `/api/ai/chat`；`anthropic` 已弃用（直连即抛错）
+- 真接入路径：API key **必须** `wrangler secret put`，**永不** `VITE_*` 暴露（见 §9）
 
-**TBD（仍需用户决策）：** AI proxy 落点（TanStack server route vs Supabase Edge Function vs 自建 Worker） —— 见 ARCHITECTURE_AUDIT.md §13 SB2/AI1。
+**proxy 落点（2026-05-28 已拍板）：** TanStack Start server route + Cloudflare Workers，
+文件 `src/routes/api/ai/chat.ts`（Phase 1 已建 mock stub）。完整路线见
+[`backend_migration_plan.md`](./backend_migration_plan.md)，实施手册见 [`AI_PROXY_SPEC.md`](./AI_PROXY_SPEC.md)。
 
 ---
 
@@ -234,7 +243,7 @@ Provider 挂载在 `src/routes/__root.tsx`：
 
 - **升 Zustand**：等 Planner / Schedule 跨页跳转出现跨页共享需求（譬如点 rule → 打开 Workspace 节点）时再做。
 - **react-query**：5-09 已移除依赖。短期 imperative fetch 够用；接 BFF / 多页同读相同表 时再装回。
-- 详见 ARCHITECTURE_AUDIT.md §5。
+- 详见 `docs/_archive/ARCHITECTURE_AUDIT.md` §5（已归档，仅历史参考）。
 
 ---
 
@@ -282,7 +291,7 @@ export const Route = createFileRoute("/_app/<new-page>")({ component: NewPage })
 
 ### 命名不统一（已知）
 
-路由 kebab-case ↔ 页目录 PascalCase 当前不强制对齐（`/course-planner` ↔ `pages/Planner/`），见 ARCHITECTURE_AUDIT.md R3。grep 时需双查。
+路由 kebab-case ↔ 页目录 PascalCase 当前不强制对齐（`/course-planner` ↔ `pages/Planner/`），见 `docs/_archive/ARCHITECTURE_AUDIT.md` R3（已归档）。grep 时需双查。
 
 ---
 
@@ -318,10 +327,71 @@ bun run format         # prettier
 ```
 
 **部署目标：Cloudflare Workers**（`wrangler.jsonc`）—— 前后端同栈。
+Server route 在 `src/routes/api/*`（TanStack Start 文件式），key 走 `wrangler secret put`，永不进前端 bundle（详见 §9）。
 
 ---
 
-## 9. 常见任务速查
+## 9. 前端安全铁律（NEVER 列表）
+
+> 任何涉及密钥 / 权限 / 数据库写的改动**必须**先读本章节。违反者 code review 直接 block。
+
+### 9.1 不允许出现在前端的东西
+
+前端代码、`.env`、`.env.example`、`.env.local`、构建产物 `dist/`、git 提交历史中
+**永远禁止出现**：
+
+1. **service_role key**（Supabase 后台管理员密钥，bypass RLS）
+2. **LLM API key**（Anthropic / OpenAI / DeepSeek / Qwen / Zhipu / 智谱 / 任何上游）
+3. **第三方服务 secret**（支付 / 邮件 / 私有对象存储 / Webhook 签名密钥）
+4. **数据库直连密码 / JWT 签名密钥 / 加密私钥**
+5. **任何 `wrangler secret put` 注入的值**（按定义就是 server-only）
+
+### 9.2 前端**允许**出现的东西
+
+- Supabase **URL**（公开端点）
+- Supabase **publishable / anon key**（`sb_publishable_*`；设计上可公开，靠 RLS 把关）
+- 公开 CDN / 公共 API endpoint URL
+- 构建时常量 `VITE_*` 中的**非密钥**配置（feature flag / bucket name / 公开 endpoint）
+
+`VITE_*` 是 **Vite 构建时常量**，会被字面量内联到 bundle —— 等同公开。
+**判定标准：能写进 README 给路人看的，才能进 `VITE_*`。**
+
+### 9.3 凡需密钥的能力都走 server route
+
+| 场景 | 走法 |
+|---|---|
+| AI 调用 | `src/routes/api/ai/chat.ts`（Phase 1 已建） |
+| RAG 检索 / 文件解析 | `src/routes/api/rag/*`（Phase 5） |
+| 课程规划 / 毕业判断（防作弊） | `src/routes/api/track/*`、`src/routes/api/requirement/*`（Phase 3） |
+| 管理员操作 / 跨用户读 | `src/routes/api/admin/*`（Phase 6，server 端用 service_role） |
+| 第三方写（支付 / 邮件 / Webhook） | `src/routes/api/<vendor>/*` |
+
+key 注入：`wrangler secret put <NAME>`。**不写**进 `wrangler.jsonc` 的 `vars` 段（vars 是构建时常量，等同公开）。
+
+### 9.4 权限判断的边界
+
+- **admin / vip / premium 等角色绝不**只在前端判定。安全边界永远是 **server route + Postgres RLS** 双层。
+- 前端的 `isGuest` / `isPremium` / `canEdit` 等 flag **只用于 UX 显隐**（按钮灰掉 / 路由跳转），**不是**安全边界。
+- 用户绕过前端 flag 仍能发请求 —— 必须假设这种情况会发生，由 server / RLS 兜底。
+
+### 9.5 数据库授权只走 RLS
+
+- 前端 `supabase-js` 用 anon key + 用户 JWT，所有授权由 Postgres RLS policies 在数据库层把关
+- 任何新增 user-owned 表，**同一个 migration 内**必须写齐 RLS policies（select / insert / update / delete，按需）
+- 公共表（`track*` / `requirement_advice` / `requirement_link`）必须明确写 "SELECT FOR ALL + INSERT/UPDATE/DELETE 拒（service_role bypass）"
+- `migrations/_template.sql` 已含 RLS 模板，照抄就行
+
+### 9.6 配套机制
+
+- `git mv` 前先 `git log --all -- <file>` 查历史，**含真 key 的文件即使删了也得视为泄露**，须 rotate 密钥
+- `.env.example` 只放占位符（`your-*-here`），CI 不读、不被 ignored
+- `wrangler secret list` 是当前 server 持有 key 的真理，与文档同步
+
+详细审计基线见 [`backend_migration_plan.md`](./backend_migration_plan.md) §1。
+
+---
+
+## 10. 常见任务速查
 
 | 想做 | 改哪里 |
 |---|---|
@@ -338,16 +408,19 @@ bun run format         # prettier
 
 ---
 
-## 10. 相关文档
+## 11. 相关文档
 
 | 文档 | 作用 |
 |---|---|
-| `PROJECT_OVERVIEW.md` | 项目定位 / 技术栈 / 商业模式 |
-| `ARCHITECTURE.md` ← 本文 | 文件结构 / 数据流 / 路由 / 状态管理 |
-| `ARCHITECTURE_AUDIT.md` | 已知技术债 + 落地方案（合并版 5-09 + 5-16） |
-| `DATA_MODEL.md` | 7 张 user-owned 表的 schema 契约 |
+| `PROJECT_OVERVIEW.md` | 项目定位 / 技术栈 / 商业模式 / 安全边界 |
+| `ARCHITECTURE.md` ← 本文 | 文件结构 / 数据流 / 路由 / 状态管理 / **前端安全铁律 §9** |
+| `backend_migration_plan.md` | 后端迁移 6 阶段路线 + 安全审计基线 |
+| `AI_PROXY_SPEC.md` | `/api/ai/chat` server route 实施手册（Phase 2 用） |
+| `DATA_MODEL.md` | 9 张 user-owned 表的 schema 契约 |
 | `TRACK_SCHEMA.md` | 5 张公共 track 表的 schema 契约 |
-| `TECH_DEBT.md` | TD-1..26 backlog（与 AUDIT 互补） |
+| `TECH_DEBT.md` | TD-1..26 backlog |
 | `DESIGN_SYSTEM.md` | 颜色 / 字体 / 动画 |
 | `CURRENT_TASK.md` | 本会话边界 |
 | `AI_MEMORY.md` | 长期项目记忆 |
+| `_archive/ARCHITECTURE_AUDIT.md` | 5-09 + 5-16 两轮架构审计（已归档，结论已入 ARCHITECTURE 正文） |
+| `_archive/20260427AI选课顾问_项目立项说明.md` | 4 月立项书（已归档，被 PROJECT_OVERVIEW.md 替代） |

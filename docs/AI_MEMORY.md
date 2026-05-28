@@ -134,7 +134,7 @@ Supabase auth 接入 + 注册 / 登录 / 登出 / 多 tab 同步；`_app.tsx` be
 `plan` 表 schema 保留（D6a 整图 JSONB）但 v5 后已无业务消费方。`planApi.ts` 留作 TD-50「自由备注画布」语义切换的接入点。
 
 ### 文档体系 — `100%`
-`CURRENT_TASK.md`（sprint）· `AI_MEMORY.md`（本文，长期）· `TECH_DEBT.md`（backlog）· `PROJECT_OVERVIEW.md` · `ARCHITECTURE.md` · `DESIGN_SYSTEM.md` · `DATA_MODEL.md` · `ARCHITECTURE_AUDIT.md`（一次性深度审计）。
+`CURRENT_TASK.md`（sprint）· `AI_MEMORY.md`（本文，长期）· `TECH_DEBT.md`（backlog）· `PROJECT_OVERVIEW.md` · `ARCHITECTURE.md` · `DESIGN_SYSTEM.md` · `DATA_MODEL.md` · `backend_migration_plan.md`（后端迁移路线 + 安全审计基线）· `AI_PROXY_SPEC.md`（/api/ai/chat 实施手册）· `_archive/ARCHITECTURE_AUDIT.md`（一次性深度审计，已归档）。
 
 ---
 
@@ -226,7 +226,7 @@ HTML5 规范禁止 button 内含 interactive content。React 不报错但 a11y /
 - 文档漂移修：CURRENT_TASK + AI_MEMORY 多处把已闭环任务仍写"待做"。本次同步排队 5/6/7/8/9 + 10 阶段 1-3 全部已闭环（指 commit hash）+ AI_MEMORY § 2/5/6/8/9 全更新；TD-7 含义已重新分配（Dashboard 写死 const）的旧用法标注
 
 ### 2026-05-17 · 基础设施 + 16 条 TD 大清理（commit c36f3c4 / 96cca12 / ba45ec4）
-- **架构审计合并**：`docs/ARCHITECTURE_AUDIT.md`（5-09 + 5-16 两轮合并），AUDIT = 历史快照 / TECH_DEBT = 唯一权威 backlog
+- **架构审计合并**：`docs/_archive/ARCHITECTURE_AUDIT.md`（5-09 + 5-16 两轮合并），AUDIT = 历史快照 / TECH_DEBT = 唯一权威 backlog（2026-05-28 归档到 _archive/，结论已入 ARCHITECTURE 正文）
 - **AI 抽象升级 v2**（用户决定 LLM 未定 → provider-agnostic）：`Token` discriminated union 留 citation / tool_use 扩展位 + 新 `providers/remote.ts` 走 `/api/ai.chat` server proxy + 新 `docs/AI_PROXY_SPEC.md`（4 家 LLM SSE 协议速记）。server route 待用户拍 LLM 上游再写
 - **错误暴露 UI**：`src/lib/errorBus.ts`（`reportApiError` / `failApiCall`）+ `__root.tsx` 挂 `<Toaster richColors />` + 6 个 api/*.ts 接 errorBus
 - **Drawer 抽 hook**：`src/hooks/useDrawer.ts`（scroll-lock + Esc + 可选 closeOnRouteChange），Navbar + DashboardLayout 各删 ~30 行
@@ -329,7 +329,7 @@ HTML5 规范禁止 button 内含 interactive content。React 不报错但 a11y /
 - 决策 D1–D4 全走默认 (a)：profiles 推迟 / 关邮件确认 / 纯浏览器 auth / 保 AuthUser shape 解耦
 - 新建 `src/lib/supabase.ts` 单例（SSR 守卫 + fail-soft env 缺失 + `isSupabaseConfigured`）；`authApi.ts` 4 函数 mock → Supabase + 新增 `onAuthChange`；`AuthContext` 加订阅，公共 API 不变
 - 死文件清扫：21 文件 + 8 目录全部 0 引用确认后删（MainLayout / PageShell / common/ / ChatPanel 等 stub）
-- react-query 移除（全项目 0 useQuery）；架构审计 `ARCHITECTURE_AUDIT.md` 全文刷新
+- react-query 移除（全项目 0 useQuery）；架构审计 `_archive/ARCHITECTURE_AUDIT.md` 全文刷新（2026-05-28 起归档）
 - 部署坑：Vite `VITE_*` 构建时替换，`wrangler.jsonc vars` 没用，CI build 前导环境变量
 
 ### 2026-05-09 · 落地页 Transparency 区 + Feedback 重做 + 共享 UserMenu

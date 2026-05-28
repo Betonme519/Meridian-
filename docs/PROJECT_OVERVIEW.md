@@ -171,27 +171,89 @@
 
 ---
 
+## 安全边界（写代码前必读）
+
+> 完整规则见 `ARCHITECTURE.md` §9。本节是给非技术读者也能看懂的版本。
+
+**项目对前端的最高约束**：浏览器里跑的任何代码都视作公开。
+凡是不能给路人看的东西，都不能进前端。
+
+### 永远禁止出现在前端的东西
+
+- **service_role key**（Supabase 后台管理员密钥，能绕过所有权限）
+- **LLM API key**（Anthropic / OpenAI / DeepSeek / Qwen / Zhipu / 任何上游）
+- **第三方服务 secret**（支付 / 邮件 / 私有对象存储 / Webhook 签名）
+- **数据库直连密码 / JWT 签名密钥 / 加密私钥**
+
+载体清单（任意一处出现都算泄露）：前端源码、`.env`、`.env.example`、`.env.local`、构建产物 `dist/`、git 提交历史。
+
+### 前端允许出现的东西
+
+- Supabase URL + publishable / anon key（`sb_publishable_*`，设计上可公开）
+- 公开 CDN / 公共 API endpoint URL
+- `VITE_*` 中的非密钥配置（feature flag / 公开 bucket 名）
+
+`VITE_*` 是构建时常量，会被字面量内联进 bundle —— **等同公开**。
+判定标准：**能写进 README 给路人看的，才能进 `VITE_*`**。
+
+### 凡需密钥的能力都走 server route
+
+```
+前端 (fetch /api/*)
+   ↓
+TanStack Start server route  (src/routes/api/*)
+   ↓                                  ↓
+key（wrangler secret put 注入）   Supabase (service_role 可选)
+   ↓
+上游 LLM / 第三方 / 文件解析
+```
+
+| 场景 | 走法 |
+|---|---|
+| AI 调用 | `src/routes/api/ai/chat.ts`（Phase 1 已建 mock stub） |
+| RAG 检索 / 文件解析 | `src/routes/api/rag/*`（Phase 5） |
+| 课程规划 / 毕业判断（防作弊） | `src/routes/api/track/*`、`/requirement/*`（Phase 3） |
+| 管理员操作 / 跨用户读 | `src/routes/api/admin/*`（Phase 6） |
+
+### 权限判断只信 server + RLS
+
+- admin / vip / premium 等角色**绝不**只在前端判定 —— 用户改前端 state 就能伪造。
+- 安全边界永远是 **server route + Postgres Row Level Security（RLS）** 双层。
+- 前端的 `isGuest` / `isPremium` / `canEdit` 等只用于 UX 显隐，不是安全边界。
+
+### 数据库授权只走 RLS
+
+- 当前 15 张表全部启用 RLS（见 `supabase/migrations/`）
+- 新增 user-owned 表的 migration **必须**同步写齐 policies（select/insert/update/delete）
+- `supabase/migrations/_template.sql` 已含 RLS 模板
+
+更详细的审计基线与后端迁移路线，见 [`backend_migration_plan.md`](./backend_migration_plan.md)。
+
+---
+
 ## 文件入口
 
 - 落地页：`src/pages/Home/`（每 section 一文件，详见 `ARCHITECTURE.md`）
 - 设计令牌：`src/styles/variables.css`（详见 `DESIGN_SYSTEM.md`）
-- 业务立项书：`docs/20260427AI选课顾问_项目立项说明.md`（市场 / RICE / 法务 / 6周路线图）
+- 业务立项书：`docs/_archive/20260427AI选课顾问_项目立项说明.md`（市场 / RICE / 法务 / 6周路线图；**已归档**，仅历史参考）
 
 ## 文档体系（AI 接手阅读顺序）
 
 ```
 docs/
-├─ CURRENT_TASK.md         ★★★ 本会话边界，最先读
-├─ AI_MEMORY.md            ★★  长期状态 + 踩过的坑 + TBD
-├─ PROJECT_OVERVIEW.md     ← 你正在看
-├─ ARCHITECTURE.md         文件结构 / 数据流 / API
-├─ ARCHITECTURE_AUDIT.md   已知技术债 + 落地方案（合并版 5-09 + 5-16）
-├─ DATA_MODEL.md           7 张 user-owned 表的 schema 契约
-├─ TRACK_SCHEMA.md         5 张公共 track 表的 schema 契约
-├─ TECH_DEBT.md            TD-1..26 列表（与 AUDIT 互补，AUDIT 看现状 / TECH_DEBT 看历史）
-└─ DESIGN_SYSTEM.md        颜色 / 字体 / 动画，写 UI 前必读
+├─ CURRENT_TASK.md            ★★★ 本会话边界，最先读
+├─ AI_MEMORY.md               ★★  长期状态 + 踩过的坑 + TBD
+├─ PROJECT_OVERVIEW.md        ← 你正在看（含安全边界）
+├─ ARCHITECTURE.md            文件结构 / 数据流 / API / 前端安全铁律 §9
+├─ backend_migration_plan.md  后端迁移 6 阶段路线 + 安全审计基线
+├─ AI_PROXY_SPEC.md           /api/ai/chat server route 实施手册（Phase 2）
+├─ DATA_MODEL.md              9 张 user-owned 表的 schema 契约
+├─ TRACK_SCHEMA.md            5 张公共 track 表的 schema 契约
+├─ TECH_DEBT.md               TD-1..26 列表
+├─ DESIGN_SYSTEM.md           颜色 / 字体 / 动画，写 UI 前必读
+└─ _archive/                  归档：ARCHITECTURE_AUDIT.md（5-09/5-16 审计快照）+ 立项书
 ```
 
 - `CURRENT_TASK.md` 每会话更新
 - `AI_MEMORY.md` 每里程碑更新
-- 后三份稳定，几周才更新一次
+- 后几份稳定，几周才更新一次

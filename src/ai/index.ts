@@ -6,7 +6,7 @@
  * | 值          | provider 文件                  | 用途                                                  |
  * | ----------- | ------------------------------ | ----------------------------------------------------- |
  * | `mock`      | providers/mock.ts              | 默认。本地无 key 跑通流式 UI / 单测 / CI               |
- * | `remote`    | providers/remote.ts            | 走本地 server-side proxy `/api/ai.chat`；上游 LLM     |
+ * | `remote`    | providers/remote.ts            | 走本地 server-side proxy `/api/ai/chat`；上游 LLM     |
  * |             |                                | (Anthropic / Qwen / Zhipu / DeepSeek) 由 server 决定  |
  * | `anthropic` | providers/anthropic.ts (弃用) | 历史路径，直接抛错提示改用 remote                      |
  *

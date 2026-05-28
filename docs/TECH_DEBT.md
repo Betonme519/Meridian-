@@ -10,9 +10,10 @@
 
 ### TD-1 · AI provider 真接入（**骨架完成，余尾：上游 LLM 未决**）
 - **现状**：provider-agnostic 骨架已就位（`src/ai/providers/{mock, remote, anthropic}.ts` + `Token` discriminated union + `docs/AI_PROXY_SPEC.md` 4 家 LLM SSE 协议速记）
-- **余尾**：server route `src/routes/api/ai.chat.ts` 未写；当前 `VITE_AI_PROVIDER=remote` 会 fetch 404
+- **余尾**：server route 在 Phase 1 (2026-05-28) 已建 mock stub `src/routes/api/ai/chat.ts`（返 10 个 text token + `[DONE]`）；当前 `VITE_AI_PROVIDER=remote` 拿到 mock 流（不再 404）。真上游接入待用户拍板 LLM 后做。
 - **阻塞**：用户未拍板上游（倾向 DeepSeek / Qwen，待定）
 - **建议**：拍板后按 `AI_PROXY_SPEC.md` Step 3-4 实施（写 server route + `wrangler secret put`）
+- **总路线**：`docs/backend_migration_plan.md` Phase 2（涵盖鉴权 / rate limit / session 校验）
 
 ### TD-2 · `rag_source.parsed_status` 永远卡 pending
 - **风险**：上传文件后 UI 永远显示"待解析"，用户认为坏掉了
@@ -90,7 +91,7 @@
 ## 🟢 低 — 从 ARCHITECTURE_AUDIT 同步
 
 > 这一段是 2026-05-09 + 2026-05-16 两轮架构审计中暴露但未单独立 TD 的项目。
-> TECH_DEBT = 唯一权威 backlog；AUDIT = 历史快照。
+> TECH_DEBT = 唯一权威 backlog；AUDIT 见 `docs/_archive/ARCHITECTURE_AUDIT.md`（已归档）。
 
 ### TD-32 · `src/layouts/` vs `src/components/layout/` 双目录共存
 - **现状**：前者 1 个 (DashboardLayout)，后者 3 个 (Navbar / Footer / UserMenu)

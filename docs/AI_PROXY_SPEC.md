@@ -1,14 +1,19 @@
-# AI Proxy Spec — `/api/ai.chat`
+# AI Proxy Spec — `/api/ai/chat`
 
 > 前后端契约文档。后期接真 LLM 时按本 spec 实现 server route，前端不动。
-> Last updated: **2026-05-17**
+> Last updated: **2026-05-28**
+>
+> **2026-05-28 变更**：endpoint 从 `/api/ai.chat` 改为 `/api/ai/chat`，并新增
+> Phase 1 mock stub（`src/routes/api/ai/chat.ts`）。原因与后续路线见
+> [`backend_migration_plan.md`](./backend_migration_plan.md)。
 
 ---
 
-> ⚠️ **当前状态（2026-05-17）：上游 LLM 未决**
+> ⚠️ **当前状态（2026-05-28）：上游 LLM 未决，stub 已就位**
 > 用户倾向 DeepSeek 或 Qwen，但**未拍板**。Step 4 各家实现细节本文已列，
-> 拍板后选对应路径补 server route 即可。本轮不动 server route。
-> 切前端 `VITE_AI_PROVIDER=remote` 当前会 fetch 404 → UI toast 报错（行为正确）。
+> 拍板后按对应路径替换 stub 即可。
+> Phase 1 已建 mock stub：`src/routes/api/ai/chat.ts` 返回 10 个 text token + `[DONE]`，
+> 切前端 `VITE_AI_PROVIDER=remote` 当前会拿到 mock 流（不再 404）。
 
 ---
 
@@ -17,12 +22,13 @@
 用户后期 LLM provider 未定（可能接 Anthropic / Qwen / Zhipu / DeepSeek 任一家）。
 为避免前端被某一家 LLM 锁死，2026-05-17 决策：
 
-- **前端**只面向 1 个 endpoint：`POST /api/ai.chat`，归一成 SSE 流
+- **前端**只面向 1 个 endpoint：`POST /api/ai/chat`，归一成 SSE 流
 - **server 端**按 env 路由到上游（`AI_UPSTREAM=anthropic|qwen|zhipu|deepseek`）
 - **切换上游**：改 `wrangler secret` + 改 `AI_UPSTREAM` env，**不动前端代码**
 
 前端实现见 `src/ai/providers/remote.ts`，已可用（直接 fetch 本 endpoint）。
-server 端 endpoint 当前**未实现**，调用会 404（这是预期，骨架阶段）。
+server 端 endpoint 在 Phase 1（2026-05-28）建了 mock stub（`src/routes/api/ai/chat.ts`），
+Phase 2 接真上游时**替换 stub 实现**即可，前端不动。
 
 ---
 
@@ -47,12 +53,13 @@ wrangler secret put AI_UPSTREAM_MODEL  # 模型名，如 "deepseek-chat" / "qwen
 
 ### Step 3：写 server route
 
-新建 `src/routes/api/ai.chat.ts`（TanStack Start 文件式 server route）：
+**2026-05-28：Phase 1 已建占位文件** `src/routes/api/ai/chat.ts`，
+Phase 2 接真上游时**替换 mock 流为下面的 proxy 实现**即可（文件路径与 createFileRoute 路径不变）：
 
 ```ts
 import { createFileRoute } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/api/ai.chat")({
+export const Route = createFileRoute("/api/ai/chat")({
   server: {
     handlers: {
       POST: async ({ request }) => {
@@ -144,7 +151,7 @@ data: [DONE]\n\n
 
 `src/ai/providers/remote.ts` 已实现 SSE 解析骨架，做了：
 
-- POST `/api/ai.chat` with `{ messages, stream: true }`
+- POST `/api/ai/chat` with `{ messages, stream: true }`
 - 4xx/5xx 时解析 `error.message` 抛错
 - 按 `\n\n` 拆 SSE 事件，每行 `data: <JSON>` 反序列化成 `Token`
 - `data: [DONE]` 表示流结束
@@ -158,7 +165,7 @@ data: [DONE]\n\n
 ## 测试
 
 接入后跑：
-1. `bun run dev`，确保 `/api/ai.chat` 不 404
+1. `bun run dev`，确保 `/api/ai/chat` 不 404（Phase 1 之后 stub 会返 mock SSE）
 2. AIAdvisor 页输入文字 → 流式回答正常
 3. 中途按"取消" → fetch abort + reader release，控制台 0 error
 4. wrangler secret 错配（如假 key）→ 前端 toast 显示 "AI 调用失败：..."
@@ -172,4 +179,5 @@ data: [DONE]\n\n
 - **`src/ai/providers/remote.ts`** —— 客户端 SSE 解析实现
 - **`src/ai/providers/mock.ts`** —— 不联网的开发态 provider
 - **`src/ai/index.ts`** —— provider 路由（`VITE_AI_PROVIDER` 选择）
-- **`ARCHITECTURE_AUDIT.md` §13 SB2/AI1** —— 本 spec 的决策来源
+- **`backend_migration_plan.md` Phase 2** —— 本 spec 在总路线中的位置
+- **`_archive/ARCHITECTURE_AUDIT.md` §13 SB2/AI1** —— 本 spec 的原始决策来源（已归档）

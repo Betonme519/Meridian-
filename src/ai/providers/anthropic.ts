@@ -4,7 +4,7 @@
  * 2026-05-17 决策（用户拍板）：后期 LLM provider 不一定是 Anthropic，
  * 可能接 Qwen / Zhipu / DeepSeek / Anthropic 任意一家。
  * 因此前端**不直接面向具体 LLM**，统一通过 `providers/remote.ts` 走本地
- * server-side proxy（`/api/ai.chat`），由 server 端根据 env 路由到上游。
+ * server-side proxy（`/api/ai/chat`），由 server 端根据 env 路由到上游。
  *
  * 本文件保留：
  *  - 历史路径：旧代码 `VITE_AI_PROVIDER=anthropic` 仍可解析（提前抛错而非 404）
