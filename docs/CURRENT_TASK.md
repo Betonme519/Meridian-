@@ -3,20 +3,21 @@
 > 短期工作内存。**AI 接手优先读这份**，再按需查 `AI_MEMORY.md` / `TECH_DEBT.md`。
 > 铁律：只做下方「排队」里的事，做完停下汇报。「不要修改」当只读。
 
-> Last updated: **2026-05-28**
+> Last updated: **2026-05-29**
 
 ---
 
 ## 目标
 
-**已闭环**：排队 5/6/7/8/9 + 10 全部 + 11 + 12 + 13 mock + **13.5 静态路径库** + **12.5 全部子任务 0-E** + **14 全部五批 UI 重设计** + **后端骨架 Phase 1**（2026-05-28 安全审计 + AI server route mock stub + 三处安全锚点 CLAUDE.md/PROJECT_OVERVIEW/ARCHITECTURE §9，详见 `docs/backend_migration_plan.md`）。详见下方「最近完成」+ AI_MEMORY § 9 + 各 commit。
-**当前推进**：无主线任务运行。下一条候选 = **排队 13.2 = backend_migration_plan Phase 2**（真 LLM 替换 Phase 1 mock stub，等用户拍上游 + 充值）或 **13.8 解析 pipeline**（卡 13.2）。
-**新优先级**（2026-05-28 14 闭环 + Phase 1 完成后重排）：
-1. **排队 13.2 = backend_migration_plan Phase 2** 真 LLM provider（替换 `src/routes/api/ai/chat.ts` mock 为真上游 proxy + `wrangler secret put`）← 下一条，等用户拍上游 + 充值
-2. **排队 13.8** 解析 pipeline + RAG（卡 13.2）
-3. **TD-10** target_gpa / goal_weights UI
-4. **TD-50** plan 表语义切换
-**最近 commit**：`341e651` 排队 14 第四批 + 第五批撤回：UI 微调收尾 + 渐变体系 + Schedule PDF + Import 大改（2026-05-28）；`9961fa8` 排队 14 UI 微调（续）：LogoFace + Dashboard/AIAdvisor 文案清理（2026-05-28）；`89b7973` 排队 14 第三批：UI 微调 Home 改名 + 卡片交互 + 配色（2026-05-28）；`6155a0e` workspace UI 修改完成（2026-05-27）。
+**已闭环**：排队 5/6/7/8/9 + 10 全部 + 11 + 12 + 13 mock + **13.5 静态路径库** + **12.5 全部子任务 0-E** + **14 全部五批 UI 重设计** + **后端骨架 Phase 1**（2026-05-28）+ **排队 13.2 backend Phase 2 主链路**（2026-05-29 接通智谱 GLM-5.1 + Supabase session 校验 + per-user rate limit）+ **TD-10a target_gpa UI**（2026-05-29 Upload 个人设置 aside）。详见下方「最近完成」+ AI_MEMORY § 9 + 各 commit。
+**当前推进**：13.2 Phase 2 主链路已通；C2b（wrangler secret put + 真部署）+ Home AI 内嵌 UI 改造 进入排队；TD-10a 已落，TD-10b goal_weights 等 buckets 语义拍板。
+**新优先级**（2026-05-29 Phase 2 主链路通后重排）：
+1. **Home AI 内嵌（类 ChatGPT）** —— 同页输入 + 下方流式回答，不再 sessionStorage 跨页传草稿到 AIAdvisor ← **下一条候选**
+2. **排队 13.8** 解析 pipeline + RAG（13.2 已解锁，启动看用户决定时机）
+3. **C2b** wrangler secret put + 真部署到 Cloudflare Worker（等真要上线时做）
+4. **TD-10b** goal_weights buckets UI（等 buckets 语义拍板）
+5. **TD-50** plan 表语义切换
+**最近 commit**：`4eb0db7` 排队 13.2 第二刀：Supabase session 校验 + per-user rate limit（2026-05-29）；`3cb7668` 排队 13.2 第一刀：接通智谱 GLM-5.1 真 SSE proxy（2026-05-29）；`6f203e7` 后端骨架 Phase 1（2026-05-28）；`341e651` 排队 14 第四批 + 第五批撤回（2026-05-28）。
 **架构转向（2026-05-25）**：用户拍板"静态路径库 + AI 连接"。改原 AI runtime 生成 reason 为 Claude 预编译 (goal × req) → 280 advice + 40 link 关系，DB 查询替代 runtime AI 调用。
 **UI 重设计（排队 14）**：✅ 已闭环（2026-05-28）。五批迭代见下方排队 14 段落 + 最近完成第一条。
 
@@ -38,6 +39,8 @@
 
 | ID | 阶段 | 完成日期 | 关键 commit / 文件 |
 |---|---|---|---|
+| **排队 13.2 Phase 2 主链路**（真 GLM-5.1 SSE proxy + Supabase session 校验 + per-user rate limit） | 后端 | 2026-05-29 | `4eb0db7` + `3cb7668` |
+| **TD-10a** target_gpa UI（Upload 个人设置 aside 加滑块） | 三 | 2026-05-29 | 本 session 待 commit |
 | **后端骨架 Phase 1**（安全审计 + AI server stub + 三处安全锚点） | 后端 | 2026-05-28 | `docs/backend_migration_plan.md` + `src/routes/api/ai/chat.ts` mock stub |
 | **排队 14** 全局功能页 UI 重设计五批 | 三 | 2026-05-28 | `341e651` · `9961fa8` · `89b7973` · `b626a4b` |
 | **排队 12.5** workspace 二改（子任务 0-E） | 二 | 2026-05-27 | `58b09cc` · `3e2f832` · `6155a0e` |
@@ -53,10 +56,11 @@
 
 | 优先级 | ID | 状态 | 卡点 |
 |---|---|---|---|
-| 1 | **排队 13.2 = backend Phase 2** 真 LLM provider | ⏳ 等启动 | 等用户拍上游（DeepSeek / Qwen / Zhipu / Anthropic）+ Key/充值；替换 `src/routes/api/ai/chat.ts` mock 为真 proxy |
-| 2 | **排队 13.8** TD-2 解析 pipeline + RAG 公告 | ❌ 阻塞 | 卡 13.2（必须先有真 LLM） |
-| 3 | **TD-10** target_gpa / goal_weights UI | ⏳ 等设计 | 待拍板：Upload 设置区 vs 新建 Settings 页 |
-| 4 | **TD-50** plan 表语义切换 | ⏳ 等设计 | "自由备注画布"模式，决定 `plan.nodes` 新 shape |
+| 1 | **Home AI 内嵌（类 ChatGPT）** | ⏳ 等启动 | 当前 Home submit → sessionStorage → 跳 AIAdvisor；目标改同页流式回答 ← 用户 2026-05-29 新提需求 |
+| 2 | **排队 13.8** TD-2 解析 pipeline + RAG 公告 | ⏳ 已解锁等启动 | 13.2 Phase 2 主链路已通；工作量中等偏大；用 GLM-OCR + GLM-4.6V-FlashX 解析培养方案/成绩单/课表 |
+| 3 | **C2b** wrangler secret put + 真部署 CF Worker | ⏳ 待真上线 | 注入 ZHIPU_API_KEY / GLM_MODEL / SUPABASE_URL / SUPABASE_ANON_KEY；deploy 后跑 GET/POST 验证 |
+| 4 | **TD-10b** goal_weights buckets UI | ⏳ 等设计 | 学校 5 大类规则分类 ≠ GPA 权重 buckets，等用户拍 buckets 语义 |
+| 5 | **TD-50** plan 表语义切换 | ⏳ 等设计 | "自由备注画布"模式，决定 `plan.nodes` 新 shape |
 
 ---
 

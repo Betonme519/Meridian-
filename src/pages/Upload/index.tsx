@@ -145,6 +145,8 @@ export default function UploadPage() {
   const [school, setSchool] = useState(schoolOptions[0]);
   const [grade, setGrade] = useState("");
   const [major, setMajor] = useState("");
+  // target_gpa 默认 3.0（DB 可为 null，未设置时滑块显示中位）
+  const [targetGpa, setTargetGpa] = useState<number>(3.0);
   const [dragHover, setDragHover] = useState<number | null>(null);
 
   // profile 加载/变化时同步到本地草稿（包括首次加载和多 tab 同步场景）
@@ -153,7 +155,8 @@ export default function UploadPage() {
     setSchool(profile.school ?? schoolOptions[0]);
     setGrade(profile.grade != null ? String(profile.grade) : "");
     setMajor(profile.major ?? "");
-  }, [profile?.school, profile?.grade, profile?.major]);
+    setTargetGpa(profile.target_gpa != null ? Number(profile.target_gpa) : 3.0);
+  }, [profile?.school, profile?.grade, profile?.major, profile?.target_gpa]);
 
   // school 是 select，change 即 commit
   const handleSchoolChange = (v: string) => {
@@ -186,6 +189,15 @@ export default function UploadPage() {
     const trimmed = major.trim();
     void updateProfile({ major: trimmed === "" ? null : trimmed }).catch((e) =>
       console.warn("[Upload] 保存专业失败:", e),
+    );
+  };
+
+  // target_gpa slider 拖动期间仅本地 state 跟随；松手 / 失焦才写 DB，避免狂触
+  // updateProfile。保留 2 位小数精度（DB numeric(3,2)），与 toFixed(1) 显示一致。
+  const handleGpaCommit = () => {
+    const rounded = Math.round(targetGpa * 10) / 10;
+    void updateProfile({ target_gpa: rounded }).catch((e) =>
+      console.warn("[Upload] 保存目标 GPA 失败:", e),
     );
   };
 
@@ -278,6 +290,39 @@ export default function UploadPage() {
                 onBlur={handleMajorBlur}
                 className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm transition-colors hover:border-slate-400 focus:border-slate-950 focus:outline-none"
               />
+            </Field>
+
+            {/* TD-10 第一刀 · 目标 GPA */}
+            <Field
+              label="目标 GPA"
+              hint="影响 advisor 推荐课程的难度倾向"
+            >
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min={0}
+                  max={4}
+                  step={0.1}
+                  value={targetGpa}
+                  onChange={(e) => setTargetGpa(parseFloat(e.target.value))}
+                  onPointerUp={handleGpaCommit}
+                  onKeyUp={(e) => {
+                    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                      handleGpaCommit();
+                    }
+                  }}
+                  className="flex-1 accent-sapphire"
+                  aria-label="目标 GPA"
+                />
+                <span className="w-12 text-right text-sm font-semibold tabular-nums text-slate-900">
+                  {targetGpa.toFixed(1)}
+                </span>
+              </div>
+              <div className="mt-1 flex justify-between text-[10px] text-slate-400">
+                <span>0.0</span>
+                <span>2.0</span>
+                <span>4.0</span>
+              </div>
             </Field>
           </div>
           <button
@@ -525,12 +570,25 @@ export default function UploadPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <label className="block">
-      <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">
-        {label}
-      </span>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">
+          {label}
+        </span>
+        {hint && (
+          <span className="text-[10px] text-slate-400">{hint}</span>
+        )}
+      </div>
       <div className="mt-2">{children}</div>
     </label>
   );
