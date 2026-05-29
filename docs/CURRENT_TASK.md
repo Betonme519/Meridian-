@@ -3,21 +3,20 @@
 > 短期工作内存。**AI 接手优先读这份**，再按需查 `AI_MEMORY.md` / `TECH_DEBT.md`。
 > 铁律：只做下方「排队」里的事，做完停下汇报。「不要修改」当只读。
 
-> Last updated: **2026-05-29**
+> Last updated: **2026-05-30**
 
 ---
 
 ## 目标
 
-**已闭环**：排队 5/6/7/8/9 + 10 全部 + 11 + 12 + 13 mock + **13.5 静态路径库** + **12.5 全部子任务 0-E** + **14 全部五批 UI 重设计** + **后端骨架 Phase 1**（2026-05-28）+ **排队 13.2 backend Phase 2 主链路**（2026-05-29 接通智谱 GLM-5.1 + Supabase session 校验 + per-user rate limit）+ **TD-10a target_gpa UI**（2026-05-29 Upload 个人设置 aside）。详见下方「最近完成」+ AI_MEMORY § 9 + 各 commit。
-**当前推进**：13.2 Phase 2 主链路已通；C2b（wrangler secret put + 真部署）+ Home AI 内嵌 UI 改造 进入排队；TD-10a 已落，TD-10b goal_weights 等 buckets 语义拍板。
-**新优先级**（2026-05-29 Phase 2 主链路通后重排）：
-1. **Home AI 内嵌（类 ChatGPT）** —— 同页输入 + 下方流式回答，不再 sessionStorage 跨页传草稿到 AIAdvisor ← **下一条候选**
-2. **排队 13.8** 解析 pipeline + RAG（13.2 已解锁，启动看用户决定时机）
-3. **C2b** wrangler secret put + 真部署到 Cloudflare Worker（等真要上线时做）
-4. **TD-10b** goal_weights buckets UI（等 buckets 语义拍板）
-5. **TD-50** plan 表语义切换
-**最近 commit**：`4eb0db7` 排队 13.2 第二刀：Supabase session 校验 + per-user rate limit（2026-05-29）；`3cb7668` 排队 13.2 第一刀：接通智谱 GLM-5.1 真 SSE proxy（2026-05-29）；`6f203e7` 后端骨架 Phase 1（2026-05-28）；`341e651` 排队 14 第四批 + 第五批撤回（2026-05-28）。
+**已闭环**：排队 5/6/7/8/9 + 10 全部 + 11 + 12 + 13 mock + **13.5 静态路径库** + **12.5 全部子任务 0-E** + **14 全部五批 UI 重设计** + **后端骨架 Phase 1**（2026-05-28）+ **排队 13.2 backend Phase 2 完整闭环**（2026-05-29~30 GLM-5.1 SSE proxy + session 校验 + rate limit + 401/429 实测通过）+ **TD-10a target_gpa UI**（2026-05-29）+ **Landing 落地页重命名**（2026-05-30）+ **Dashboard 内嵌 AI 对话**（2026-05-30 类 ChatGPT 双栏布局 + 决策卡竖列）。详见下方「最近完成」+ AI_MEMORY § 9 + 各 commit。
+**当前推进**：无主线任务运行。13.2 完整闭环，Home AI 内嵌完成。下一条候选见下方优先级。
+**新优先级**（2026-05-30 Home AI 内嵌闭环后重排）：
+1. **排队 13.8** 解析 pipeline + RAG（13.2 已解锁，工作量中等偏大）← **下一条候选**
+2. **C2b** wrangler secret put + 真部署到 Cloudflare Worker（等真要上线时做）
+3. **TD-10b** goal_weights buckets UI（等 buckets 语义拍板）
+4. **TD-50** plan 表语义切换
+**最近 commit**：`cbea9fd` Dashboard 内嵌 AI 对话（2026-05-30 + 多轮迭代待 squash 进同一 commit）；`54137b2` 落地页 Home → Landing 重命名（2026-05-30）；`7d70c93` TD-10a target_gpa UI（2026-05-29）；`4eb0db7` 13.2 第二刀 session + rate limit（2026-05-29）；`3cb7668` 13.2 第一刀 GLM-5.1 SSE proxy（2026-05-29）。
 **架构转向（2026-05-25）**：用户拍板"静态路径库 + AI 连接"。改原 AI runtime 生成 reason 为 Claude 预编译 (goal × req) → 280 advice + 40 link 关系，DB 查询替代 runtime AI 调用。
 **UI 重设计（排队 14）**：✅ 已闭环（2026-05-28）。五批迭代见下方排队 14 段落 + 最近完成第一条。
 
@@ -39,7 +38,9 @@
 
 | ID | 阶段 | 完成日期 | 关键 commit / 文件 |
 |---|---|---|---|
-| **排队 13.2 Phase 2 主链路**（真 GLM-5.1 SSE proxy + Supabase session 校验 + per-user rate limit） | 后端 | 2026-05-29 | `4eb0db7` + `3cb7668` |
+| **Dashboard 内嵌 AI 对话**（同页 ChatGPT 式流式 + 双栏布局 + 决策卡竖列 + Enter 发送 + 多轮 UI 微调） | 三 | 2026-05-30 | `cbea9fd` + 后续微调待 squash |
+| **Landing 落地页改名**（src/pages/Home → src/pages/Landing；6 docs 路径同步） | 工程 | 2026-05-30 | `54137b2` |
+| **排队 13.2 Phase 2 完整闭环**（GLM-5.1 SSE proxy + Supabase session 校验 + per-user rate limit + 401/429 实测通过） | 后端 | 2026-05-29~30 | `4eb0db7` + `3cb7668`（+ 用户 2026-05-30 本地 C2a 实测通过） |
 | **TD-10a** target_gpa UI（Upload 个人设置 aside 加滑块） | 三 | 2026-05-29 | 本 session 待 commit |
 | **后端骨架 Phase 1**（安全审计 + AI server stub + 三处安全锚点） | 后端 | 2026-05-28 | `docs/backend_migration_plan.md` + `src/routes/api/ai/chat.ts` mock stub |
 | **排队 14** 全局功能页 UI 重设计五批 | 三 | 2026-05-28 | `341e651` · `9961fa8` · `89b7973` · `b626a4b` |
@@ -56,11 +57,10 @@
 
 | 优先级 | ID | 状态 | 卡点 |
 |---|---|---|---|
-| 1 | **Home AI 内嵌（类 ChatGPT）** | ⏳ 等启动 | 当前 Home submit → sessionStorage → 跳 AIAdvisor；目标改同页流式回答 ← 用户 2026-05-29 新提需求 |
-| 2 | **排队 13.8** TD-2 解析 pipeline + RAG 公告 | ⏳ 已解锁等启动 | 13.2 Phase 2 主链路已通；工作量中等偏大；用 GLM-OCR + GLM-4.6V-FlashX 解析培养方案/成绩单/课表 |
-| 3 | **C2b** wrangler secret put + 真部署 CF Worker | ⏳ 待真上线 | 注入 ZHIPU_API_KEY / GLM_MODEL / SUPABASE_URL / SUPABASE_ANON_KEY；deploy 后跑 GET/POST 验证 |
-| 4 | **TD-10b** goal_weights buckets UI | ⏳ 等设计 | 学校 5 大类规则分类 ≠ GPA 权重 buckets，等用户拍 buckets 语义 |
-| 5 | **TD-50** plan 表语义切换 | ⏳ 等设计 | "自由备注画布"模式，决定 `plan.nodes` 新 shape |
+| 1 | **排队 13.8** TD-2 解析 pipeline + RAG 公告 | ⏳ 已解锁等启动 | 13.2 Phase 2 完整闭环；工作量中等偏大；用 GLM-OCR + GLM-4.6V-FlashX 解析培养方案/成绩单/课表 |
+| 2 | **C2b** wrangler secret put + 真部署 CF Worker | ⏳ 待真上线 | 注入 ZHIPU_API_KEY / GLM_MODEL / SUPABASE_URL / SUPABASE_ANON_KEY；deploy 后跑 GET/POST 验证 |
+| 3 | **TD-10b** goal_weights buckets UI | ⏳ 等设计 | 学校 5 大类规则分类 ≠ GPA 权重 buckets，等用户拍 buckets 语义 |
+| 4 | **TD-50** plan 表语义切换 | ⏳ 等设计 | "自由备注画布"模式，决定 `plan.nodes` 新 shape |
 
 ---
 
