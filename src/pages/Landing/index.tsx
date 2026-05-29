@@ -9,7 +9,7 @@ import Control from "./Control";
 import Feedback from "./Feedback";
 import Faq from "./Faq";
 import FinalCTA from "./FinalCTA";
-import "./Home.css";
+import "./Landing.css";
 
 /**
  * Home page — composition of section components. Each section lives in its

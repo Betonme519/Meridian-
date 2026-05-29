@@ -70,7 +70,7 @@
 ## 🟢 低 — 累计影响，不卡业务
 
 ### TD-18 · 死代码 / 历史包袱（**大部分已清**，剩零碎）
-- 当前剩余：`src/data/` 空目录 / `src/pages/Home/Trust.tsx` "kept unmounted" / `src/assets/` 3 个空目录 + .gitkeep
+- 当前剩余：`src/data/` 空目录 / `src/pages/Landing/Trust.tsx` "kept unmounted" / `src/assets/` 3 个空目录 + .gitkeep
 - **建议**：业务方向定下来后统一清扫；要清需要用户确认清单
 
 ### TD-20 · 路由命名 kebab-case vs 页目录 PascalCase 不统一

@@ -358,7 +358,7 @@
 ## 不要修改
 
 - 全局 `src/components/layout/`（Navbar / Footer / DashboardLayout / UserMenu）
-- 落地页 `src/pages/Home/*`
+- 落地页 `src/pages/Landing/*`（原 `Home/`，2026-05-29 改名，避免跟菜单第一项 label 「Home」 撞名）
 - 路由根与分组：`src/routes/__root.tsx` · `src/router.tsx` · `src/routes/_app.tsx` · `src/routes/_app/*`（除非任务要求加 beforeLoad）
 - 菜单单一真理 `src/config/menu.ts`（除非要新增菜单项 / 调整 title 文案）
 - 设计令牌 `src/styles/variables.css` · `globals.css`

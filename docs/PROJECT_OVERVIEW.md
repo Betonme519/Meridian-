@@ -233,7 +233,7 @@ key（wrangler secret put 注入）   Supabase (service_role 可选)
 
 ## 文件入口
 
-- 落地页：`src/pages/Home/`（每 section 一文件，详见 `ARCHITECTURE.md`）
+- 落地页：`src/pages/Landing/`（每 section 一文件，详见 `ARCHITECTURE.md`；原 `Home/`，2026-05-30 改名）
 - 设计令牌：`src/styles/variables.css`（详见 `DESIGN_SYSTEM.md`）
 - 业务立项书：`docs/_archive/20260427AI选课顾问_项目立项说明.md`（市场 / RICE / 法务 / 6周路线图；**已归档**，仅历史参考）
 

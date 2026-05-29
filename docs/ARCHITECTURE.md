@@ -299,8 +299,8 @@ export const Route = createFileRoute("/_app/<new-page>")({ component: NewPage })
 
 | 区域 | 谁能改 |
 |---|---|
-| `pages/Home/<Section>.tsx` | 任意 agent，互不冲突 |
-| `pages/Home/index.tsx` | 加新 section 时是协调点，约定一人改 |
+| `pages/Landing/<Section>.tsx` | 任意 agent，互不冲突 |
+| `pages/Landing/index.tsx` | 加新 section 时是协调点，约定一人改 |
 | `components/layout/*` · `layouts/*` | layout owner |
 | `config/menu.ts` | menu owner（Navbar + DashboardLayout 共用） |
 | `styles/globals.css` `variables.css` | design system owner |
@@ -395,7 +395,7 @@ key 注入：`wrangler secret put <NAME>`。**不写**进 `wrangler.jsonc` 的 `
 
 | 想做 | 改哪里 |
 |---|---|
-| 加新落地页 section | `src/pages/Home/<Name>.tsx` + `index.tsx` 引入 |
+| 加新落地页 section | `src/pages/Landing/<Name>.tsx` + `index.tsx` 引入 |
 | 加新功能页 | `src/pages/<Name>/` + `src/routes/_app/<name>.tsx` + `src/config/menu.ts` 加 MenuItem |
 | 加新独立鉴权页 | `src/routes/<name>.tsx`（仿 `login.tsx`，不进 `_app`） |
 | 加新表 | (1) 写 `supabase/migrations/000X_add_<table>.sql` + `_verify.sql` → (2) 用户 Supabase Dashboard 跑 → (3) `bunx supabase gen types` 安全跑法重生 `src/types/db.ts` → (4) 写 `src/api/<table>Api.ts` 薄壳 → (5) 写 `src/hooks/use<X>.ts` → (6) 页面消费 |
