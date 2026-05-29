@@ -9,11 +9,11 @@
 
 ---
 
-> ⚠️ **当前状态（2026-05-28）：上游 LLM 未决，stub 已就位**
-> 用户倾向 DeepSeek 或 Qwen，但**未拍板**。Step 4 各家实现细节本文已列，
-> 拍板后按对应路径替换 stub 即可。
-> Phase 1 已建 mock stub：`src/routes/api/ai/chat.ts` 返回 10 个 text token + `[DONE]`，
-> 切前端 `VITE_AI_PROVIDER=remote` 当前会拿到 mock 流（不再 404）。
+> ✅ **当前状态（2026-05-29）：Phase 2 进行中，上游 = 智谱 GLM-5.1**
+> 用户 2026-05-29 拍板智谱。`src/routes/api/ai/chat.ts` 已从 mock 换成真 SSE proxy
+> （OpenAI 兼容协议 → 智谱 endpoint）。本地 `.dev.vars` 注入 `ZHIPU_API_KEY` + `GLM_MODEL=glm-5.1`。
+> 部署前还需：`wrangler secret put` + Supabase session 校验 + rate limit。
+> 详见 [`backend_migration_plan.md`](./backend_migration_plan.md) §Phase 2。
 
 ---
 

@@ -84,17 +84,22 @@ LLM (DeepSeek/Qwen/Zhipu/Anthropic) + Supabase Postgres
 
 ### Phase 2 · AI key 与 AI 调用迁后端
 
-**触发条件：** 用户拍板 LLM 上游（DeepSeek / Qwen / Zhipu / Anthropic 之一）
+**触发条件：** ✅ 已触发（2026-05-29 用户拍板 **智谱 GLM**）
 
-**任务：**
-1. `wrangler secret put AI_UPSTREAM_KEY / AI_UPSTREAM / AI_UPSTREAM_MODEL`
-2. 在 `src/routes/api/ai/chat.ts` 替换 mock 为真 proxy 实现（按 `AI_PROXY_SPEC.md` §Step 4）
-3. 实现 `proxyOpenAICompatible`（DeepSeek/Qwen/Zhipu 通用）+ `proxyAnthropic`
-4. server route 内手动校验 Supabase session（`authorization` header → `supabase.auth.getUser`）
-5. 前端 `.env.local` 切 `VITE_AI_PROVIDER=remote`
-6. 加 server-side rate limit（KV 存计数，每 user 每分钟上限）
+**进行中（2026-05-29）：**
+1. ✅ `src/routes/api/ai/chat.ts` 已从 mock 替换为真 SSE proxy（智谱 OpenAI 兼容协议）
+2. ✅ 本地 `.dev.vars` 注入 `ZHIPU_API_KEY` + `GLM_MODEL=glm-5.1`
+3. ✅ 错误归一脱敏（不暴露厂商 / endpoint / raw error）
+4. ⏳ 部署：`wrangler secret put ZHIPU_API_KEY` + `wrangler secret put GLM_MODEL`
+5. ⏳ 前端 `.env.local` 切 `VITE_AI_PROVIDER=remote` 跑通
+6. ⏳ Supabase session 校验（authorization header → `supabase.auth.getUser`）
+7. ⏳ server-side rate limit（KV 存计数，每 user 每分钟上限）
 
-**风险：** session 校验失败会让所有 AI 请求 401，需要本地 + 部署双跑通
+**模型切换策略（同 provider 内零成本）：**
+- 跑顺后改 `GLM_MODEL` 一行即可切档：`glm-5.1` → `glm-4.5-air`（便宜 75%）→ `glm-4.5-flash`（免费兜底）
+- 未来换 provider（DeepSeek / Qwen）：endpoint + key 名换两处，协议本体不变（OpenAI 兼容）
+
+**风险：** session 校验未加之前所有人都能调，**部署前必须补**。当前仅本地 dev 跑通 mock→真链路。
 
 ---
 
