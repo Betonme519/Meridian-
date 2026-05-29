@@ -251,11 +251,36 @@
 - 兴趣持久化（用户拍板暂不进 profile）
 - option seed 0007 补录（AI 接通后 track_option 表降级为兜底）
 
-#### 排队 13.8 — TD-2 解析 pipeline + RAG 公告（13.2 后接）
+#### 排队 13.8 — TD-2 解析 pipeline + RAG 公告（**下一条候选 · 2026-05-31+ 开工**）
 
-- 依赖 TD-1（真 LLM）已落地
-- 非结构化数据（公告 / 手册细节）入口，挂到 requirement 上做 RAG 增强
-- 跟「公告 RAG」一起做
+✅ **前置已满足**：13.2 Phase 2 完整闭环（GLM-5.1 真 SSE + session 校验 + rate limit + 401/429 实测）
+
+**目标**：用户上传的非结构化文档（培养方案 PDF / 成绩单 / 课表图片 / 公告）→ 解析提结构化数据 → 向量化入库 → advisor 推理时 RAG 检索引用
+
+**明天回来 quick start checklist**：
+
+1. **现状 recap**：
+   - 文件上传 UI 已有（`src/pages/Upload/index.tsx` 3 个 file slot：培养方案 / 成绩单 / 课表）
+   - `rag_source` 表 + `ragSourceApi` 已有（commit 历史可查），文件上 Supabase Storage 后写 row，`parsed_status=pending`
+   - 当前 pending 文件**无解析路径**（都停在 pending 状态）
+
+2. **决策点（开工前要拍）**：
+   - 上游模型分流：PDF 走 pdf-parse 抽文字 → GLM-5.1 结构化；扫描件 PDF / 图片走 GLM-OCR；课表截图走 GLM-4.6V-FlashX
+   - 向量化方案：用智谱自己的 embedding（`embedding-3`）还是上 pgvector + 第三方？
+   - chunk 策略：按章节切（培养方案）/ 按行切（成绩单）/ 整图（课表）
+
+3. **代码骨架（预估）**：
+   - `src/routes/api/rag/parse.ts` —— POST 接 rag_source.id，按 kind 分流解析
+   - `src/routes/api/rag/search.ts` —— POST 接 query string，向量召回 top-K chunks
+   - 新 migration：`0013_add_rag_chunk.sql` —— chunk 表 + 向量列 + RLS
+   - server route 复用 13.2 的 session 校验 + rate limit 骨架
+
+4. **不在 13.8 范围**：
+   - 公告/RSS 抓取（用户没接入数据源，先不做）
+   - 多文件协同解析（一次只解析一份）
+   - 增量更新（每次重新整解整）
+
+5. **依赖**：`@supabase/supabase-js`、可能需要 `pdf-parse`（已装？需查 package.json）、智谱 OCR/Vision API 形态（看 bigmodel 文档）
 
 ---
 
