@@ -25,15 +25,30 @@
  */
 
 import type { Chat, Token } from "../stream";
+import { supabase } from "@/lib/supabase";
 
 // 2026-05-28: 路径从 `/api/ai.chat` 改为 `/api/ai/chat`（TanStack Router 文件路由
 // 对 `.` 解释为分段符；改用 `/` 与目录式 server route `src/routes/api/ai/chat.ts` 对齐）。
 const ENDPOINT = "/api/ai/chat";
 
 export const remoteChat: Chat = async function* ({ messages, signal }) {
+  // 2026-05-29 Phase 2：带 Supabase session JWT 给 server route 校验。
+  // 未登录用户走不到 AIAdvisor 页（路由有 beforeLoad），所以 session 通常存在；
+  // 即便 session 不存在也照常发请求，由 server 端返 401 走错误归一。
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData?.session?.access_token;
+
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    accept: "text/event-stream",
+  };
+  if (accessToken) {
+    headers.authorization = `Bearer ${accessToken}`;
+  }
+
   const res = await fetch(ENDPOINT, {
     method: "POST",
-    headers: { "content-type": "application/json", accept: "text/event-stream" },
+    headers,
     body: JSON.stringify({ messages, stream: true }),
     signal,
   });
