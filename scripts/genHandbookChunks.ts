@@ -6,14 +6,12 @@
  * 区别是这份会**真调智谱 embedding-3 API**（花钱，按 token 计；两本手册一次几块钱级）。
  *
  * 运行：
- *   1) 先装好依赖（pdfjs-dist 已随 13.8-A 装）
- *   2) 干跑预览 chunk 数（不花钱、不调 API、不写 SQL）：
+ *   1) 干跑预览 chunk 数（不花钱、不调 API、不写 SQL）：
  *        npx tsx scripts/genHandbookChunks.ts --dry
- *   3) 真跑（需 ZHIPU_API_KEY 环境变量）：
- *        ZHIPU_API_KEY=xxx npx tsx scripts/genHandbookChunks.ts
- *      Windows PowerShell：
- *        $env:ZHIPU_API_KEY="xxx"; npx tsx scripts/genHandbookChunks.ts
- *   4) 把生成的 0012_seed_handbook_chunks.sql 贴进 Supabase Dashboard 跑
+ *   2) 真跑（花钱）—— key 自动从 .dev.vars / .env.local 读，无需手动设：
+ *        npx tsx scripts/genHandbookChunks.ts
+ *      （也可显式覆盖：PowerShell `$env:ZHIPU_API_KEY="xxx"; npx tsx ...`）
+ *   3) 把生成的 0012_seed_handbook_chunks.sql 贴进 Supabase Dashboard 跑
  *      （前提：0012_add_handbook_rag.sql 已先跑，建好 rag_chunk + pgvector）
  *
  * 设计：
@@ -159,13 +157,23 @@ function chunkText(full: string): Chunk[] {
 
 /* ───────────────────────── Embedding ───────────────────────── */
 
-async function embedBatch(texts: string[]): Promise<number[][]> {
-  const apiKey = process.env.ZHIPU_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "缺少 ZHIPU_API_KEY 环境变量。干跑预览用 --dry；真跑前先设好 key。",
-    );
+/**
+ * 取 ZHIPU_API_KEY：优先环境变量，缺省则从 .dev.vars / .env.local 里抠。
+ * 这样用户不用手动复制密钥，直接 `npx tsx scripts/genHandbookChunks.ts` 即可。
+ */
+function resolveApiKey(): string | null {
+  const fromEnv = process.env.ZHIPU_API_KEY?.trim();
+  if (fromEnv) return fromEnv;
+  for (const fname of [".dev.vars", ".env.local"]) {
+    const p = resolve(REPO_ROOT, fname);
+    if (!existsSync(p)) continue;
+    const m = readFileSync(p, "utf8").match(/^\s*ZHIPU_API_KEY\s*=\s*(.+)\s*$/m);
+    if (m) return m[1].trim().replace(/^["']|["']$/g, "");
   }
+  return null;
+}
+
+async function embedBatch(texts: string[], apiKey: string): Promise<number[][]> {
   let lastErr: unknown;
   for (let attempt = 1; attempt <= EMBED_RETRY; attempt++) {
     try {
@@ -230,6 +238,15 @@ async function main() {
     "",
   );
 
+  // 真跑前先确认 key 拿得到（干跑不需要）
+  const apiKey = DRY ? "" : resolveApiKey();
+  if (!DRY && !apiKey) {
+    throw new Error(
+      "拿不到 ZHIPU_API_KEY：请确认项目根 .dev.vars 里有 ZHIPU_API_KEY=...，" +
+        "或先 $env:ZHIPU_API_KEY=\"你的key\"（PowerShell）。干跑预览用 --dry。",
+    );
+  }
+
   let grandTotal = 0;
 
   for (const src of SOURCES) {
@@ -255,7 +272,7 @@ async function main() {
       console.log(
         `  embedding ${i + 1}-${i + batch.length} / ${chunks.length} …`,
       );
-      const vecs = await embedBatch(batch.map((c) => c.content));
+      const vecs = await embedBatch(batch.map((c) => c.content), apiKey);
       embeddings.push(...vecs);
     }
 

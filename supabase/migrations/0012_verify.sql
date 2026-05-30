@@ -12,7 +12,7 @@ order by ordinal_position;
 
 -- § 3  RLS 开启 + 读策略存在 → relrowsecurity = t；rag_chunk_read_authed 一行
 select relrowsecurity from pg_class where relname = 'rag_chunk';
-select polname from pg_policies where tablename = 'rag_chunk';
+select policyname from pg_policies where tablename = 'rag_chunk';
 
 -- § 4  match RPC 存在且 SECURITY DEFINER → prosecdef = t
 select proname, prosecdef
