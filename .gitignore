@@ -1,3 +1,6 @@
+# 13.8-B 生成的手册向量 seed（~7MB，可由 scripts/genHandbookChunks.ts 重新生成，不入库）
+supabase/migrations/0012_seed_handbook_chunks*.sql
+
 # Logs
 logs
 *.log
