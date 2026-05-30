@@ -10,9 +10,9 @@
 ## 目标
 
 **已闭环**：排队 5/6/7/8/9 + 10 全部 + 11 + 12 + 13 mock + **13.5 静态路径库** + **12.5 全部子任务 0-E** + **14 全部五批 UI 重设计** + **后端骨架 Phase 1**（2026-05-28）+ **排队 13.2 backend Phase 2 完整闭环**（2026-05-29~30 GLM-5.1 SSE proxy + session 校验 + rate limit + 401/429 实测通过）+ **TD-10a target_gpa UI**（2026-05-29）+ **Landing 落地页重命名**（2026-05-30）+ **Dashboard 内嵌 AI 对话**（2026-05-30 类 ChatGPT 双栏布局 + 决策卡竖列）。详见下方「最近完成」+ AI_MEMORY § 9 + 各 commit。
-**当前推进**：**排队 13.8-A 个人文档解析闭环**（2026-05-30）—— 浏览器抽文字（pdfjs）→ 写回 rag_source.parsed_text → Dashboard 对话 prepend system 上下文喂 GLM-5.1。下一条 = 13.8-B 手册 RAG。
-**新优先级**（2026-05-30 13.8-A 闭环后重排）：
-1. **排队 13.8-B** 手册 RAG / pgvector 向量化（个人文档 A 已闭环；只剩公共手册向量检索）← **下一条候选**
+**当前推进**：**排队 13.8 A+B 代码全交付**（2026-05-30）。A 个人文档解析已闭环；B 手册 RAG 代码 + migration + 脚本（`--dry` 实测 624 块）+ chat.ts 检索注入全就绪，**只剩用户跑库 3 步**（migration / 脚本真 embedding / seed SQL，见排队 13.8-B）。
+**新优先级**（2026-05-30 13.8 全交付后重排）：
+1. **跑 13.8-B 库**（用户操作：Supabase 跑 0012 migration + 脚本真 embedding + seed SQL）← **当前卡用户**
 2. **C2b** wrangler secret put + 真部署到 Cloudflare Worker（等真要上线时做）
 3. **TD-10b** goal_weights buckets UI（等 buckets 语义拍板）
 4. **TD-50** plan 表语义切换
@@ -38,7 +38,8 @@
 
 | ID | 阶段 | 完成日期 | 关键 commit / 文件 |
 |---|---|---|---|
-| **排队 13.8-A** 个人文档解析 → 塞 prompt（pdfjs 浏览器抽文字 + parsed_text 写回 + Dashboard system 上下文喂 GLM-5.1） | 后端 | 2026-05-30 | 本 session 待 commit（零 migration） |
+| **排队 13.8-B** 手册 RAG（migration 0012 pgvector+rag_chunk+match RPC / genHandbookChunks 脚本实测 624 块 / chat.ts 检索注入）**代码交付** · ⏳ 待跑库 | 后端 | 2026-05-30 | 本 session 待 commit |
+| **排队 13.8-A** 个人文档解析 → 塞 prompt（pdfjs 浏览器抽文字 + parsed_text 写回 + Dashboard system 上下文喂 GLM-5.1） | 后端 | 2026-05-30 | `106f530` |
 | **Dashboard 内嵌 AI 对话**（同页 ChatGPT 式流式 + 双栏布局 + 决策卡竖列 + Enter 发送 + 多轮 UI 微调） | 三 | 2026-05-30 | `cbea9fd` + 后续微调待 squash |
 | **Landing 落地页改名**（src/pages/Home → src/pages/Landing；6 docs 路径同步） | 工程 | 2026-05-30 | `54137b2` |
 | **排队 13.2 Phase 2 完整闭环**（GLM-5.1 SSE proxy + Supabase session 校验 + per-user rate limit + 401/429 实测通过） | 后端 | 2026-05-29~30 | `4eb0db7` + `3cb7668`（+ 用户 2026-05-30 本地 C2a 实测通过） |
@@ -58,7 +59,7 @@
 
 | 优先级 | ID | 状态 | 卡点 |
 |---|---|---|---|
-| 1 | **排队 13.8-B** 手册 RAG / pgvector 向量化 | ⏳ 已解锁等启动 | A（个人文档）已闭环；B = 两本公共手册 PDF 向量化进 rag_chunk + 运行时检索 |
+| 1 | **排队 13.8-B** 手册 RAG | ✅ 代码交付 / ⏳ 待跑库 | 代码 + migration + 脚本（实测 624 块）+ chat 检索全就绪；剩用户跑 3 步（migration/embedding/seed SQL） |
 | 2 | **C2b** wrangler secret put + 真部署 CF Worker | ⏳ 待真上线 | 注入 ZHIPU_API_KEY / GLM_MODEL / SUPABASE_URL / SUPABASE_ANON_KEY；deploy 后跑 GET/POST 验证 |
 | 3 | **TD-10b** goal_weights buckets UI | ⏳ 等设计 | 学校 5 大类规则分类 ≠ GPA 权重 buckets，等用户拍 buckets 语义 |
 | 4 | **TD-50** plan 表语义切换 | ⏳ 等设计 | "自由备注画布"模式，决定 `plan.nodes` 新 shape |
@@ -269,33 +270,24 @@
 - ✅ 注入：Dashboard 对话 handleAsk prepend system 块（主）+ `GradPathAdvisorInput.personalDocs` 字段 + prompts system 指令 + trackRecommendation 透传（次）
 - ✅ `tsc --noEmit` 0 新错（仅 CardSwap + PathLoader 历史）；dev server 烟测 3 路由 200 无 transform 错
 
-##### B — 手册 RAG / pgvector 向量化 ⏳ 下一条候选
+##### B — 手册 RAG / pgvector 向量化 ✅ 代码交付 2026-05-30（⏳ 待用户跑库）
 
-**目标**：两本公共手册 PDF（`public/docs/ecnu-2025-{guide,handbook}.pdf` 5.5M + 9.5M）→ 向量化入 rag_chunk → advisor 运行时 RAG 检索引用（个人文档已走 A，不进 B）
+**目标**：两本公共手册 PDF（`public/docs/ecnu-2025-{guide,handbook}.pdf` 5.5M + 9.5M）→ 向量化入 rag_chunk → advisor 运行时 RAG 检索引用（个人文档走 A，不进 B）。
 
-**B quick start checklist**：
+**决策（已定）**：embedding-3 `dimensions=1024`；段落感知 ~700 字窗口 + 120 重叠；top-K=5，min_similarity=0.3。
 
-1. **现状 recap**：
-   - 个人文档解析（A）已闭环，走 `parsed_text` 直塞 prompt，**不进 B**
-   - B 只处理两本**校级共享**手册 PDF（`public/docs/ecnu-2025-guide.pdf` 5.5M + `ecnu-2025-handbook.pdf` 9.5M）
-   - 已有 5 份结构化 digest（`docs/ecnu-digests/`）+ 198 条 track_requirement，手册 RAG 是兜「digest 没覆盖的犄角细则」
+**已交付（代码 + 实测）**：
+- ✅ `supabase/migrations/0012_add_handbook_rag.sql`：`create extension vector` + `rag_chunk(source_key, heading, chunk_index, content, embedding vector(1024))` + **authed 可读 RLS**（手册共享非 user-owned）+ `match_handbook_chunks` RPC（SECURITY DEFINER cosine `<=>`，grant anon/authed）+ `0012_verify.sql`（6 段）
+- ✅ `scripts/genHandbookChunks.ts`：pdfjs legacy 抽文字（Windows worker 用 `pathToFileURL` 修 file:// 协议）→ 段落感知分块 → 批 embedding-3 → 产 `0012_seed_handbook_chunks.sql`（per-row INSERT ON CONFLICT 幂等）。**`--dry` 实测过**：guide 215 块 + handbook 409 块 = 624 块
+- ✅ `src/routes/api/ai/chat.ts`：step 4.5 `retrieveHandbookContext`（embed query → `match_handbook_chunks` RPC top-K → prepend system；全 try/catch best-effort，失败/无命中/未灌库静默跳过）+ GET health 加 rag 字段
+- ✅ `tsc --noEmit` 0 新错
 
-2. **决策点（开工前要拍）**：
-   - vector 维度：建议 `embedding-3` 带 `dimensions=1024`（index 小够用）
-   - chunk 策略：按章节 / 标题切（手册结构清晰）
-   - top-K：建议 4-6 段
+**⏳ 你要跑的 3 步（代码就绪，剩运行）**：
+1. Supabase Dashboard SQL 跑 `0012_add_handbook_rag.sql`（启 pgvector + 建表 + RPC），再跑 `0012_verify.sql` § 1-4 确认
+2. 本地设 `ZHIPU_API_KEY` 跑 `npx tsx scripts/genHandbookChunks.ts`（真调 embedding，约几角钱，624 块）→ 产 seed SQL
+3. Dashboard 跑生成的 `0012_seed_handbook_chunks.sql` 灌库 → 跑 `0012_verify.sql` § 5/6 验召回。之后 Home 对话自动带手册检索（要 `VITE_AI_PROVIDER=remote` + server 有 key）
 
-3. **代码骨架（预估）**：
-   - 新 migration `0012`：`create extension vector` + `rag_chunk(id, source_key, chunk_index, content, embedding vector(1024))` + **全 authed 用户可 SELECT 的 RLS**（手册共享，非 user-owned）+ `match_handbook_chunks(query_embedding, match_count)` RPC（cosine `<=>`）
-   - 离线脚本 `scripts/genHandbookChunks.ts`（仿 `genRequirementAdvice.ts`）：pdf 抽文字 → 按章节切 → 调 `embedding-3`（`https://open.bigmodel.cn/api/paas/v4/embeddings`，**同一个 `ZHIPU_API_KEY`**）→ 输出 `0012_seed_handbook_chunks.sql`
-   - `src/routes/api/ai/chat.ts` 在 auth+ratelimit 后、调上游前：embed 用户最后一条 query → `match_handbook_chunks` RPC top-K → prepend system 上下文
-
-4. **不在 B 范围**：
-   - 个人文档（已走 A）/ 课表图片（等视觉档）
-   - 公告/RSS 抓取（无数据源）
-   - 增量更新（手册变了整本重灌）
-
-5. **依赖**：离线脚本可能需 `pdf-parse` 或复用 `pdfjs-dist`（A 已装）；智谱 embeddings API 形态见 bigmodel 文档
+**不在 B 范围**：个人文档（走 A）/ 课表图片（等视觉档）/ 公告 RSS（无数据源）/ 增量更新（手册变了整本重灌）
 
 ---
 
@@ -422,7 +414,13 @@
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线（5-15 ~ 5-25 各排队 N 详细 / 5-17 基础设施大波次 / 5-16 数据源切 PDF / 5-15 digest 录入 等）见 `AI_MEMORY.md § 9`（L210+）+ git log。
 
-- **2026-05-30** — 排队 13.8-A 个人文档解析 → 塞 prompt（本 session，尚未 commit）
+- **2026-05-30** — 排队 13.8-B 手册 RAG 代码交付（本 session，尚未 commit）
+  - `0012_add_handbook_rag.sql`：pgvector + rag_chunk（authed 可读 RLS，非 user-owned）+ match_handbook_chunks RPC（SECURITY DEFINER cosine）+ 0012_verify
+  - `scripts/genHandbookChunks.ts`：pdfjs legacy 抽字（pathToFileURL 修 Windows worker）+ 段落感知分块 + 批 embedding-3 → seed SQL；`--dry` 实测 guide 215 + handbook 409 = 624 块
+  - `chat.ts` step 4.5 retrieveHandbookContext（embed query → match RPC top-K → prepend system，best-effort 失败静默）
+  - 剩用户跑 3 步：Supabase 跑 0012 migration → 设 ZHIPU_API_KEY 跑脚本真 embedding → 跑 seed SQL 灌库
+
+- **2026-05-30** — 排队 13.8-A 个人文档解析 → 塞 prompt（commit `106f530`）
   - `pdfjs-dist` v5 + `src/lib/docExtract.ts` 浏览器抽文字（PDF/文本，图片抛 UnsupportedDocError）；worker 走 Vite `?url`
   - `ragSourceApi` 加 downloadRagSource + updateParseResult（复用 0001 已建 parsed_text 等列，**零 migration**）；`useRagSources` 加 parseSource（乐观 race-guard）+ parsedDocs
   - Upload 页每行解析按钮 + 状态徽章（parsing spinner）+ failed parse_error + 图片灰态
@@ -445,9 +443,4 @@
   - AIAdvisor 单屏 + 8 mode 卡 2×4 自动拉满；Schedule 改两列「左结构树 + 右 PDF 预览」；Upload section 5 区重排；RequirementProgress 改 per-requirement 滑块 + `getCreditCap` regex 兜底
   - **migration 0011** `0011_clean_e3_title.sql` 待用户 Supabase Dashboard 跑
 
-- **2026-05-27** — 排队 14 第一批（commit `b626a4b`）
-  - globals.css @theme 加 4 点缀 token（flame/gold/maya/sapphire）；5 页 + TRUST_META 批量替换 amber/rose/emerald/blue 系；大块底色全 → 白底 + border
-  - Dashboard 定位收敛为「AI Feed 决策状态快报」（删 Section 1 信息导入 + Section 3 模拟动作）+ GPT-style 提问框 sessionStorage 跨页传草稿到 AIAdvisor
-  - PathLoader 新组件（SVG + GSAP timeline）替换 Loader2
-
-> 更早条目（排队 12.5 子任务 A-E / 排队 12.5 sub-0 反向勾选 / 排队 13 mock advisor / 排队 13.5 静态路径库 / 排队 12 v5 workspace / 排队 11 / 排队 10 / 5-17 基础设施大波次 / 5-16 数据源切 PDF + TD-25 / 5-15 digest 录入）已全部由 `AI_MEMORY.md § 9` + git log 覆盖，本节不再保留。
+> 更早条目（排队 14 第一批 / 排队 12.5 子任务 A-E / 排队 12.5 sub-0 反向勾选 / 排队 13 mock advisor / 排队 13.5 静态路径库 / 排队 12 v5 workspace / 排队 11 / 排队 10 / 5-17 基础设施大波次 / 5-16 数据源切 PDF + TD-25 / 5-15 digest 录入）已全部由 `AI_MEMORY.md § 9` + git log 覆盖，本节不再保留。

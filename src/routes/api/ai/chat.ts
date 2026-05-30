@@ -22,6 +22,10 @@
  * 鉴权：Authorization Bearer → supabase.auth.getUser(token) 验签
  * Rate limit：进程内 Map per user，1 分钟窗口 60 次（Worker 单实例够用，
  *             多实例 / 长期方案用 KV 升级，见 backend_migration_plan §Phase 6）
+ *
+ * 13.8-B 手册 RAG（best-effort）：调上游前 embed 用户问题 → match_handbook_chunks
+ *   RPC 召回 top-K 手册条款 → prepend 为 system 上下文。失败 / 无命中静默跳过。
+ *   前提：migration 0012 + 0012_seed_handbook_chunks.sql 已灌库（见 genHandbookChunks.ts）。
  */
 
 import { createFileRoute } from "@tanstack/react-router";
@@ -39,6 +43,15 @@ const DEFAULT_MODEL = "glm-5.1";
 // Rate limit：每用户 1 分钟 60 次（advisor 场景充足，不至于挡住正常使用）
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 60;
+
+// 13.8-B 手册 RAG：embed 用户问题 → match_handbook_chunks 召回 → prepend 上下文。
+// 同一个 ZHIPU_API_KEY；embedding-3 dimensions=1024 与 migration 0012 对齐。
+const EMBED_ENDPOINT = "https://open.bigmodel.cn/api/paas/v4/embeddings";
+const DEFAULT_EMBED_MODEL = "embedding-3";
+const EMBED_DIMS = 1024;
+const RAG_TOP_K = 5;
+const RAG_MIN_SIMILARITY = 0.3; // 低于此视为不相关，丢弃，避免硬塞噪声
+const RAG_CONTEXT_CHAR_CAP = 4_000; // 注入上下文的字符预算
 
 // ---------------------------------------------------------------------------
 // 类型
@@ -314,6 +327,87 @@ function pipeUpstreamToClient(
 }
 
 // ---------------------------------------------------------------------------
+// 手册 RAG 检索（13.8-B，best-effort）
+// ---------------------------------------------------------------------------
+//
+// embed 用户最后一条问题 → match_handbook_chunks RPC 召回 top-K → 拼成 system
+// 上下文。任何一步失败（embedding 报错 / RPC 报错 / 无命中 / 手册没灌库）都返
+// null，对话照常进行 —— RAG 是增强，不是依赖。
+// ---------------------------------------------------------------------------
+
+interface MatchedChunk {
+  source_key: string;
+  heading: string | null;
+  content: string;
+  similarity: number;
+}
+
+async function retrieveHandbookContext(
+  query: string,
+  apiKey: string,
+): Promise<string | null> {
+  try {
+    const supabaseUrl = readEnv("SUPABASE_URL");
+    const supabaseAnonKey = readEnv("SUPABASE_ANON_KEY");
+    if (!supabaseUrl || !supabaseAnonKey) return null;
+
+    const q = query.trim();
+    if (!q) return null;
+
+    // 1) embed 问题（截断长 query，省 token）
+    const embedRes = await fetch(EMBED_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: readEnv("EMBEDDING_MODEL") || DEFAULT_EMBED_MODEL,
+        input: q.slice(0, 2_000),
+        dimensions: EMBED_DIMS,
+      }),
+    });
+    if (!embedRes.ok) return null;
+    const embedJson = (await embedRes.json()) as {
+      data?: { embedding: number[] }[];
+    };
+    const vec = embedJson.data?.[0]?.embedding;
+    if (!vec || vec.length === 0) return null;
+
+    // 2) 余弦最近邻 RPC（match RPC 是 SECURITY DEFINER，anon 客户端即可查）
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await client.rpc("match_handbook_chunks", {
+      query_embedding: vec,
+      match_count: RAG_TOP_K,
+    });
+    if (error || !Array.isArray(data) || data.length === 0) return null;
+
+    const chunks = (data as MatchedChunk[]).filter(
+      (c) => (c.similarity ?? 0) >= RAG_MIN_SIMILARITY,
+    );
+    if (chunks.length === 0) return null;
+
+    // 3) 拼上下文，预算内截断
+    let acc =
+      "以下是从学校官方手册检索到的相关条款，回答时可引用并注明大致出处；" +
+      "手册没提到的不要编造：\n\n";
+    for (const c of chunks) {
+      const head = c.heading
+        ? `〔${c.source_key}·${c.heading}〕`
+        : `〔${c.source_key}〕`;
+      const piece = `${head}\n${c.content}\n\n`;
+      if (acc.length + piece.length > RAG_CONTEXT_CHAR_CAP) break;
+      acc += piece;
+    }
+    return acc.trim();
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 主入口
 // ---------------------------------------------------------------------------
 
@@ -377,6 +471,24 @@ export const Route = createFileRoute("/api/ai/chat")({
             },
             { status: 500 },
           );
+        }
+
+        // 4.5 手册 RAG（13.8-B）：检索相关条款 prepend system 上下文。
+        //     best-effort —— 失败 / 无命中 / 手册未灌库都静默跳过，不影响对话。
+        const lastUser = [...body.messages]
+          .reverse()
+          .find((m) => m.role === "user");
+        if (lastUser?.content) {
+          const ragBlock = await retrieveHandbookContext(
+            lastUser.content,
+            apiKey,
+          );
+          if (ragBlock) {
+            body.messages = [
+              { role: "system", content: ragBlock },
+              ...body.messages,
+            ];
+          }
         }
 
         // 5. 调上游
@@ -460,6 +572,12 @@ export const Route = createFileRoute("/api/ai/chat")({
           ),
           authEnforced: true,
           rateLimit: `${RATE_LIMIT_MAX} req / ${RATE_LIMIT_WINDOW_MS / 1000}s per user`,
+          rag: {
+            embedModel: readEnv("EMBEDDING_MODEL") || DEFAULT_EMBED_MODEL,
+            dims: EMBED_DIMS,
+            topK: RAG_TOP_K,
+            note: "best-effort；手册未灌库 / 无命中则静默跳过",
+          },
           endpoint: "/api/ai/chat",
         });
       },
