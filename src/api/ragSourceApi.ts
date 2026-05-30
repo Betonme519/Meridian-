@@ -12,6 +12,8 @@
  *   - listRagSources(userId)           SELECT 该用户所有 source，按 created_at desc
  *   - uploadRagSource({...})           pre-gen id → 传 Storage → 写表；失败兜底清理
  *   - deleteRagSource(source)          先删 Storage 对象 → 再删表行
+ *   - downloadRagSource(source)        从 Storage 拉回 Blob（解析时浏览器抽文字用）
+ *   - updateParseResult(id, patch)     写回 parsed_status / parsed_text / parse_error / parsed_at
  *
  * 切后端只动本文件。
  */
@@ -177,4 +179,59 @@ export async function deleteRagSource(source: RagSource): Promise<void> {
     .delete()
     .eq("id", source.id);
   if (error) failApiCall("ragSource.delete", `删除导入记录失败：${error.message}`);
+}
+
+/**
+ * 从 Storage 拉回文件 Blob —— 排队 13.8-A 解析时用。
+ *
+ * 解析在浏览器跑：先 download 得 Blob → 包成 File → docExtract.extractText。
+ * RLS：Storage 用路径首段 = auth.uid() 把守，非本人文件 download 会被拒。
+ */
+export async function downloadRagSource(source: RagSource): Promise<Blob> {
+  if (!isSupabaseConfigured) failApiCall("ragSource.download", NOT_CONFIGURED_MSG);
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .download(source.storage_path);
+  if (error || !data) {
+    failApiCall(
+      "ragSource.download",
+      `下载文件失败：${error?.message ?? "未知错误"}`,
+    );
+  }
+  return data as Blob;
+}
+
+/** updateParseResult 的入参：解析状态机的写回字段（均为 rag_source 现有列）。 */
+export interface ParseResultPatch {
+  parsed_status: ParsedStatus;
+  /** parsed 时写抽取出的全文；其它状态可不带 */
+  parsed_text?: string | null;
+  /** failed 时写错误摘要；成功时清空（null） */
+  parse_error?: string | null;
+  /** 到达 parsed/failed 终态时的时间戳（ISO） */
+  parsed_at?: string | null;
+}
+
+/**
+ * 写回解析结果。owner-only RLS（rag_source_update_owner）已把守，
+ * 非本人行 update 影响 0 行。返回更新后的整行。
+ */
+export async function updateParseResult(
+  id: string,
+  patch: ParseResultPatch,
+): Promise<RagSource> {
+  if (!isSupabaseConfigured) failApiCall("ragSource.parse", NOT_CONFIGURED_MSG);
+  const { data, error } = await supabase
+    .from("rag_source")
+    .update(patch)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error || !data) {
+    failApiCall(
+      "ragSource.parse",
+      `保存解析结果失败：${error?.message ?? "未知错误"}`,
+    );
+  }
+  return data as RagSource;
 }

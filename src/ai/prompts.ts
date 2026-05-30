@@ -96,6 +96,11 @@ export interface GradPathAdvisorInput {
   completedCodes: string[];
   /** 启发式产的骨架路径，每 milestone 1 条 */
   skeleton: AdvisorSkeletonPath[];
+  /**
+   * 排队 13.8-A：用户上传并解析出的个人文档文本（成绩单 / 培养方案），已按预算截断。
+   * 缺省 undefined（无上传 / 未解析）。LLM 可据此引用真实成绩 / 培养方案要求。
+   */
+  personalDocs?: { kind: string; name: string; text: string }[];
 }
 
 /**
@@ -125,6 +130,10 @@ export function gradPathAdvisorPrompt(input: GradPathAdvisorInput): Message[] {
     requirements: input.requirements,
     completedCodes: input.completedCodes,
     skeleton: input.skeleton,
+    // 13.8-A：仅在有解析文档时带上，避免给 mock / 旧逻辑塞 undefined 字段
+    ...(input.personalDocs?.length
+      ? { personalDocs: input.personalDocs }
+      : {}),
   });
 
   return [
@@ -141,6 +150,7 @@ const GRAD_PATH_ADVISOR_SYSTEM = `${GRAD_PATH_ADVISOR_MARKER}
   - requirements[] 用户可见的课程类要求
   - completedCodes[] 用户已修课程代码
   - skeleton[] 启发式预算的候选路径（你可保留或重排）
+  - personalDocs[]（可能不存在）用户上传并解析出的成绩单 / 培养方案文本，可据此引用其真实已修课程 / 成绩 / 培养方案要求；文本可能含噪声，按常识理解，不要照抄乱码也不要编造
 
 不要凭印象编造华师大规则。如果用户问的内容不在数据里，在 reason 字段写"该规则未在数据中，需查阅手册"。
 

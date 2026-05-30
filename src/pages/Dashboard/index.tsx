@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useProfile } from "@/hooks/useProfile";
+import { useRagSources } from "@/hooks/useRagSources";
+import { buildPersonalDocBlock } from "@/lib/personalDocContext";
 import {
   ArrowRight,
   ArrowUp,
@@ -185,6 +187,8 @@ const toneText: Record<DecisionCard["tone"], string> = {
 
 export default function DashboardPage() {
   const { profile } = useProfile();
+  // 13.8-A：已解析的个人文档（成绩单 / 培养方案）—— 发问时作 system 上下文 prepend
+  const { parsedDocs } = useRagSources();
   const navigate = useNavigate();
   // 派生当前目标模式:profile 加载完成后用 profile.goal_mode;guest / loading 时 fallback
   const currentGoalMode = profile?.goal_mode ?? "高 GPA";
@@ -235,10 +239,17 @@ export default function DashboardPage() {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
+    // 13.8-A：有已解析个人文档时，prepend 一条 system 上下文给 AI 读真实成绩 /
+    // 培养方案。只进发往模型的消息，不进 UI 的 messages state（保持对话干净）。
+    const docBlock = buildPersonalDocBlock(parsedDocs);
+    const sentMessages: Message[] = docBlock
+      ? [{ role: "system", content: docBlock }, ...nextMessages]
+      : nextMessages;
+
     let acc = "";
     try {
       for await (const tok of chat({
-        messages: nextMessages,
+        messages: sentMessages,
         signal: ctrl.signal,
       })) {
         if (ctrl.signal.aborted) break;

@@ -297,6 +297,8 @@ export async function fetchAdvisorRecommendation(args: {
   progressByOptionId: Map<string, UserProgress>;
   goalMode?: GoalMode | null;
   completedCodes?: Set<string>;
+  /** 13.8-A：已解析个人文档（成绩单 / 培养方案），见 personalDocsForAdvisor */
+  personalDocs?: { kind: string; name: string; text: string }[];
   signal?: AbortSignal;
 }): Promise<RecommendationResult> {
   const skeleton = computeRecommendation(args);
@@ -322,6 +324,7 @@ export async function fetchAdvisorRecommendation(args: {
       optionId: p.optionId ?? null,
       reason: p.reason,
     })),
+    ...(args.personalDocs?.length ? { personalDocs: args.personalDocs } : {}),
   };
 
   let raw: string;

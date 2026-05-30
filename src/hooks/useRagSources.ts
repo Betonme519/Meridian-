@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as ragApi from "@/api/ragSourceApi";
 import type { RagSource, RagSourceKind } from "@/api/ragSourceApi";
+import { extractText, UnsupportedDocError } from "@/lib/docExtract";
 import { useAuth } from "@/hooks/useAuth";
 
 /**
@@ -41,6 +42,14 @@ interface UseRagSourcesValue {
    */
   upload: (file: File, kind: RagSourceKind) => Promise<RagSource>;
   remove: (source: RagSource) => Promise<void>;
+  /**
+   * 解析一条 source（排队 13.8-A）：下载 Blob → 浏览器抽文字 → 写回
+   * parsed_text / parsed_status。乐观先置 'parsing'，终态 'parsed' / 'failed'。
+   * 图片等不支持类型走 'failed' + parse_error（静默，不弹 toast）。
+   */
+  parseSource: (source: RagSource) => Promise<void>;
+  /** 已解析且有正文的文档（喂 AI 顾问用，见 personalDocContext） */
+  parsedDocs: RagSource[];
   refresh: () => Promise<void>;
 }
 
@@ -163,5 +172,85 @@ export function useRagSources(): UseRagSourcesValue {
     [],
   );
 
-  return { sources, loading, error, uploading, upload, remove, refresh };
+  // 解析单条 source —— 排队 13.8-A。
+  // 复用 requestIdRef race-guard：解析期间切账号 / 重拉，旧结果不回写。
+  const parseSource = useCallback(async (source: RagSource) => {
+    const reqId = requestIdRef.current;
+    setError(null);
+    // 乐观：行立刻显「解析中」，清掉上次的 parse_error
+    setSources((prev) =>
+      prev.map((s) =>
+        s.id === source.id
+          ? { ...s, parsed_status: "parsing", parse_error: null }
+          : s,
+      ),
+    );
+
+    const nowIso = new Date().toISOString();
+    try {
+      const blob = await ragApi.downloadRagSource(source);
+      // Blob 没有 name，包成 File 让 extractText 能按扩展名 / mime 分流
+      const file = new File([blob], source.name, {
+        type: source.mime ?? blob.type,
+      });
+      const text = await extractText(file);
+      const updated = await ragApi.updateParseResult(source.id, {
+        parsed_status: "parsed",
+        parsed_text: text,
+        parse_error: null,
+        parsed_at: nowIso,
+      });
+      if (reqId !== requestIdRef.current) return;
+      setSources((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "解析失败";
+      // 持久化 failed 状态（best-effort：写库失败就只更本地）
+      try {
+        const updated = await ragApi.updateParseResult(source.id, {
+          parsed_status: "failed",
+          parse_error: msg,
+          parsed_at: nowIso,
+        });
+        if (reqId !== requestIdRef.current) return;
+        setSources((prev) =>
+          prev.map((s) => (s.id === updated.id ? updated : s)),
+        );
+      } catch {
+        if (reqId !== requestIdRef.current) return;
+        setSources((prev) =>
+          prev.map((s) =>
+            s.id === source.id
+              ? { ...s, parsed_status: "failed", parse_error: msg }
+              : s,
+          ),
+        );
+      }
+      // 不支持类型（图片 / Word）= 预期内，靠 failed 徽章 + parse_error 提示即可，
+      // 不再额外 setError 弹横幅，避免红字吓人。其余真错误才暴露到页面 error。
+      if (reqId === requestIdRef.current && !(e instanceof UnsupportedDocError)) {
+        setError(msg);
+      }
+    }
+  }, []);
+
+  // 已解析且有正文 —— 喂 AI 顾问用（personalDocContext 再按预算截断）。
+  const parsedDocs = useMemo(
+    () =>
+      sources.filter(
+        (s) => s.parsed_status === "parsed" && !!s.parsed_text?.trim(),
+      ),
+    [sources],
+  );
+
+  return {
+    sources,
+    loading,
+    error,
+    uploading,
+    upload,
+    remove,
+    parseSource,
+    parsedDocs,
+    refresh,
+  };
 }

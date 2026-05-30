@@ -12,13 +12,14 @@ import {
   Settings2,
   ShieldCheck,
   Smartphone,
+  Sparkles,
   Trash2,
   Upload as UploadIcon,
   type LucideIcon,
 } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { useRagSources } from "@/hooks/useRagSources";
-import type { ParsedStatus, RagSourceKind } from "@/api/ragSourceApi";
+import type { ParsedStatus, RagSource, RagSourceKind } from "@/api/ragSourceApi";
 import CourseManager from "@/pages/Upload/CourseManager";
 import RequirementProgress from "@/pages/Upload/RequirementProgress";
 
@@ -139,6 +140,7 @@ export default function UploadPage() {
     uploading,
     upload,
     remove,
+    parseSource,
   } = useRagSources();
 
   // 本地草稿态——profile 加载后由 useEffect 覆盖默认值；guest 态下保持默认
@@ -255,6 +257,21 @@ export default function UploadPage() {
       await remove(target);
     } catch (e) {
       console.warn("[Upload] 删除失败:", e);
+    }
+  };
+
+  // 图片 / 截图类（课表）暂不支持解析 —— UI 显灰态而非给解析按钮（排队 13.8-A）。
+  const isImageSource = (r: RagSource) =>
+    (r.mime ?? "").startsWith("image/") ||
+    /\.(png|jpe?g|gif|webp|bmp|heic|heif|tiff?)$/i.test(r.name);
+
+  const handleParse = async (id: string) => {
+    const target = sources.find((s) => s.id === id);
+    if (!target) return;
+    try {
+      await parseSource(target);
+    } catch (e) {
+      console.warn("[Upload] 解析失败:", e);
     }
   };
 
@@ -471,12 +488,12 @@ export default function UploadPage() {
             className="animate-fade-in-up-soft mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white"
             style={{ animationDelay: "60ms" }}
           >
-            <div className="grid grid-cols-[1.4fr_120px_140px_120px_120px] gap-4 border-b border-slate-100 bg-slate-50/40 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 max-md:hidden">
+            <div className="grid grid-cols-[1.4fr_120px_140px_120px_180px] gap-4 border-b border-slate-100 bg-slate-50/40 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 max-md:hidden">
               <span>文件</span>
               <span>类型</span>
               <span>导入日期</span>
               <span>状态</span>
-              <span />
+              <span>操作</span>
             </div>
 
             {sources.length === 0 && !sourcesLoading && (
@@ -485,36 +502,72 @@ export default function UploadPage() {
               </p>
             )}
 
-            {sources.map((r) => (
-              <article
-                key={r.id}
-                className="grid gap-2 border-b border-slate-100 px-5 py-3 transition-colors last:border-b-0 hover:bg-slate-50/60 md:grid-cols-[1.4fr_120px_140px_120px_120px] md:items-center md:gap-4"
-              >
-                <div>
-                  <p className="text-sm font-medium text-slate-900">{r.name}</p>
-                  <p className="text-[11px] text-slate-400 md:hidden">
-                    {r.kind} · {formatDate(r.created_at)}
-                  </p>
-                </div>
-                <span className="text-xs text-slate-700 max-md:hidden">{r.kind}</span>
-                <span className="text-xs tabular-nums text-slate-500 max-md:hidden">
-                  {formatDate(r.created_at)}
-                </span>
-                <span
-                  className={`inline-flex h-5 w-fit items-center rounded-full px-2 text-[11px] font-semibold ${STATUS_CLS[r.parsed_status]}`}
+            {sources.map((r) => {
+              const isImg = isImageSource(r);
+              const parsing = r.parsed_status === "parsing";
+              // 图片不支持解析；其余在 待解析 / 失败 / 已完成 都可（已完成 = 重新解析）
+              const canParse = !isImg && !parsing;
+              const parseLabel =
+                r.parsed_status === "parsed"
+                  ? "重新解析"
+                  : r.parsed_status === "failed"
+                    ? "重试"
+                    : "解析";
+              return (
+                <article
+                  key={r.id}
+                  className="grid gap-2 border-b border-slate-100 px-5 py-3 transition-colors last:border-b-0 hover:bg-slate-50/60 md:grid-cols-[1.4fr_120px_140px_120px_180px] md:items-center md:gap-4"
                 >
-                  {STATUS_LABEL[r.parsed_status]}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => void handleRemove(r.id)}
-                  className="inline-flex h-8 w-fit items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-medium text-slate-700 transition-colors hover:border-flame/50 hover:text-flame"
-                >
-                  <Trash2 className="h-3 w-3" />
-                  删除
-                </button>
-              </article>
-            ))}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-slate-900">{r.name}</p>
+                    <p className="text-[11px] text-slate-400 md:hidden">
+                      {r.kind} · {formatDate(r.created_at)}
+                    </p>
+                    {/* 失败原因 / 图片不支持提示 —— 紧贴文件名下方 */}
+                    {r.parsed_status === "failed" && r.parse_error && (
+                      <p className="mt-0.5 text-[11px] leading-4 text-flame/80">
+                        {r.parse_error}
+                      </p>
+                    )}
+                    {isImg && r.parsed_status !== "failed" && (
+                      <p className="mt-0.5 text-[11px] leading-4 text-slate-400">
+                        图片暂不支持解析
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-xs text-slate-700 max-md:hidden">{r.kind}</span>
+                  <span className="text-xs tabular-nums text-slate-500 max-md:hidden">
+                    {formatDate(r.created_at)}
+                  </span>
+                  <span
+                    className={`inline-flex h-5 w-fit items-center gap-1 rounded-full px-2 text-[11px] font-semibold ${STATUS_CLS[r.parsed_status]}`}
+                  >
+                    {parsing && <Loader2 className="h-2.5 w-2.5 animate-spin" />}
+                    {STATUS_LABEL[r.parsed_status]}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {canParse && (
+                      <button
+                        type="button"
+                        onClick={() => void handleParse(r.id)}
+                        className="inline-flex h-8 w-fit items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-medium text-slate-700 transition-colors hover:border-sapphire/50 hover:text-sapphire"
+                      >
+                        <Sparkles className="h-3 w-3" />
+                        {parseLabel}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void handleRemove(r.id)}
+                      className="inline-flex h-8 w-fit items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-medium text-slate-700 transition-colors hover:border-flame/50 hover:text-flame"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      删除
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </div>
       </div>
