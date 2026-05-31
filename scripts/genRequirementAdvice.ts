@@ -1,10 +1,10 @@
 /**
  * 排队 13.5 静态路径库生成器 —— 一次性产 0007/0008 seed SQL
  *
- * 输入：硬编码 35 reqs 元数据 + 280 advice 文案 + 80 link 关系
+ * 输入：硬编码 35 reqs 元数据 + 280 advice 文案 + 137 link 关系（2026-05-31 扩为全 198 系统抽取）
  * 输出：
- *   - supabase/migrations/0007_seed_requirement_advice.sql （280 INSERT）
- *   - supabase/migrations/0008_seed_requirement_link.sql   （~80 INSERT）
+ *   - supabase/migrations/0007_seed_requirement_advice.sql       （280 INSERT）
+ *   - supabase/migrations/0013_seed_requirement_link_full.sql   （137 INSERT，取代 0008）
  *
  * 运行：npx tsx scripts/genRequirementAdvice.ts
  *      或 bun run scripts/genRequirementAdvice.ts
@@ -420,58 +420,148 @@ const ADVICE: Record<GoalMode, Record<string, AdviceCell>> = {
 /* ───────────────────────── LINKS：~80 条 req↔req 关系 ───────────────────────── */
 
 const LINKS: LinkRow[] = [
-  // ── substitute（替代）──
-  { from: "E2-6", to: "C6-1", kind: "substitute", metadata: { max_credits: 2 }, note: "劳动 2 学分可由创新创业学分顶 ≤ 2 分", sourceRef: "E2-6 cross_ref C6-3" },
-
-  // ── cross_ref（条款引用 / 组合）──
-  { from: "E2-8", to: "E2-6", kind: "cross_ref", bidirectional: true, note: "通识必修 4 学分 = 劳动 2 + 心理 2", sourceRef: "E2-8" },
-  { from: "E2-8", to: "E2-7", kind: "cross_ref", bidirectional: true, note: "通识必修 4 学分 = 劳动 2 + 心理 2", sourceRef: "E2-8" },
-  { from: "E3-1", to: "E3-2", kind: "cross_ref", note: "通识 8 学分含人类思维与学科史论模块", sourceRef: "E3-1" },
-  { from: "E3-1", to: "E3-3", kind: "cross_ref", note: "通识 8 学分含经典阅读模块", sourceRef: "E3-1" },
-  { from: "E3-1", to: "E3-4", kind: "cross_ref", note: "通识 8 学分含模块课程模块", sourceRef: "E3-1" },
-  { from: "E2-6", to: "C6-1", kind: "cross_ref", bidirectional: true, note: "劳动教育条款明确引用 C6-3 创新创业学分", sourceRef: "E2-6" },
+  // ── substitute（替代/冲抵） ──
+  { from: "E2-6", to: "C6-1", kind: "substitute", metadata: {"max_credits":2}, note: "劳动2学分可由创新创业学分顶≤2分", sourceRef: "E2-6 cross_ref C6-3" },
+  { from: "C6-3", to: "E2-6", kind: "substitute", metadata: {"max_credits":2}, note: "创新创业学分冲抵劳动与创造模块", sourceRef: "C6-3" },
+  { from: "D4-16", to: "D4-1", kind: "substitute", note: "创新竞赛获奖可代替毕业论文", sourceRef: "D4-16" },
+  { from: "E2-6", to: "C6-3", kind: "substitute", metadata: {"max_credits":2}, note: "劳动学分可由创新创业冲抵≤2", sourceRef: "E2-6" },
+  // ── cross_ref（引用/组合） ──
+  { from: "E2-8", to: "E2-6", kind: "cross_ref", bidirectional: true, note: "通识必修4学分=劳动2+心理2", sourceRef: "E2-8" },
+  { from: "E2-8", to: "E2-7", kind: "cross_ref", bidirectional: true, note: "通识必修4学分=劳动2+心理2", sourceRef: "E2-8" },
+  { from: "E3-1", to: "E3-2", kind: "cross_ref", note: "通识8学分含人类思维与学科史论模块", sourceRef: "E3-1" },
+  { from: "E3-1", to: "E3-3", kind: "cross_ref", note: "通识8学分含经典阅读模块", sourceRef: "E3-1" },
+  { from: "E3-1", to: "E3-4", kind: "cross_ref", note: "通识8学分含模块课程模块", sourceRef: "E3-1" },
+  { from: "E2-6", to: "C6-1", kind: "cross_ref", bidirectional: true, note: "劳动教育条款明确引用C6-3创新创业学分", sourceRef: "E2-6" },
   { from: "E4-4", to: "E4-5", kind: "cross_ref", note: "师范生课程结构包含教师教育板块", sourceRef: "E4-4" },
-  { from: "C9-3", to: "C9-1", kind: "cross_ref", note: "推免综合公式适用范围由 C9-1 资格条款决定", sourceRef: "C9-3" },
-  { from: "A2-1", to: "A1-12", kind: "cross_ref", bidirectional: true, note: "毕业资格审核三档对应毕业/结业/肄业 三档基础条款", sourceRef: "A2-1" },
-  { from: "A3-3", to: "A3-2", kind: "cross_ref", note: "处分期间不可申请学位条款引用学位 GPA 阈值", sourceRef: "A3-3" },
-  { from: "C2-6", to: "A3-2", kind: "cross_ref", note: "双学位授予条件引用学位 GPA 阈值（2.0）", sourceRef: "C2-6" },
-  { from: "C1-9", to: "A3-2", kind: "cross_ref", note: "辅修学位授予条件引用学位 GPA 阈值", sourceRef: "C1-9" },
-  { from: "D4-12", to: "D4-11", kind: "cross_ref", note: "论文重复率结果引用不予答辩 4 触发清单", sourceRef: "D4-12" },
-  { from: "B3-1", to: "A3-2", kind: "cross_ref", note: "学业预警判定引用学位 GPA 阈值", sourceRef: "B3-1" },
-
-  // ── prerequisite（前置）──
+  { from: "C9-3", to: "C9-1", kind: "cross_ref", note: "推免综合公式适用范围由C9-1资格条款决定", sourceRef: "C9-3" },
+  { from: "A2-1", to: "A1-12", kind: "cross_ref", bidirectional: true, note: "毕业资格审核三档对应毕业/结业/肄业三档", sourceRef: "A2-1" },
+  { from: "A3-3", to: "A3-2", kind: "cross_ref", note: "处分期间不可申请学位引用学位GPA阈值", sourceRef: "A3-3" },
+  { from: "C2-6", to: "A3-2", kind: "cross_ref", note: "双学位授予条件引用学位GPA阈值(2.0)", sourceRef: "C2-6" },
+  { from: "C1-9", to: "A3-2", kind: "cross_ref", note: "辅修学位授予条件引用学位GPA阈值", sourceRef: "C1-9" },
+  { from: "D4-12", to: "D4-11", kind: "cross_ref", note: "论文重复率结果引用不予答辩4触发清单", sourceRef: "D4-12" },
+  { from: "B3-1", to: "A3-2", kind: "cross_ref", note: "学业预警判定引用学位GPA阈值", sourceRef: "B3-1" },
+  { from: "A1-10", to: "A1-1", kind: "cross_ref", note: "退学含规定学习年限内未毕业结业", sourceRef: "A1-10" },
+  { from: "A1-10", to: "A1-5", kind: "cross_ref", note: "退学含超期未注册又未办暂缓", sourceRef: "A1-10" },
+  { from: "A2-2", to: "A1-1", kind: "cross_ref", note: "提前毕业以标准学习年限为基准", sourceRef: "A2-2" },
+  { from: "B1-4", to: "B6-6", kind: "cross_ref", note: "期中退课缴费引用学分制收费", sourceRef: "B1-4" },
+  { from: "B3-6", to: "B3-7", kind: "cross_ref", note: "试读结果引用第十一条三条件", sourceRef: "B3-6" },
+  { from: "B6-6", to: "B6-5", kind: "cross_ref", note: "期中退课退费引用第八条单价", sourceRef: "B6-6" },
+  { from: "B6-8", to: "B6-5", kind: "cross_ref", note: "毕业超修补缴引用第八条单价", sourceRef: "B6-8" },
+  { from: "B6-10", to: "B6-5", kind: "cross_ref", note: "公费师范超年限按第八条缴费", sourceRef: "B6-10" },
+  { from: "B6-10", to: "B6-6", kind: "cross_ref", note: "公费师范期中退课按第九条", sourceRef: "B6-10" },
+  { from: "C1-8", to: "A1-1", kind: "cross_ref", note: "辅修最长年限锚定主修最长年限", sourceRef: "C1-8" },
+  { from: "C5-2", to: "C3-1", kind: "cross_ref", note: "转专业限制群体含强基计划学生", sourceRef: "C5-2" },
+  { from: "C5-11", to: "A2-2", kind: "cross_ref", note: "提前完成可申请提前毕业", sourceRef: "C5-11" },
+  { from: "C5-11", to: "B6-4", kind: "cross_ref", note: "转专业学费按转入专业、毕业学期结算", sourceRef: "C5-11" },
+  { from: "C6-2", to: "C6-5", kind: "cross_ref", note: "训练项目途径对应项目级别认定", sourceRef: "C6-2" },
+  { from: "C6-2", to: "C6-6", kind: "cross_ref", note: "竞赛获奖途径对应竞赛分值认定", sourceRef: "C6-2" },
+  { from: "C6-2", to: "C6-7", kind: "cross_ref", note: "论文专利著作途径对应分值认定", sourceRef: "C6-2" },
+  { from: "C6-2", to: "C6-8", kind: "cross_ref", note: "自主创业途径对应创业分值认定", sourceRef: "C6-2" },
+  { from: "C8-3", to: "C3-1", kind: "cross_ref", note: "卓越学院结构含强基计划", sourceRef: "C8-3" },
+  { from: "C8-4", to: "C3-2", kind: "cross_ref", note: "强基计划通过高考招生入卓越学院", sourceRef: "C8-4" },
+  { from: "C8-5", to: "C4-3", kind: "cross_ref", note: "拔尖个性化选课学分≥24", sourceRef: "C8-5" },
+  { from: "C8-5", to: "C3-3", kind: "cross_ref", note: "强基达转段要求可直接转段读研", sourceRef: "C8-5" },
+  { from: "C9-3", to: "C9-4", kind: "cross_ref", note: "综合成绩素质加分由7类构成", sourceRef: "C9-3" },
+  { from: "C9-7", to: "C2-6", kind: "cross_ref", note: "双学位推免由招生专业院系牵头", sourceRef: "C9-7" },
+  { from: "D2-7", to: "A1-9", kind: "cross_ref", note: "创业休学不计最长学习年限", sourceRef: "D2-7" },
+  { from: "D4-16", to: "D5-1", kind: "cross_ref", note: "替代具体办法参见D5", sourceRef: "D4-16" },
+  { from: "D5-4", to: "D4-1", kind: "cross_ref", note: "抽检即校外专家抽查机制", sourceRef: "D4-1" },
+  { from: "D5-2", to: "D4-13", kind: "cross_ref", note: "抽检学术规范维度引学术不端", sourceRef: "D5-2" },
+  { from: "D6-7", to: "D6-4", kind: "cross_ref", note: "延期不超执行周期1年须毕业前完成", sourceRef: "D6-7" },
+  { from: "E1-3", to: "E2-1", kind: "cross_ref", note: "培养方案4大结构含公共必修块", sourceRef: "E1-3" },
+  { from: "E1-3", to: "E3-1", kind: "cross_ref", note: "4大结构含通识教育8学分块", sourceRef: "E1-3" },
+  { from: "E1-3", to: "E1-2", kind: "cross_ref", note: "课程结构属培养方案9部分之一", sourceRef: "E1-2" },
+  { from: "D2-7", to: "A1-3", kind: "cross_ref", note: "创业休学期不计入最长年限", sourceRef: "process 5-4" },
+  { from: "C6-5", to: "D6-6", kind: "cross_ref", note: "创新训练结题后学分计入C6-5", sourceRef: "process 8-3" },
+  // ── prerequisite（前置） ──
   { from: "C9-1", to: "C9-3", kind: "prerequisite", note: "达推免资格才适用综合排名公式", sourceRef: "C9-1" },
-  { from: "A3-2", to: "A1-12", kind: "prerequisite", note: "学位 GPA 阈值达成是 '毕业 + 学位' 档前置", sourceRef: "A3-2" },
-  { from: "E2-1", to: "A2-1", kind: "prerequisite", note: "思想政治理论课全部通过是毕业资格审核硬要求", sourceRef: "A2-1" },
-  { from: "E2-2", to: "A2-1", kind: "prerequisite", note: "大学英语 8 学分完成是毕业资格审核硬要求", sourceRef: "A2-1" },
-  { from: "E2-4", to: "A2-1", kind: "prerequisite", note: "公共体育 4 学分完成是毕业资格审核硬要求", sourceRef: "A2-1" },
-  { from: "E2-5", to: "A2-1", kind: "prerequisite", note: "国情教育 3 学分完成是毕业资格审核硬要求", sourceRef: "A2-1" },
-  { from: "E2-6", to: "A2-1", kind: "prerequisite", note: "劳动教育 2 学分完成是毕业资格审核硬要求", sourceRef: "A2-1" },
-  { from: "E2-7", to: "A2-1", kind: "prerequisite", note: "心理健康 2 学分完成是毕业资格审核硬要求", sourceRef: "A2-1" },
-  { from: "E3-1", to: "A2-1", kind: "prerequisite", note: "通识 8 学分完成是毕业资格审核硬要求", sourceRef: "A2-1" },
-  { from: "B5-9", to: "A1-12", kind: "prerequisite", note: "体测达 50 分是 '毕业' 档前置（< 50 按结业/肄业）", sourceRef: "B5-9" },
-  { from: "E4-4", to: "E4-5", kind: "prerequisite", note: "师范生需完成 4 板块（含教师教育）才符合培养方案", sourceRef: "E4-4" },
-  { from: "C1-9", to: "C2-6", kind: "prerequisite", note: "辅修学位先于双学位审定（双学位需先具备辅修条件）", sourceRef: "C2-6" },
-
-  // ── excludes（互斥）──
-  { from: "E4-4", to: "E1-3", kind: "excludes", note: "师范生培养方案与一般本科 4 大结构互斥（板块分类不同）", sourceRef: "E4-4" },
-  { from: "C3-3", to: "C9-1", kind: "excludes", note: "强基本研衔接转段与普通推免互斥（资格不同）", sourceRef: "C3-3" },
-
-  // ── triggers（触发链）──
-  { from: "A1-10", to: "A1-12", kind: "triggers", note: "退学情形触发 → 学籍结束 → 肄业档", sourceRef: "A1-10" },
-  { from: "A3-3", to: "A3-2", kind: "triggers", note: "处分期间触发 → 学位申请冻结", sourceRef: "A3-3" },
-  { from: "B3-1", to: "B3-4", kind: "triggers", note: "学业预警累计 → 第一次退学线 → 试读", sourceRef: "B3-1" },
-  { from: "B3-4", to: "A1-10", kind: "triggers", note: "第一次退学线触发 → 试读（学制内仅限 1 次）", sourceRef: "B3-4" },
-  { from: "B4-4", to: "A3-3", kind: "triggers", note: "旷课纪律处分触发 → 处分期间学位申请冻结", sourceRef: "B4-4" },
-  { from: "B5-9", to: "A1-12", kind: "triggers", note: "体测 < 50 分触发 → 按结业/肄业档（2023 级起）", sourceRef: "B5-9" },
-  { from: "D3-6", to: "D3-6", kind: "triggers", note: "实习不及格 / 缺勤 ≥ 1/3 → 重修", sourceRef: "D3-6", bidirectional: false },
-  { from: "D4-12", to: "D4-11", kind: "triggers", note: "论文重复率 30% 整改 / 50% 直接不予答辩", sourceRef: "D4-12" },
-  { from: "D4-11", to: "A2-1", kind: "triggers", note: "论文不予答辩 → 毕业资格审核失败 → 延期毕业", sourceRef: "D4-11" },
-  { from: "C5-2", to: "A1-12", kind: "triggers", note: "转专业违规处理 → 可能影响毕业档", sourceRef: "C5-2" },
-  { from: "C9-3", to: "C9-1", kind: "triggers", note: "推免综合排名失格 → 推免资格 4 条触发取消", sourceRef: "C9-3" },
-  { from: "A4-2", to: "A2-1", kind: "triggers", note: "学分认定超过 40% 上限 → 毕业资格审核拒绝", sourceRef: "A4-2" },
-
-  // ── 重复检测自环防御：手动跳过 D3-6 → D3-6（CHECK 会拒，留作注释提醒）──
+  { from: "A3-2", to: "A1-12", kind: "prerequisite", note: "学位GPA阈值达成是'毕业+学位'档前置", sourceRef: "A3-2" },
+  { from: "E2-1", to: "A2-1", kind: "prerequisite", note: "思政课全部通过是毕业资格审核硬要求", sourceRef: "A2-1" },
+  { from: "E2-2", to: "A2-1", kind: "prerequisite", note: "大学英语8学分完成是毕业资格审核硬要求", sourceRef: "A2-1" },
+  { from: "E2-4", to: "A2-1", kind: "prerequisite", note: "公共体育4学分完成是毕业资格审核硬要求", sourceRef: "A2-1" },
+  { from: "E2-5", to: "A2-1", kind: "prerequisite", note: "国情教育3学分完成是毕业资格审核硬要求", sourceRef: "A2-1" },
+  { from: "E2-6", to: "A2-1", kind: "prerequisite", note: "劳动教育2学分完成是毕业资格审核硬要求", sourceRef: "A2-1" },
+  { from: "E2-7", to: "A2-1", kind: "prerequisite", note: "心理健康2学分完成是毕业资格审核硬要求", sourceRef: "A2-1" },
+  { from: "E3-1", to: "A2-1", kind: "prerequisite", note: "通识8学分完成是毕业资格审核硬要求", sourceRef: "A2-1" },
+  { from: "B5-9", to: "A1-12", kind: "prerequisite", note: "体测达50分是'毕业'档前置(<50按结业/肄业)", sourceRef: "B5-9" },
+  { from: "E4-4", to: "E4-5", kind: "prerequisite", note: "师范生需完成4板块(含教师教育)才符合培养方案", sourceRef: "E4-4" },
+  { from: "C1-9", to: "C2-6", kind: "prerequisite", note: "辅修学位先于双学位审定", sourceRef: "C2-6" },
+  { from: "A1-6", to: "A1-5", kind: "prerequisite", note: "未注册不予选课，注册是选课前置", sourceRef: "A1-6" },
+  { from: "A3-1", to: "A3-2", kind: "prerequisite", note: "学位申请须满足A3-2的GPA条件之一", sourceRef: "A3-1" },
+  { from: "A3-1", to: "A1-12", kind: "prerequisite", note: "学位申请需先通过毕业环节审查", sourceRef: "A3-1" },
+  { from: "B3-1", to: "A3-2", kind: "prerequisite", note: "预警线GPA对标学位授予条件", sourceRef: "B3-1" },
+  { from: "B6-11", to: "B1-2", kind: "prerequisite", note: "未缴费不予注册阻断选课", sourceRef: "B6-11" },
+  { from: "C1-9", to: "A3-2", kind: "prerequisite", note: "获主修学士学位才可授辅修学位", sourceRef: "C1-9" },
+  { from: "C6-4", to: "C6-3", kind: "prerequisite", note: "累加学分仅能抵充一次", sourceRef: "C6-4" },
+  { from: "C3-3", to: "C3-4", kind: "prerequisite", note: "达转段要求才走推免转段通道", sourceRef: "C3-3" },
+  { from: "C9-4", to: "C9-5", kind: "prerequisite", note: "素质加分经专家审核小组鉴定", sourceRef: "C9-5" },
+  { from: "D1-2", to: "A1-9", kind: "prerequisite", note: "无课程学期须办休学(注册前置)", sourceRef: "D1-5" },
+  { from: "D4-3", to: "D4-1", kind: "prerequisite", note: "开题答辩通过方可进入撰写", sourceRef: "D4-3" },
+  { from: "D5-4", to: "D4-12", kind: "prerequisite", note: "抽检对象为通过重复率检测论文", sourceRef: "D5-4" },
+  { from: "D6-1", to: "D6-3", kind: "prerequisite", note: "国创/市创/校创从培育项目产生", sourceRef: "D6-1" },
+  { from: "D6-8", to: "D6-6", kind: "prerequisite", note: "结题验收前不能申报新项目", sourceRef: "D6-8" },
+  { from: "E4-7", to: "E4-5", kind: "prerequisite", note: "须修完教师教育课程才能申请实习", sourceRef: "E4-7" },
+  { from: "B1-2", to: "A1-5", kind: "prerequisite", note: "未注册不能选课", sourceRef: "process 2-2" },
+  // ── excludes（互斥/免修） ──
+  { from: "E4-4", to: "E1-3", kind: "excludes", note: "师范生培养方案与一般本科4大结构互斥", sourceRef: "E4-4" },
+  { from: "C3-3", to: "C9-1", kind: "excludes", note: "强基本研衔接转段与普通推免互斥", sourceRef: "C3-3" },
+  { from: "A1-12", to: "A1-13", kind: "excludes", note: "取消学籍者不出具肄业/写实证明", sourceRef: "A1-12" },
+  { from: "A3-3", to: "A3-1", kind: "excludes", note: "处分期间不可申请学位，解除后再申请", sourceRef: "A3-3" },
+  { from: "B3-1", to: "B1-6", kind: "excludes", note: "学业预警学生不可申请免听", sourceRef: "B1-5" },
+  { from: "B3-1", to: "B1-7", kind: "excludes", note: "学业预警学生不可申请免修", sourceRef: "B1-5" },
+  { from: "B3-4", to: "B1-6", kind: "excludes", note: "试读学生不可申请免听", sourceRef: "B1-5" },
+  { from: "B3-4", to: "B1-7", kind: "excludes", note: "试读学生不可申请免修", sourceRef: "B1-5" },
+  { from: "C5-10", to: "C2-3", kind: "excludes", note: "双学位退出不归入转专业", sourceRef: "C5-10" },
+  { from: "C3-4", to: "C9-1", kind: "excludes", note: "强基转段推免走教育部专项独立通道", sourceRef: "C3-4" },
+  { from: "B1-7", to: "E2-2", kind: "excludes", note: "大学英语测评通过方可免修", sourceRef: "process 3-6" },
+  { from: "B1-5", to: "E2-1", kind: "excludes", note: "思政课不允许免听免修", sourceRef: "process 3-6" },
+  { from: "B1-5", to: "E2-4", kind: "excludes", note: "体育课不允许免听免修", sourceRef: "process 3-6" },
+  { from: "C5-9", to: "C5-4", kind: "excludes", note: "参军创业复学转专业不受5%下限", sourceRef: "process 4-7" },
+  { from: "C5-7", to: "C5-4", kind: "excludes", note: "卓越学院转专业不受5%下限", sourceRef: "process 4-5" },
+  // ── triggers（触发链） ──
+  { from: "A1-10", to: "A1-12", kind: "triggers", note: "退学情形触发→学籍结束→肄业档", sourceRef: "A1-10" },
+  { from: "A3-3", to: "A3-2", kind: "triggers", note: "处分期间触发→学位申请冻结", sourceRef: "A3-3" },
+  { from: "B3-1", to: "B3-4", kind: "triggers", note: "学业预警累计→第一次退学线→试读", sourceRef: "B3-1" },
+  { from: "B3-4", to: "A1-10", kind: "triggers", note: "第一次退学线触发→试读(学制内仅限1次)", sourceRef: "B3-4" },
+  { from: "B4-4", to: "A3-3", kind: "triggers", note: "旷课纪律处分触发→处分期间学位申请冻结", sourceRef: "B4-4" },
+  { from: "B5-9", to: "A1-12", kind: "triggers", note: "体测<50分触发→按结业/肄业档", sourceRef: "B5-9" },
+  { from: "D4-12", to: "D4-11", kind: "triggers", note: "论文重复率30%整改/50%直接不予答辩", sourceRef: "D4-12" },
+  { from: "D4-11", to: "A2-1", kind: "triggers", note: "论文不予答辩→毕业资格审核失败→延期毕业", sourceRef: "D4-11" },
+  { from: "C5-2", to: "A1-12", kind: "triggers", note: "转专业违规处理→可能影响毕业档", sourceRef: "C5-2" },
+  { from: "C9-3", to: "C9-1", kind: "triggers", note: "推免综合排名失格→推免资格4条触发取消", sourceRef: "C9-3" },
+  { from: "A4-2", to: "A2-1", kind: "triggers", note: "学分认定超过40%上限→毕业资格审核拒绝", sourceRef: "A4-2" },
+  { from: "A5-2", to: "A5-4", kind: "triggers", note: "取消考核资格者不予补考", sourceRef: "A5-4" },
+  { from: "A5-3", to: "A5-4", kind: "triggers", note: "未办缓考视为缺考，缺考不予补考", sourceRef: "A5-3" },
+  { from: "A5-7", to: "A5-4", kind: "triggers", note: "考核违纪不予补考", sourceRef: "A5-4" },
+  { from: "A5-7", to: "A3-3", kind: "triggers", note: "考核违纪受处分→阻断学位申请", sourceRef: "A5-7" },
+  { from: "B1-6", to: "B4-1", kind: "triggers", note: "免听未批擅自缺课视为旷课", sourceRef: "B1-6" },
+  { from: "B1-7", to: "B4-1", kind: "triggers", note: "免修未批擅自缺课视为旷课", sourceRef: "B1-7" },
+  { from: "B4-4", to: "A1-10", kind: "triggers", note: "连续两周旷课触发退学", sourceRef: "B4-4" },
+  { from: "C6-10", to: "C6-4", kind: "triggers", note: "弄虚作假取消已获学分", sourceRef: "C6-10" },
+  { from: "C9-8", to: "C9-1", kind: "triggers", note: "不能毕业或获学位取消推免资格", sourceRef: "C9-8" },
+  { from: "D1-6", to: "D1-2", kind: "triggers", note: "逾期未注册→退学/结业/毕业处理", sourceRef: "D1-6" },
+  { from: "D2-2", to: "A1-9", kind: "triggers", note: "治疗/请假超1/3学期→应办休学", sourceRef: "D2-2" },
+  { from: "D2-6", to: "D2-9", kind: "triggers", note: "逾期未复学→毕业/结业/退学", sourceRef: "D2-9" },
+  { from: "D3-5", to: "D3-6", kind: "triggers", note: "分散实习造假→不及格须重修", sourceRef: "D3-5" },
+  { from: "D3-6", to: "D3-4", kind: "triggers", note: "实习考核不及格→重修学分", sourceRef: "D3-6" },
+  { from: "D4-1", to: "D4-12", kind: "triggers", note: "抄袭检测→重复率超标处理", sourceRef: "D4-1" },
+  { from: "D4-12", to: "D4-9", kind: "triggers", note: "复检/整改不合格→不及格+补答辩", sourceRef: "D4-12" },
+  { from: "D4-9", to: "D4-7", kind: "triggers", note: "答辩未通过→三月补答辩仅一次", sourceRef: "D4-9" },
+  { from: "D4-11", to: "D4-7", kind: "triggers", note: "初评/交叉评阅不合格→不受理答辩", sourceRef: "D4-11" },
+  { from: "D4-12", to: "D4-7", kind: "triggers", note: "重度重合→取消该次答辩资格", sourceRef: "D4-12" },
+  { from: "D4-13", to: "D4-7", kind: "triggers", note: "学术不端→成绩不及格必须重修", sourceRef: "D4-13" },
+  { from: "D4-10", to: "D4-7", kind: "triggers", note: "中途放弃→补考/重修/延期缺考", sourceRef: "D4-10" },
+  { from: "D5-5", to: "D4-7", kind: "triggers", note: "第一次抽检不合格→取消答辩延期三月", sourceRef: "D5-5" },
+  { from: "D5-5", to: "D4-9", kind: "triggers", note: "复评不合格→视为补答辩不通过须重修", sourceRef: "D5-5" },
+  { from: "D5-3", to: "D5-5", kind: "triggers", note: "评议不合格→进入不合格处理", sourceRef: "D5-3" },
+  { from: "D5-7", to: "D5-3", kind: "triggers", note: "存在问题论文→提高院系抽检比例", sourceRef: "D5-7" },
+  { from: "D5-7", to: "D4-13", kind: "triggers", note: "学术不端查实→已毕业撤销学位", sourceRef: "D5-7" },
+  { from: "D6-5", to: "D6-6", kind: "triggers", note: "结项率低→下年度减少/不给名额", sourceRef: "D6-5" },
+  { from: "D6-6", to: "D6-7", kind: "triggers", note: "未按时结题→限期整改或延期", sourceRef: "D6-6" },
+  { from: "D1-6", to: "A1-10", kind: "triggers", note: "逾期未注册触发自动退学", sourceRef: "process 2-5" },
+  { from: "D2-9", to: "A1-10", kind: "triggers", note: "休学逾期未复学触发自动退学", sourceRef: "process 5-7" },
+  { from: "B3-6", to: "B3-7", kind: "triggers", note: "试读不通过触发二次退学线", sourceRef: "process 5-11" },
+  { from: "A3-7", to: "A1-13", kind: "triggers", note: "学术不端触发撤销学位/学历", sourceRef: "process 7-4" },
 ];
 
 /* ───────────────────────── 输出 SQL ───────────────────────── */
@@ -536,9 +626,11 @@ END $$;
 
 function buildLinkSql(): string {
   const header = `-- ─────────────────────────────────────────────────────────────────────
--- 0008_seed_requirement_link — ~${LINKS.length} req↔req 关系
+-- 0013_seed_requirement_link_full — ${LINKS.length} req↔req 关系（全 198 系统抽取）
 -- AUTO-GENERATED by scripts/genRequirementAdvice.ts —— DO NOT HAND-EDIT
 --
+-- 取代 0008（含其全部关系的超集）；2026-05-31 读 5 份 digest 系统抽取，覆盖 117/198 规则。
+-- 连接只存客观事实关系（不带目标字段，目标适配交运行时 AI 层）。
 -- 5 档 kind：substitute / prerequisite / excludes / cross_ref / triggers
 -- 同 (from, to, kind) ON CONFLICT DO UPDATE（幂等可重跑）
 -- ─────────────────────────────────────────────────────────────────────
@@ -595,7 +687,7 @@ function main() {
   const linkSql = buildLinkSql();
 
   const adviceOut = resolve(MIGRATIONS_DIR, "0007_seed_requirement_advice.sql");
-  const linkOut = resolve(MIGRATIONS_DIR, "0008_seed_requirement_link.sql");
+  const linkOut = resolve(MIGRATIONS_DIR, "0013_seed_requirement_link_full.sql");
 
   writeFileSync(adviceOut, adviceSql, "utf8");
   writeFileSync(linkOut, linkSql, "utf8");
@@ -604,7 +696,7 @@ function main() {
   const linkCount = LINKS.filter((l) => l.from !== l.to).length;
 
   console.log(`✓ 0007 advice seed: ${adviceCount} rows → ${adviceOut}`);
-  console.log(`✓ 0008 link   seed: ${linkCount} rows → ${linkOut}`);
+  console.log(`✓ 0013 link   seed: ${linkCount} rows → ${linkOut}`);
 }
 
 main();

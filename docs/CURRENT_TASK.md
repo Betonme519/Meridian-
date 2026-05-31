@@ -10,11 +10,11 @@
 ## 目标
 
 **已闭环**：排队 5/6/7/8/9 + 10 全部 + 11 + 12 + 13 mock + **13.5 静态路径库** + **12.5 全部子任务 0-E** + **14 全部五批 UI 重设计** + **后端骨架 Phase 1**（2026-05-28）+ **排队 13.2 backend Phase 2 完整闭环**（2026-05-29~30 GLM-5.1 SSE proxy + session 校验 + rate limit + 401/429 实测通过）+ **TD-10a target_gpa UI**（2026-05-29）+ **Landing 落地页重命名**（2026-05-30）+ **Dashboard 内嵌 AI 对话**（2026-05-30）+ **排队 13.8 A+B 全闭环**（2026-05-30 个人文档解析 + 手册 RAG 624 块灌库完成）。详见下方「最近完成」+ AI_MEMORY § 9 + 各 commit。
-**当前推进**：**无主线任务运行。排队 13.8 A+B 全闭环**（2026-05-30 用户跑通 migration 0012 + 624 块向量灌库 + verify §5 确认 guide 215 / handbook 409）。下一条候选见下方优先级。
-**新优先级**（2026-05-30 13.8 全闭环后重排）：
+**当前推进**：**连接图重做已闭环（代码层）**（2026-05-31）——读 5 份 digest 系统抽取，`requirement_link` 从 40 条/35 规则 → **137 条/覆盖 117/198 规则**，全部端点校验 0 dangling、连接只存事实关系（无目标字段）。产物 `0013_seed_requirement_link_full.sql`（取代 0008），**待用户在 Supabase Dashboard 跑一次**。TD-10b ✅；TD-50 ❌ 做完即弃（便利贴价值不足，已回滚）。
+**待用户操作**：Supabase Dashboard 跑 `supabase/migrations/0013_seed_requirement_link_full.sql`（幂等），RAISE NOTICE 应显 inserted/updated≈137、skipped=0。
+**新优先级**（2026-05-31）：
 1. **C2b** wrangler secret put + 真部署到 Cloudflare Worker（等真要上线时做）← **下一条候选**
-2. **TD-10b** goal_weights buckets UI（等 buckets 语义拍板）
-3. **TD-50** plan 表语义切换
+2. （可选）接轻量 AI 层：GLM-5.1 按目标在这张连接图上挑可执行组合 / 精简 advice 文案
 **最近 commit**：`02e6167` splitSeedSql + gitignore 向量 seed；`8c72623` 13.8-B 手册 RAG 代码；`106f530` 13.8-A 个人文档解析；`cbea9fd` Dashboard 内嵌 AI 对话；`54137b2` 落地页 Home → Landing。
 **架构转向（2026-05-25）**：用户拍板"静态路径库 + AI 连接"。改原 AI runtime 生成 reason 为 Claude 预编译 (goal × req) → 280 advice + 40 link 关系，DB 查询替代 runtime AI 调用。
 **UI 重设计（排队 14）**：✅ 已闭环（2026-05-28）。五批迭代见下方排队 14 段落 + 最近完成第一条。
@@ -24,8 +24,8 @@
 1. **先收尾跟毕业路径无关或基本无关的后端**（已完成）—— typed client（TD-3）/ chat_message 接入 / rule + rule_conflict 接入。
 2. **再做毕业路径主线** —— 三问同根（画布主线分支 / AI 锁既定逻辑 / 何时灌学校数据），都卡在结构化 schema 不存在。
 
-**TD-1（真 LLM provider）用户主动后放**。骨架已升级 provider-agnostic（DeepSeek/Qwen/Zhipu/Anthropic 任一家可接），等用户拍板上游再写 server route。
-**TD-2（解析 pipeline）依赖 TD-1**，也后放。
+**TD-1（真 LLM provider）✅ 已闭环 = 排队 13.2**（2026-05-29~30 GLM-5.1 SSE proxy 完整跑通）。骨架 provider-agnostic（DeepSeek/Qwen/Zhipu/Anthropic 任一家可接），当前接 Zhipu GLM-5.1。
+**TD-2（解析 pipeline）✅ 已闭环 = 排队 13.8**（2026-05-30 A 个人文档解析 + B 手册 RAG 624 块灌库）。
 
 ---
 
@@ -42,6 +42,8 @@
 | **Dashboard 内嵌 AI 对话**（同页 ChatGPT 式流式 + 双栏布局 + 决策卡竖列 + Enter 发送 + 多轮 UI 微调） | 三 | 2026-05-30 | `cbea9fd` + 后续微调待 squash |
 | **Landing 落地页改名**（src/pages/Home → src/pages/Landing；6 docs 路径同步） | 工程 | 2026-05-30 | `54137b2` |
 | **排队 13.2 Phase 2 完整闭环**（GLM-5.1 SSE proxy + Supabase session 校验 + per-user rate limit + 401/429 实测通过） | 后端 | 2026-05-29~30 | `4eb0db7` + `3cb7668`（+ 用户 2026-05-30 本地 C2a 实测通过） |
+| **连接图重做** `requirement_link` 全 198 系统抽取（读 5 digest，40→137 条/覆盖 117 规则；扩 `genRequirementAdvice.ts` LINKS + 产 `0013_seed_requirement_link_full.sql` 取代 0008；端点 0 dangling；连接只存事实关系） | 二 | 2026-05-31 | 本 session 待 commit + 用户跑 0013 |
+| **TD-10b** goal_weights AI 派生 + 静默存储（AIAdvisor 分析判「个性化定制」→ AI 吐 7 轴权重行 → page `parseGoalWeights` 静默写 goal_weights jsonb，**无手动 UI**；prompts.ts 加权重契约 + mock `analyzePersonalized` 多目标产权重） | 三 | 2026-05-31 | 本 session 待 commit |
 | **TD-10a** target_gpa UI（Upload 个人设置 aside 加滑块） | 三 | 2026-05-29 | 本 session 待 commit |
 | **后端骨架 Phase 1**（安全审计 + AI server stub + 三处安全锚点） | 后端 | 2026-05-28 | `docs/backend_migration_plan.md` + `src/routes/api/ai/chat.ts` mock stub |
 | **排队 14** 全局功能页 UI 重设计五批 | 三 | 2026-05-28 | `341e651` · `9961fa8` · `89b7973` · `b626a4b` |
@@ -59,8 +61,6 @@
 | 优先级 | ID | 状态 | 卡点 |
 |---|---|---|---|
 | 1 | **C2b** wrangler secret put + 真部署 CF Worker | ⏳ 待真上线 | 注入 ZHIPU_API_KEY / GLM_MODEL / SUPABASE_URL / SUPABASE_ANON_KEY；deploy 后跑 GET/POST 验证 |
-| 2 | **TD-10b** goal_weights buckets UI | ⏳ 等设计 | 学校 5 大类规则分类 ≠ GPA 权重 buckets，等用户拍 buckets 语义 |
-| 3 | **TD-50** plan 表语义切换 | ⏳ 等设计 | "自由备注画布"模式，决定 `plan.nodes` 新 shape |
 
 ---
 
@@ -364,8 +364,8 @@
 下一条候选执行顺序：
 
 1. **C2b** wrangler secret put + 真部署 CF Worker ← 等真上线
-2. **TD-10b** goal_weights buckets UI（等 buckets 语义拍板）
-3. **TD-50** plan 表语义切换（"自由备注画布"模式，决定 plan.nodes 新 shape）
+
+> TD-10b ✅ 已闭环（2026-05-31 AI 派生静默权重）。TD-50 ❌ 做完即弃（用户认为便利贴价值不足，已回滚）。
 
 > **历史主线顺序**：13 mock ✅ → 13.5 静态路径库 ✅ → 12.5 workspace 二次重构 ✅ → 14 UI 重设计 ✅ → 13.2 真 LLM ✅ → 13.8-A 个人文档解析 ✅ → 13.8-B 手册 RAG ✅（624 块灌库 2026-05-30）
 

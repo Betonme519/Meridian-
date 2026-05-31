@@ -30,6 +30,32 @@ type Mode = {
   pro?: boolean;
 };
 
+/** 7 个权重轴 = GOAL_MODES 去掉「个性化定制」自身，作为 goal_weights 的合法 key */
+const WEIGHT_AXES = GOAL_MODES.filter(
+  (m) => m !== "个性化定制",
+) as Exclude<GoalMode, "个性化定制">[];
+
+/**
+ * 从 AI 输出里解析「权重：<轴>=<0-100>, …」行（TD-10b）。
+ *
+ * 个性化定制模式下 AI 会额外吐这一行，格式宽松（中英冒号 / 逗号 / 空格都吃）：
+ *   权重：高 GPA=60, 保研路线=30, 实习优先=10
+ * 只保留落在 7 个合法轴里的 key，数值 clamp 到 0-100。解析不到返回 {}。
+ */
+function parseGoalWeights(text: string): Record<string, number> {
+  const line = text.match(/权重[：:]\s*(.+?)(?:\n|$)/)?.[1];
+  if (!line) return {};
+  const out: Record<string, number> = {};
+  for (const axis of WEIGHT_AXES) {
+    // 轴名后跟 = / ： / 空格，再抓数字
+    const hit = line.match(
+      new RegExp(`${axis.replace(/\s/g, "\\s*")}\\s*[=：:]?\\s*(\\d{1,3})`),
+    );
+    if (hit) out[axis] = Math.max(0, Math.min(100, parseInt(hit[1], 10)));
+  }
+  return out;
+}
+
 /**
  * 把 ISO 时间格式化成"刚刚 / N 分钟前 / N 小时前 / N 天前 / 绝对日期"。
  * 历史列表上的时间戳，不需要精确到秒。
@@ -233,6 +259,18 @@ export default function AIAdvisorPage() {
 
     // 干净跑完才写 profile（abort 时 acc 可能不完整，不要把半截解析写回）
     if (!wasAborted && mode) setSelectedMode(mode);
+
+    // TD-10b · 个性化定制权重：AI 后端分析后吐一行「权重：<轴>=<0-100>, …」，
+    // 这里静默解析 + 写 goal_weights，用户无感（无手动滑块）。
+    // 仅 mode=个性化定制 且解析到至少一轴时才写；非个性化模式不碰 goal_weights。
+    if (!wasAborted && mode === "个性化定制") {
+      const weights = parseGoalWeights(acc);
+      if (Object.keys(weights).length > 0) {
+        void updateProfile({ goal_weights: weights }).catch((e) =>
+          console.warn("[AIAdvisor] 保存目标权重失败:", e),
+        );
+      }
+    }
 
     // 落库：用户有输入 + acc 非空（至少有半截 assistant 内容）才写
     if (snapshotUserText.trim() && acc) {

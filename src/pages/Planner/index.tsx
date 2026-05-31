@@ -110,6 +110,27 @@ const MILESTONE_LABEL: Record<UserMilestoneCode, string> = {
   thesis: "论文项目",
 };
 
+/**
+ * 论文 / 第二课堂 milestone 下全是后台规则类 req（assessment_rule / status_gate /
+ * program_rule），画布隐藏 → 没有可见课程节点当锚点。这里直接在 milestone 级挂
+ * 建议捷径（文案据规则 digest：论文 D4 / 第二课堂 C6+D6）。纯展示，点击不进
+ * ImpactPanel（无 requirement 可模拟）。
+ */
+const MILESTONE_SHORTCUTS: Partial<
+  Record<UserMilestoneCode, { id: string; oneLiner: string }[]>
+> = {
+  thesis: [
+    { id: "T-1", oneLiner: "第七学期定选题，早开题早跳过抽检批次" },
+    { id: "T-2", oneLiner: "竞赛获奖 / 专利成果可替代毕业论文免答辩" },
+    { id: "T-3", oneLiner: "重复率盯紧：30% 限期整改 / 50% 直接延期" },
+  ],
+  second: [
+    { id: "S-1", oneLiner: "创新创业学分可顶劳动与创造 ≤ 2 分" },
+    { id: "S-2", oneLiner: "竞赛 / 论文 / 专利累加 > 8 分记 A，其余记 P" },
+    { id: "S-3", oneLiner: "CTP 创新训练项目结题可换创新创业学分" },
+  ],
+};
+
 const ACTION_LABEL: Record<ActionMode, string> = {
   take: "选择它",
   delay: "推迟它",
@@ -693,11 +714,9 @@ function PathGraph({
           <LegendDot className="bg-gold" label="推荐路径" />
           <LegendDot className="bg-maya" label="已满足" />
           <LegendDot className="bg-slate-300" label="其他路径" />
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-sapphire px-1 text-[9px] font-semibold leading-none text-sapphire">
-              N
-            </span>
-            可展开的分支数
+          <span className="inline-flex items-center gap-1">
+            <ChevronRight className="h-3.5 w-3.5" />
+            可展开看建议
           </span>
           <span className="inline-flex items-center gap-1">
             <MousePointer2 className="h-3.5 w-3.5" />
@@ -777,6 +796,8 @@ function GraphNodeButton({ node, onClick }: { node: GraphNode; onClick: () => vo
           : "border-slate-200 bg-white text-slate-900";
   const active = node.isActive ? "ring-2 ring-slate-950 ring-offset-2" : "";
 
+  // requirement 节点有捷径时（isCollapsed 非 undefined）用箭头示意可展开，
+  // 否则 CircleDot。结构节点(root/milestone/bucket)恒用箭头。
   const LeadIcon =
     node.kind === "shortcut"
       ? Lightbulb
@@ -784,13 +805,11 @@ function GraphNodeButton({ node, onClick }: { node: GraphNode; onClick: () => vo
         ? node.isCollapsed
           ? ChevronRight
           : ChevronDown
-        : CircleDot;
-
-  // 红点提醒徽章:requirement 节点有 shortcuts 时,右上角浮一个圆显示分支数量。
-  // 替代 ImpactPanel 里那句"有 N 条路径建议 · 在画布上点开此卡查看"——
-  // 直接把信号挂在卡片上,所见即所得。
-  const shortcutCount =
-    node.kind === "requirement" && node.item ? node.item.shortcuts.length : 0;
+        : node.kind === "requirement" && node.isCollapsed !== undefined
+          ? node.isCollapsed
+            ? ChevronRight
+            : ChevronDown
+          : CircleDot;
 
   return (
     <button
@@ -823,19 +842,10 @@ function GraphNodeButton({ node, onClick }: { node: GraphNode; onClick: () => vo
       </div>
       <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-slate-500">
         <span className="min-w-0 truncate">{node.meta}</span>
-        {shortcutCount > 0 ? (
-          <span
-            aria-label={`${shortcutCount} 条路径建议`}
-            className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-sapphire px-1 text-[10px] font-semibold leading-none text-sapphire"
-          >
-            {shortcutCount}
+        {node.count != null && (
+          <span className="rounded-full bg-white/70 px-1.5 py-0.5 font-medium text-slate-700">
+            {node.count}
           </span>
-        ) : (
-          node.count != null && (
-            <span className="rounded-full bg-white/70 px-1.5 py-0.5 font-medium text-slate-700">
-              {node.count}
-            </span>
-          )
         )}
       </div>
     </button>
@@ -919,6 +929,36 @@ function buildGraph({
   let requirementY = 40;
   for (const milestone of milestones) {
     if (!expandedMilestones.has(milestone.code)) continue;
+
+    // 论文 / 第二课堂：无可见课程节点，直接在 milestone 右侧挂建议捷径
+    if (milestone.code !== "course") {
+      const msShortcuts = MILESTONE_SHORTCUTS[milestone.code] ?? [];
+      for (let i = 0; i < msShortcuts.length; i += 1) {
+        const sc = msShortcuts[i];
+        const scNode: GraphNode = {
+          id: `mshortcut:${milestone.code}:${i}`,
+          kind: "shortcut",
+          x: 410,
+          y: bucketY + i * 60,
+          w: 340,
+          h: 52,
+          title: sc.oneLiner,
+          meta: `建议 · ${sc.id}`,
+          isRecommended: false,
+          isActive: false,
+        };
+        nodes.push(scNode);
+        edges.push({
+          id: `${milestone.node.id}-${scNode.id}`,
+          from: milestone.node,
+          to: scNode,
+          isRecommended: false,
+        });
+      }
+      bucketY += msShortcuts.length * 60 + 24;
+      continue;
+    }
+
     const milestoneItems = items.filter((item) => item.milestone === milestone.code);
     const bucketLabels =
       milestone.code === "course"

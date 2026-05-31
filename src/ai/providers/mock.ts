@@ -38,6 +38,45 @@ function recommendMode(text: string): GoalMode {
 }
 
 /**
+ * 7 个非个性化轴的关键词组（与 recommendMode 同源，顺序对齐 GOAL_MODES）。
+ * 用于 TD-10b：统计命中数 → 多目标时判「个性化定制」并产权重向量。
+ */
+const AXIS_PATTERNS: Record<Exclude<GoalMode, "个性化定制">, RegExp> = {
+  "高 GPA": /gpa|绩点|刷分|高分/gi,
+  最轻松毕业: /毕业|requirement|学分|第二课堂|劳动教育/gi,
+  保研路线: /保研|排名|科研|导师|推免/gi,
+  留学路线: /留学|申请|推荐信|海外|gre|托福|雅思/gi,
+  实习优先: /实习|工作|上班|面试|offer/gi,
+  时间自由: /自由|时间|兴趣|社团|生活/gi,
+  低压力模式: /压力|焦虑|睡眠|轻松|健康/gi,
+};
+
+/**
+ * TD-10b · 多目标分析：命中 ≥2 个轴时判定「个性化定制」并按命中强度产 0-100 权重。
+ * 命中 ≤1 个轴时返回 null —— 让调用方回退到 recommendMode 的单一模式逻辑（行为不变）。
+ */
+function analyzePersonalized(
+  text: string,
+): { weights: Record<string, number> } | null {
+  const counts: Record<string, number> = {};
+  let maxCount = 0;
+  let hitAxes = 0;
+  for (const [axis, re] of Object.entries(AXIS_PATTERNS)) {
+    const n = (text.match(re) ?? []).length;
+    counts[axis] = n;
+    if (n > 0) hitAxes += 1;
+    if (n > maxCount) maxCount = n;
+  }
+  if (hitAxes < 2 || maxCount === 0) return null;
+  // 最强轴归一化到 100，其余按比例；无关轴为 0
+  const weights: Record<string, number> = {};
+  for (const axis of Object.keys(AXIS_PATTERNS)) {
+    weights[axis] = Math.round((counts[axis] / maxCount) * 100);
+  }
+  return { weights };
+}
+
+/**
  * 给推荐 mode 配 2 句话理由。模板化拼装：
  *   - 第一句解释为啥这个 mode 匹配（mode 决定）
  *   - 第二句引用一两个用户原话里的关键词（动态从 userText 抓）
@@ -51,7 +90,7 @@ function rationaleFor(mode: GoalMode, userText: string): string {
     实习优先: "把时间留给实习，意味着课程要选 workload 小、可灵活调时段的。",
     时间自由: "你想给个人发展留空间，建议把硬课压在少数学期、其他学期轻装。",
     低压力模式: "你提到了压力 / 健康 / 睡眠 —— 课程负荷要往低优先级走。",
-    个性化定制: "你的目标看起来是多个方向的组合，建议在权重面板做精细配比。",
+    个性化定制: "你的目标看起来是多个方向的组合，系统已按各方向的侧重自动配比权重。",
   };
 
   // 从用户文本里抓 1-2 个关键词原话引用
@@ -277,8 +316,23 @@ export const mockChat: Chat = async function* ({ messages, signal }) {
     }
   }
 
-  const mode = recommendMode(userText);
-  const reply = `推荐：${mode}\n\n理由：${rationaleFor(mode, userText)}`;
+  // TD-10b：先看是否多目标 → 个性化定制 + 权重行；否则走单一 mode 启发式
+  const personalized = analyzePersonalized(userText);
+  let reply: string;
+  if (personalized) {
+    const weightLine = (
+      Object.keys(AXIS_PATTERNS) as Exclude<GoalMode, "个性化定制">[]
+    )
+      .map((axis) => `${axis}=${personalized.weights[axis]}`)
+      .join(", ");
+    reply =
+      `推荐：个性化定制\n\n` +
+      `理由：${rationaleFor("个性化定制", userText)}\n\n` +
+      `权重：${weightLine}`;
+  } else {
+    const mode = recommendMode(userText);
+    reply = `推荐：${mode}\n\n理由：${rationaleFor(mode, userText)}`;
+  }
 
   for (const ch of reply) {
     if (signal?.aborted) return;

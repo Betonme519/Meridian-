@@ -42,10 +42,14 @@
 - **风险**：46 个 Radix primitive 装而不用，业务页全靠裸 Tailwind class；视觉漂移已开始
 - **建议**：排队 14 UI 重设计时统一替 `<Button>` / `<Card>` / `<Dialog>`
 
-### TD-10 · `target_gpa` / `goal_weights` 字段无 UI 入口
-- **风险**：schema 留位但用户无法输入；个性化模式无权重面板
-- **决策点**：(1) 放 Upload 个人设置区还是新建 Settings 页？(2) goal_weights 是 8 个 slider 还是更简化形态？
-- **建议**：拍板后即可实施
+### TD-10 · `target_gpa` / `goal_weights` 字段无 UI 入口 — ✅ 已闭环
+- ~~**风险**：schema 留位但用户无法输入；个性化模式无权重面板~~
+- **TD-10a**（2026-05-29）：target_gpa 滑块 → Upload 个人设置 aside。
+- **TD-10b**（2026-05-31）：goal_weights = **AI 派生 + 静默存储，无手动 UI**。
+  - 决策演进：曾做过 7 轴手动滑块面板（GoalWeightsPanel），同日用户改主意 —— 「不用把数值条拉出来，AI 后端分析好就存系统，用户也不用知道」。手动面板已删。
+  - 终态实现：AIAdvisor「描述你的情况」分析流判定「个性化定制」时，AI 额外吐一行 `权重：<7轴>=<0-100>`；`src/pages/AIAdvisor/index.tsx` 的 `parseGoalWeights` 静默解析 → `updateProfile({goal_weights})`，用户不可见。
+  - 契约：`src/ai/prompts.ts` RECOMMEND_MODE_SYSTEM 加权重行规则；`src/ai/providers/mock.ts` `analyzePersonalized` 命中 ≥2 轴 → 个性化定制 + 按强度归一化权重。
+  - key = GOAL_MODES 去「个性化定制」的 7 个字符串；非个性化模式不写 goal_weights。
 
 ### TD-11 · 上传去重（**大小预检已完成**，余尾：sha256 去重）
 - **未完成**：rag_source 加 `sha256` 字段 + 上传前内容预校验（避免同名同内容传两次建两行两份对象）
@@ -173,8 +177,7 @@
 - **风险**：长期会出现"同一概念两套图标"
 - **建议**：与排队 14 UI 重设计一起约束
 
-### TD-50 · plan 表语义切换待定（"自由备注画布"模式）
-- **现状**：排队 12 落地后 plan 表 + planApi.ts 成 orphan；`usePlans.ts` 因依赖 seedGraph 已删
-- **设想**：未来"自由备注画布"模式 = 用户在 track 树上拖出便利贴 / 思考节点，plan.nodes shape 改为 `{ id, anchor_option_id?, text, color?, position }`，不再是 ReactFlow MeridianFlowNode
-- **风险**：若长期不用，plan 表整张退役；要删需要 migration + 数据备份
-- **建议**：排队 13 + 14 跑通后看用户需求是否真出现"想标自由想法"的需求；不主动开工
+### TD-50 · plan 表语义切换（"自由备注画布"模式）— ❌ 做完即弃（2026-05-31）
+- **现状**：排队 12 落地后 plan 表 + planApi.ts 成 orphan；`usePlans.ts` 已删。
+- **经过**：2026-05-31 曾按"便利贴浮层"实现一版（planApi 改型 + usePlanNotes + NotesLayer + Planner 集成），用户验收前评估后判定**便利贴价值不足**——track 图已结构化呈现毕业路径，再叠一层"随手贴自由想法"跟通用便签 app 重叠，不解决学生真问题。**全套代码已回滚**（planApi 还原 ReactFlow 形状 / 删 usePlanNotes / 删 NotesLayer / Planner 还原）。
+- **结论**：plan 表 + planApi.ts 维持 orphan。不再主动开工；除非未来出现明确、跟毕业路径强相关的"自由标注"需求。
