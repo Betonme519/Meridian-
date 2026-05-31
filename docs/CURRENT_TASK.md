@@ -10,12 +10,15 @@
 ## 目标
 
 **已闭环**：排队 5/6/7/8/9 + 10 全部 + 11 + 12 + 13 mock + **13.5 静态路径库** + **12.5 全部子任务 0-E** + **14 全部五批 UI 重设计** + **后端骨架 Phase 1**（2026-05-28）+ **排队 13.2 backend Phase 2 完整闭环**（2026-05-29~30 GLM-5.1 SSE proxy + session 校验 + rate limit + 401/429 实测通过）+ **TD-10a target_gpa UI**（2026-05-29）+ **Landing 落地页重命名**（2026-05-30）+ **Dashboard 内嵌 AI 对话**（2026-05-30）+ **排队 13.8 A+B 全闭环**（2026-05-30 个人文档解析 + 手册 RAG 624 块灌库完成）。详见下方「最近完成」+ AI_MEMORY § 9 + 各 commit。
-**当前推进**：**连接图重做已闭环（代码层）**（2026-05-31）——读 5 份 digest 系统抽取，`requirement_link` 从 40 条/35 规则 → **137 条/覆盖 117/198 规则**，全部端点校验 0 dangling、连接只存事实关系（无目标字段）。产物 `0013_seed_requirement_link_full.sql`（取代 0008），**待用户在 Supabase Dashboard 跑一次**。TD-10b ✅；TD-50 ❌ 做完即弃（便利贴价值不足，已回滚）。
-**待用户操作**：Supabase Dashboard 跑 `supabase/migrations/0013_seed_requirement_link_full.sql`（幂等），RAISE NOTICE 应显 inserted/updated≈137、skipped=0。
+**当前推进**：**连接图重做 + TD-10b + 画布建议层微调全闭环并 commit**（2026-05-31，commit `93dc411`，用户已在 Supabase 跑过 0013）。
+- **连接图**：读 5 份 digest 系统抽取，`requirement_link` 40 条/35 规则 → **137 条/覆盖 117/198 规则**，0 dangling、只存事实关系（无目标字段）。`0013_seed_requirement_link_full.sql` 取代 0008（幂等）✅ 已灌库。
+- **TD-10b** ✅ goal_weights 改 AI 派生 + 静默存储（删手动滑块）。
+- **画布微调** ✅ 论文/第二课堂补 milestone 级建议捷径（`MILESTONE_SHORTCUTS`）；规则节点去数字角标、左 icon 改箭头示意可展开。纯前端。
+- **TD-50** ❌ 自由备注画布做完即弃（便利贴价值不足，已回滚）。
 **新优先级**（2026-05-31）：
 1. **C2b** wrangler secret put + 真部署到 Cloudflare Worker（等真要上线时做）← **下一条候选**
 2. （可选）接轻量 AI 层：GLM-5.1 按目标在这张连接图上挑可执行组合 / 精简 advice 文案
-**最近 commit**：`02e6167` splitSeedSql + gitignore 向量 seed；`8c72623` 13.8-B 手册 RAG 代码；`106f530` 13.8-A 个人文档解析；`cbea9fd` Dashboard 内嵌 AI 对话；`54137b2` 落地页 Home → Landing。
+**最近 commit**：`93dc411` 连接图重做 + TD-10b 权重 AI 派生 + 画布建议层微调；`02e6167` splitSeedSql + gitignore 向量 seed；`8c72623` 13.8-B 手册 RAG 代码；`106f530` 13.8-A 个人文档解析；`cbea9fd` Dashboard 内嵌 AI 对话。
 **架构转向（2026-05-25）**：用户拍板"静态路径库 + AI 连接"。改原 AI runtime 生成 reason 为 Claude 预编译 (goal × req) → 280 advice + 40 link 关系，DB 查询替代 runtime AI 调用。
 **UI 重设计（排队 14）**：✅ 已闭环（2026-05-28）。五批迭代见下方排队 14 段落 + 最近完成第一条。
 
@@ -42,8 +45,9 @@
 | **Dashboard 内嵌 AI 对话**（同页 ChatGPT 式流式 + 双栏布局 + 决策卡竖列 + Enter 发送 + 多轮 UI 微调） | 三 | 2026-05-30 | `cbea9fd` + 后续微调待 squash |
 | **Landing 落地页改名**（src/pages/Home → src/pages/Landing；6 docs 路径同步） | 工程 | 2026-05-30 | `54137b2` |
 | **排队 13.2 Phase 2 完整闭环**（GLM-5.1 SSE proxy + Supabase session 校验 + per-user rate limit + 401/429 实测通过） | 后端 | 2026-05-29~30 | `4eb0db7` + `3cb7668`（+ 用户 2026-05-30 本地 C2a 实测通过） |
-| **连接图重做** `requirement_link` 全 198 系统抽取（读 5 digest，40→137 条/覆盖 117 规则；扩 `genRequirementAdvice.ts` LINKS + 产 `0013_seed_requirement_link_full.sql` 取代 0008；端点 0 dangling；连接只存事实关系） | 二 | 2026-05-31 | 本 session 待 commit + 用户跑 0013 |
-| **TD-10b** goal_weights AI 派生 + 静默存储（AIAdvisor 分析判「个性化定制」→ AI 吐 7 轴权重行 → page `parseGoalWeights` 静默写 goal_weights jsonb，**无手动 UI**；prompts.ts 加权重契约 + mock `analyzePersonalized` 多目标产权重） | 三 | 2026-05-31 | 本 session 待 commit |
+| **画布建议层微调**（论文/第二课堂补 milestone 级建议捷径 `MILESTONE_SHORTCUTS`；规则节点去数字角标 + 左 icon 改箭头示意可展开；纯前端） | 二 | 2026-05-31 | `93dc411` |
+| **连接图重做** `requirement_link` 全 198 系统抽取（读 5 digest，40→137 条/覆盖 117 规则；扩 `genRequirementAdvice.ts` LINKS + 产 `0013_seed_requirement_link_full.sql` 取代 0008；端点 0 dangling；连接只存事实关系；用户已灌库） | 二 | 2026-05-31 | `93dc411` |
+| **TD-10b** goal_weights AI 派生 + 静默存储（AIAdvisor 分析判「个性化定制」→ AI 吐 7 轴权重行 → page `parseGoalWeights` 静默写 goal_weights jsonb，**无手动 UI**；prompts.ts 加权重契约 + mock `analyzePersonalized` 多目标产权重） | 三 | 2026-05-31 | `93dc411` |
 | **TD-10a** target_gpa UI（Upload 个人设置 aside 加滑块） | 三 | 2026-05-29 | 本 session 待 commit |
 | **后端骨架 Phase 1**（安全审计 + AI server stub + 三处安全锚点） | 后端 | 2026-05-28 | `docs/backend_migration_plan.md` + `src/routes/api/ai/chat.ts` mock stub |
 | **排队 14** 全局功能页 UI 重设计五批 | 三 | 2026-05-28 | `341e651` · `9961fa8` · `89b7973` · `b626a4b` |
