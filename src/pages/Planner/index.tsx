@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import {
   BookOpen,
   CheckCircle2,
@@ -44,6 +44,7 @@ import type { RequirementLink, AdviceShortcut, GoalFit } from "@/api/requirement
 import { GOAL_MODES } from "@/api/profileApi";
 import { useUserRequirementDone } from "@/hooks/useUserRequirementDone";
 import PathLoader from "@/components/effects/PathLoader";
+import DotGrid from "@/components/effects/DotGrid";
 
 type ActionMode = "take" | "delay" | "switch";
 type FocusMode = "all" | "recommended";
@@ -154,6 +155,15 @@ const GOAL_FIT_TONE: Record<GoalFit, string> = {
   ok: "bg-slate-100 text-slate-600 ring-slate-200",
   bad: "bg-flame/15 text-flame ring-flame/40",
 };
+
+// 画布点阵激活色：品牌色 gold → maya → sapphire（呼应 brand-gradient）。
+// 模块级常量保证引用稳定，避免 DotGrid 每次渲染重订阅绘制循环。
+const DOT_ACTIVE_COLORS = ["#FFB62E", "#7CC3FF", "#4164FF"];
+
+// 画布右侧预留滚动余量：右面板浮在画布最右侧约 400px 上，会盖住右边节点。
+// 给内容区右侧补一段空白，保证横向永远有可滚动量 —— 双指左滑就能把被面板挡住的
+// 右侧分支拉出来看（即便导图本体宽度已小于视口也能滚）。
+const CANVAS_RIGHT_RESERVE = 440;
 
 export default function PlannerPage() {
   const { user, loading: authLoading } = useAuth();
@@ -294,6 +304,8 @@ export default function PlannerPage() {
 
   const [selectedReqId, setSelectedReqId] = useState<string | null>(null);
   const [actionMode, setActionMode] = useState<ActionMode>("take");
+  // 右面板真实 DOM ref —— 画布展开右侧分支时测它的左边界，把新分支滚到面板之外（见 PathGraph 跟随滚动）
+  const asideRef = useRef<HTMLElement | null>(null);
   const [focusMode, setFocusMode] = useState<FocusMode>("all");
   // 排队 12.5：路径建议选中态 —— { reqId, index } 或 null。selected 切 req 时清掉。
   const [selectedShortcut, setSelectedShortcut] = useState<{ reqId: string; index: number } | null>(
@@ -438,18 +450,23 @@ export default function PlannerPage() {
   }
 
   return (
-    <section className="mx-auto flex max-w-[1500px] flex-col px-4 py-4 sm:px-6 lg:px-8 xl:h-[calc(100vh-5rem)]">
-      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_370px]">
-        <main className="flex min-w-0 min-h-0 flex-col gap-3">
-          <WorkbenchHeader
-            school={track.school}
-            year={track.year}
-            goalMode={goalMode}
-            summary={progressSummary}
-            focusMode={focusMode}
-            onFocusModeChange={setFocusMode}
-          />
-
+    <section className="relative mx-auto flex max-w-[1500px] flex-col px-4 py-4 sm:px-6 lg:h-[calc(100vh-5rem)] lg:overflow-hidden lg:px-8">
+      {/* 交互点阵背景：fixed 铺满整个视口（除最左 icon rail 被其不透明白底盖住），
+          内容区在 z-10 浮于其上；右侧面板为不透明卡片同样浮于其上 */}
+      <div className="pointer-events-none fixed inset-0 z-0">
+        <DotGrid
+          dotSize={4}
+          gap={16}
+          baseColor="#dbe0e8"
+          activeColors={DOT_ACTIVE_COLORS}
+          proximity={130}
+          shockRadius={220}
+          shockStrength={4}
+          returnDuration={1.2}
+        />
+      </div>
+      <div className="relative z-10 grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_370px]">
+        <main className="flex min-h-0 min-w-0 flex-col">
           <PathGraph
             items={visibleRequirements}
             selectedId={selected?.requirement.id ?? null}
@@ -457,10 +474,19 @@ export default function PlannerPage() {
             onSelect={setSelectedReqId}
             onShortcutSelect={(reqId, index) => setSelectedShortcut({ reqId, index })}
             selectedShortcutKey={selectedShortcutKey}
+            school={track.school}
+            year={track.year}
+            goalMode={goalMode}
+            summary={progressSummary}
+            onFocusModeChange={setFocusMode}
+            panelRef={asideRef}
           />
         </main>
 
-        <aside className="scrollbar-thin flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white xl:overflow-y-auto">
+        <aside
+          ref={asideRef}
+          className="scrollbar-thin relative z-10 flex min-h-0 flex-col overflow-y-auto rounded-xl border border-slate-200 bg-white xl:translate-x-2.5"
+        >
           <ImpactPanel
             selected={selected}
             actionMode={actionMode}
@@ -484,14 +510,26 @@ export default function PlannerPage() {
   );
 }
 
-function WorkbenchHeader({
+function PathGraph({
+  items,
+  selectedId,
+  focusMode,
+  onSelect,
+  onShortcutSelect,
+  selectedShortcutKey,
   school,
   year,
   goalMode,
   summary,
-  focusMode,
   onFocusModeChange,
+  panelRef,
 }: {
+  items: VisibleRequirement[];
+  selectedId: string | null;
+  focusMode: FocusMode;
+  onSelect: (id: string) => void;
+  onShortcutSelect: (reqId: string, index: number) => void;
+  selectedShortcutKey: string | null;
   school: string;
   year: number;
   goalMode: GoalMode;
@@ -503,84 +541,9 @@ function WorkbenchHeader({
     paths: number;
     completedMatches: number;
   } | null;
-  focusMode: FocusMode;
   onFocusModeChange: (mode: FocusMode) => void;
-}) {
-  return (
-    <header className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1">
-      {/* 主信息：goal 强调 + 进度 bar 占主轴（视觉主体） */}
-      <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-gold/60 bg-white px-3 text-sm font-semibold text-slate-900">
-        <Target className="h-3.5 w-3.5 text-gold" />
-        {goalMode}
-      </span>
-
-      {/* 次要信息：学校 + KPI 计数 muted 小号（下沉次级） */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
-        <span>
-          {school} · {year} 级
-        </span>
-        <span className="text-slate-300">·</span>
-        <span>
-          推荐{" "}
-          <strong className="font-semibold text-slate-700 tabular-nums">
-            {summary?.paths ?? 0}
-          </strong>
-        </span>
-        <span className="text-slate-300">·</span>
-        <span>
-          可见{" "}
-          <strong className="font-semibold text-slate-700 tabular-nums">
-            {summary?.visible ?? 0}
-          </strong>
-        </span>
-        <span className="text-slate-300">·</span>
-        <span>
-          待处理{" "}
-          <strong className="font-semibold text-slate-700 tabular-nums">
-            {summary?.unmet ?? 0}
-          </strong>
-        </span>
-      </div>
-
-      {/* 操作:focus toggle —— ml-auto 真把它推到 header 最右端 */}
-      <div className="ml-auto flex h-8 items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm">
-        <button
-          type="button"
-          onClick={() => onFocusModeChange("all")}
-          className={`h-6 rounded-full px-3 text-xs font-medium transition-all ${
-            focusMode === "all" ? "bg-brand-gradient text-white" : "text-slate-500 hover:text-slate-900"
-          }`}
-        >
-          全部路径
-        </button>
-        <button
-          type="button"
-          onClick={() => onFocusModeChange("recommended")}
-          className={`h-6 rounded-full px-3 text-xs font-medium transition-all ${
-            focusMode === "recommended" ? "bg-brand-gradient text-white" : "text-slate-500 hover:text-slate-900"
-          }`}
-        >
-          只看推荐
-        </button>
-      </div>
-    </header>
-  );
-}
-
-function PathGraph({
-  items,
-  selectedId,
-  focusMode,
-  onSelect,
-  onShortcutSelect,
-  selectedShortcutKey,
-}: {
-  items: VisibleRequirement[];
-  selectedId: string | null;
-  focusMode: FocusMode;
-  onSelect: (id: string) => void;
-  onShortcutSelect: (reqId: string, index: number) => void;
-  selectedShortcutKey: string | null;
+  /** 右面板 DOM ref：测真实左边界，展开右侧分支时滚到面板之外 */
+  panelRef: RefObject<HTMLElement | null>;
 }) {
   const defaultMilestones = useMemo(
     () => new Set<UserMilestoneCode>(USER_MILESTONES.map((m) => m.code)),
@@ -686,14 +649,25 @@ function PathGraph({
     let targetLeft = container.scrollLeft;
     let targetTop = container.scrollTop;
 
+    // 右面板（xl 起浮在画布右侧）会挡住右边新分支：测它的真实左边界，
+    // 把可用宽度收到面板左侧；面板被挪动/视口变宽都能自适应。
+    // <xl 时面板是堆叠在下方的（不重叠画布）→ 退回整宽。
+    const containerRect = container.getBoundingClientRect();
+    const panelEl = panelRef.current;
+    let usableWidth = container.clientWidth;
+    if (panelEl && window.innerWidth >= 1280) {
+      const panelRect = panelEl.getBoundingClientRect();
+      // 面板左边界（视口坐标）映射到画布容器内坐标，再留 24px 呼吸位
+      usableWidth = Math.max(320, panelRect.left - containerRect.left - 24);
+    }
     const visibleLeft = container.scrollLeft;
-    const visibleRight = visibleLeft + container.clientWidth;
+    const visibleRight = visibleLeft + usableWidth;
     if (srcLeft < visibleLeft + margin) {
       // 被点节点在视口左侧外 → 往左滚显示节点
       targetLeft = Math.max(0, srcLeft - margin);
     } else if (wantRight > visibleRight - margin) {
-      // 需要露出右边新层级（或节点自身右边界）
-      targetLeft = Math.max(0, wantRight - container.clientWidth + 60);
+      // 需要露出右边新层级（或节点自身右边界）→ 让到面板左侧
+      targetLeft = Math.max(0, wantRight - usableWidth + 60);
     }
 
     const visibleTop = container.scrollTop;
@@ -708,27 +682,19 @@ function PathGraph({
   }, [graph]);
 
   return (
-    <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      {/* 悬浮毛玻璃图例 —— 一小块，浮在画布左上，pointer-events-none 不挡画布交互 */}
-      <div className="pointer-events-none absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-white/55 px-3 py-2 text-xs text-slate-500 shadow-sm ring-1 ring-white/70 backdrop-blur-md">
-        <LegendDot className="bg-gold" label="推荐路径" />
-        <LegendDot className="bg-maya" label="已满足" />
-        <LegendDot className="bg-slate-300" label="其他路径" />
-        <span className="inline-flex items-center gap-1">
-          <ChevronRight className="h-3.5 w-3.5" />
-          可展开看建议
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <MousePointer2 className="h-3.5 w-3.5" />
-          点选后看右侧影响
-        </span>
-      </div>
-
+    <>
+      {/* 流程图：fixed 铺满整个 workspace（侧栏右侧、顶到视口最上沿），滚动条落在 workspace 底/右。
+          top-0 → 画布边界就是整个 workspace（不再被 header 那条线切掉顶部）；header / 悬浮 chip
+          以更高 z 浮在画布之上，graph 内部用 TOP_PAD 给顶部留出避让带。
+          z-[1] 压在右面板（z-10）之下——画布铺到最右、面板浮于其上。 */}
       <div
         ref={scrollRef}
-        className="scrollbar-thin relative min-h-[420px] flex-1 overflow-auto bg-[radial-gradient(circle,#e2e8f0_1px,transparent_1px)] bg-[size:22px_22px]"
+        className="scrollbar-thin fixed bottom-0 left-0 right-0 top-0 z-[1] overflow-auto overscroll-x-contain lg:left-16"
       >
-        <div className="relative" style={{ width: graph.width, height: graph.height }}>
+        <div
+          className="relative"
+          style={{ width: graph.width + CANVAS_RIGHT_RESERVE, height: graph.height }}
+        >
           <svg className="absolute inset-0 h-full w-full" aria-hidden="true">
             <defs>
               {/* 推荐连线渐变：gold → maya，沿连线左→右流向目标 */}
@@ -786,7 +752,75 @@ function PathGraph({
           ))}
         </div>
       </div>
-    </section>
+
+      {/* 悬浮 chip 按 workspace 边界分布（fixed），z-30 浮于右面板之上、保持可点。
+          右上是面板位置，故操作组放到左上语境下方，避免被面板压住。 */}
+      {/* 语境（左上）：学校/年级 + KPI 计数（目标已移到右上一行） */}
+      <div className="pointer-events-none fixed left-3 top-[76px] z-30 flex max-w-[min(calc(100vw-7rem),560px)] flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-white/55 px-3 py-2 shadow-sm ring-1 ring-white/70 backdrop-blur-md lg:left-[76px]">
+        <span className="text-[11px] text-slate-400">
+          {school} · {year} 级
+        </span>
+        <span className="flex items-center gap-2 text-[11px] text-slate-400">
+          <span>
+            推荐 <strong className="font-semibold text-slate-700 tabular-nums">{summary?.paths ?? 0}</strong>
+          </span>
+          <span>
+            可见 <strong className="font-semibold text-slate-700 tabular-nums">{summary?.visible ?? 0}</strong>
+          </span>
+          <span>
+            待处理{" "}
+            <strong className="font-semibold text-slate-700 tabular-nums">{summary?.unmet ?? 0}</strong>
+          </span>
+        </span>
+      </div>
+
+      {/* 顶部右侧一行：目标 + 全部路径/只看推荐，贴近 header 的「2026 春季学期」。
+          lg 起进 header 行（top-3，让出右侧 ~168px 给日期+头像）；移动端落到 header 下方一行。
+          容器 pointer-events-none、子项 auto —— 空隙不挡画布点击。 */}
+      <div className="pointer-events-none fixed right-3 top-14 z-40 flex items-center gap-2 lg:right-[168px] lg:top-3">
+        <span className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full bg-white/55 px-3 py-1.5 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-white/70 backdrop-blur-md">
+          <Target className="h-3.5 w-3.5 text-gold" />
+          {goalMode}
+        </span>
+        <div className="pointer-events-auto flex h-8 items-center rounded-full bg-white/55 p-1 shadow-sm ring-1 ring-white/70 backdrop-blur-md">
+          <button
+            type="button"
+            onClick={() => onFocusModeChange("all")}
+            className={`h-6 rounded-full px-3 text-xs font-medium transition-all ${
+              focusMode === "all" ? "bg-brand-gradient text-white" : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            全部路径
+          </button>
+          <button
+            type="button"
+            onClick={() => onFocusModeChange("recommended")}
+            className={`h-6 rounded-full px-3 text-xs font-medium transition-all ${
+              focusMode === "recommended"
+                ? "bg-brand-gradient text-white"
+                : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            只看推荐
+          </button>
+        </div>
+      </div>
+
+      {/* 图例（左下，稍上移）：颜色含义 + 交互提示 */}
+      <div className="pointer-events-none fixed bottom-7 left-3 z-30 flex max-w-[min(calc(100vw-7rem),560px)] flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-white/55 px-3 py-2 text-xs text-slate-500 shadow-sm ring-1 ring-white/70 backdrop-blur-md lg:left-[76px]">
+        <LegendDot className="bg-gold" label="推荐路径" />
+        <LegendDot className="bg-maya" label="已满足" />
+        <LegendDot className="bg-slate-300" label="其他路径" />
+        <span className="inline-flex items-center gap-1">
+          <ChevronRight className="h-3.5 w-3.5" />
+          可展开看建议
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <MousePointer2 className="h-3.5 w-3.5" />
+          点选后看右侧影响
+        </span>
+      </div>
+    </>
   );
 }
 
@@ -938,12 +972,15 @@ function buildGraph({
   const reqRows = Math.max(1, items.length);
   const height = Math.max(620, reqRows * 74 + 170);
   const width = 1400;
+  // 顶部留白：画布现在顶到 workspace 最上沿（top-0），header（~56px）+ 悬浮 chip 浮在其上，
+  // 这里把整张图下移避开它们（滚到顶也不被 header 压住）
+  const TOP_PAD = 84;
 
   const root: GraphNode = {
     id: "root",
     kind: "root",
     x: 24,
-    y: Math.round(height / 2 - 35),
+    y: Math.round(height / 2 - 35) + TOP_PAD,
     w: 132,
     h: 70,
     title: "我的目标",
@@ -957,7 +994,8 @@ function buildGraph({
 
   const milestones = USER_MILESTONES.map((milestone, index) => {
     const milestoneItems = items.filter((item) => item.milestone === milestone.code);
-    const y = Math.round(90 + index * Math.max(130, (height - 210) / USER_MILESTONES.length));
+    const y =
+      TOP_PAD + Math.round(90 + index * Math.max(130, (height - 210) / USER_MILESTONES.length));
     const node: GraphNode = {
       id: `milestone:${milestone.code}`,
       kind: "milestone",
@@ -982,8 +1020,8 @@ function buildGraph({
     return { code: milestone.code, node };
   });
 
-  let bucketY = 58;
-  let requirementY = 40;
+  let bucketY = 58 + TOP_PAD;
+  let requirementY = 40 + TOP_PAD;
   for (const milestone of milestones) {
     if (!expandedMilestones.has(milestone.code)) continue;
 
@@ -1122,7 +1160,12 @@ function buildGraph({
     }
   }
 
-  return { nodes, edges, width, height: Math.max(height, requirementY + 110, bucketY + 110) };
+  return {
+    nodes,
+    edges,
+    width,
+    height: Math.max(height + TOP_PAD, requirementY + 110, bucketY + 110),
+  };
 }
 
 function edgePath(from: GraphNode, to: GraphNode): string {

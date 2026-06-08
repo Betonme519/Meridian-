@@ -42,4 +42,12 @@ if (fs.existsSync(devVarsPath)) {
   }
 }
 
-export default defineConfig();
+// 显式预打包 gsap + InertiaPlugin 子路径，避免 dev 首次遇到新依赖时重新优化
+// 导致「Failed to fetch dynamically imported module」（动态路由 chunk 加载失败）。
+export default defineConfig({
+  vite: {
+    optimizeDeps: {
+      include: ["gsap", "gsap/InertiaPlugin"],
+    },
+  },
+});

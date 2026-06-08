@@ -3,7 +3,7 @@
 > 短期工作内存。**AI 接手优先读这份**，再按需查 `AI_MEMORY.md` / `TECH_DEBT.md`。
 > 铁律：只做下方「排队」里的事，做完停下汇报。「不要修改」当只读。
 
-> Last updated: **2026-05-30**
+> Last updated: **2026-06-09**
 
 ---
 
@@ -18,7 +18,7 @@
 **新优先级**（2026-05-31）：
 1. **C2b** wrangler secret put + 真部署到 Cloudflare Worker（等真要上线时做）← **下一条候选**
 2. （可选）接轻量 AI 层：GLM-5.1 按目标在这张连接图上挑可执行组合 / 精简 advice 文案
-**最近 commit**：`93dc411` 连接图重做 + TD-10b 权重 AI 派生 + 画布建议层微调；`02e6167` splitSeedSql + gitignore 向量 seed；`8c72623` 13.8-B 手册 RAG 代码；`106f530` 13.8-A 个人文档解析；`cbea9fd` Dashboard 内嵌 AI 对话。
+**最近 commit**：（本 session 待 commit）workspace 画布布局微调——纯前端 UI 优化，详见下方 ✅ 表 2026-06-09 行；`66152a2` workspace 思维导图画布精致化（点阵背景 + 浮动毛玻璃图例 + 节点端口圆点/柔光 + 推荐线 gold→maya 渐变）；`93dc411` 连接图重做 + TD-10b 权重 AI 派生 + 画布建议层微调；`02e6167` splitSeedSql + gitignore 向量 seed；`8c72623` 13.8-B 手册 RAG 代码；`106f530` 13.8-A 个人文档解析；`cbea9fd` Dashboard 内嵌 AI 对话。
 **架构转向（2026-05-25）**：用户拍板"静态路径库 + AI 连接"。改原 AI runtime 生成 reason 为 Claude 预编译 (goal × req) → 280 advice + 40 link 关系，DB 查询替代 runtime AI 调用。
 **UI 重设计（排队 14）**：✅ 已闭环（2026-05-28）。五批迭代见下方排队 14 段落 + 最近完成第一条。
 
@@ -40,6 +40,7 @@
 
 | ID | 阶段 | 完成日期 | 关键 commit / 文件 |
 |---|---|---|---|
+| **workspace 画布布局微调**（纯前端 UI 优化：右面板右移一点 / 目标 + 全部路径·只看推荐 切换并入右上一行靠"2026 春季学期"，左上 chip 只留 学校·年级 + 计数 / 画布滚动容器 `top-0` 顶到整屏（边界=整个 workspace）+ TOP_PAD 84 避让 header / 展开右侧分支按右面板**真实左边界**测量跟随滚动（替死值 inset）/ 双指横滑左右平移 = `overscroll-x-contain` 挡浏览器翻页 + 内容区右侧预留 `CANVAS_RIGHT_RESERVE 440` 保证横向滚动量把被面板挡住的右节点拉出来。曾试 click-drag 平移已回滚——灰层是浏览器双指翻页手势非本程序问题） | 二 | 2026-06-09 | `src/pages/Planner/index.tsx`，本 session 待 commit |
 | **排队 13.8-B** 手册 RAG（migration 0012 pgvector+rag_chunk+match RPC / genHandbookChunks 脚本 / chat.ts 检索注入 / **624 块向量灌库完成**） | 后端 | 2026-05-30 | `8c72623` + `02e6167` |
 | **排队 13.8-A** 个人文档解析 → 塞 prompt（pdfjs 浏览器抽文字 + parsed_text 写回 + Dashboard system 上下文喂 GLM-5.1） | 后端 | 2026-05-30 | `106f530` |
 | **Dashboard 内嵌 AI 对话**（同页 ChatGPT 式流式 + 双栏布局 + 决策卡竖列 + Enter 发送 + 多轮 UI 微调） | 三 | 2026-05-30 | `cbea9fd` + 后续微调待 squash |
