@@ -708,37 +708,43 @@ function PathGraph({
   }, [graph]);
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-none flex-col gap-2 border-b border-slate-200 px-4 py-2 lg:flex-row lg:items-center lg:justify-end">
-        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-          <LegendDot className="bg-gold" label="推荐路径" />
-          <LegendDot className="bg-maya" label="已满足" />
-          <LegendDot className="bg-slate-300" label="其他路径" />
-          <span className="inline-flex items-center gap-1">
-            <ChevronRight className="h-3.5 w-3.5" />
-            可展开看建议
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <MousePointer2 className="h-3.5 w-3.5" />
-            点选后看右侧影响
-          </span>
-        </div>
+    <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      {/* 悬浮毛玻璃图例 —— 一小块，浮在画布左上，pointer-events-none 不挡画布交互 */}
+      <div className="pointer-events-none absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-white/55 px-3 py-2 text-xs text-slate-500 shadow-sm ring-1 ring-white/70 backdrop-blur-md">
+        <LegendDot className="bg-gold" label="推荐路径" />
+        <LegendDot className="bg-maya" label="已满足" />
+        <LegendDot className="bg-slate-300" label="其他路径" />
+        <span className="inline-flex items-center gap-1">
+          <ChevronRight className="h-3.5 w-3.5" />
+          可展开看建议
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <MousePointer2 className="h-3.5 w-3.5" />
+          点选后看右侧影响
+        </span>
       </div>
 
       <div
         ref={scrollRef}
-        className="scrollbar-thin relative min-h-[420px] flex-1 overflow-auto bg-[linear-gradient(#f8fafc_1px,transparent_1px),linear-gradient(90deg,#f8fafc_1px,transparent_1px)] bg-[size:28px_28px]"
+        className="scrollbar-thin relative min-h-[420px] flex-1 overflow-auto bg-[radial-gradient(circle,#e2e8f0_1px,transparent_1px)] bg-[size:22px_22px]"
       >
         <div className="relative" style={{ width: graph.width, height: graph.height }}>
           <svg className="absolute inset-0 h-full w-full" aria-hidden="true">
+            <defs>
+              {/* 推荐连线渐变：gold → maya，沿连线左→右流向目标 */}
+              <linearGradient id="edge-rec" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#FFB62E" />
+                <stop offset="100%" stopColor="#7CC3FF" />
+              </linearGradient>
+            </defs>
             {graph.edges.map((edge) => (
               <path
                 key={edge.id}
                 d={edgePath(edge.from, edge.to)}
                 fill="none"
-                stroke={edge.isRecommended ? "#d97706" : "#cbd5e1"}
-                strokeWidth={edge.isRecommended ? 2.4 : 1.4}
-                strokeDasharray={edge.isRecommended ? undefined : "5 7"}
+                stroke={edge.isRecommended ? "url(#edge-rec)" : "#cbd5e1"}
+                strokeWidth={edge.isRecommended ? 2.2 : 1.2}
+                strokeDasharray={edge.isRecommended ? undefined : "4 8"}
                 strokeLinecap="round"
               />
             ))}
@@ -784,17 +790,54 @@ function PathGraph({
   );
 }
 
+interface NodeTone {
+  /** 端口圆点底色 */
+  dot: string;
+  /** active 选中环颜色 */
+  ring: string;
+  /** 前导图标颜色 */
+  iconColor: string;
+  /** 前导图标小色块底色 */
+  iconBg: string;
+}
+
+/**
+ * 节点配色统一出口：按 kind / isRecommended / isComplete 决定 accent。
+ * 集中管理避免颜色散落（推荐 gold / 已满足 maya / 其他 slate）。
+ */
+function toneOf(node: GraphNode): NodeTone {
+  if (node.kind === "shortcut" || node.isRecommended) {
+    return {
+      dot: "bg-gold",
+      ring: "ring-gold/70",
+      iconColor: "text-gold",
+      iconBg: "bg-gold/10",
+    };
+  }
+  if (node.isComplete) {
+    return {
+      dot: "bg-maya",
+      ring: "ring-maya/70",
+      iconColor: "text-maya",
+      iconBg: "bg-maya/10",
+    };
+  }
+  return {
+    dot: "bg-slate-300",
+    ring: "ring-sapphire/60",
+    iconColor: "text-slate-400",
+    iconBg: "bg-slate-100",
+  };
+}
+
 function GraphNodeButton({ node, onClick }: { node: GraphNode; onClick: () => void }) {
   const isStructure = node.kind === "root" || node.kind === "milestone" || node.kind === "bucket";
-  const tone =
-    node.kind === "shortcut"
-      ? "border-gold/60 bg-white text-slate-900"
-      : node.isRecommended
-        ? "border-gold/60 bg-white text-slate-900 shadow-[0_0_0_1px_rgba(217,119,6,0.12)]"
-        : node.isComplete
-          ? "border-maya/60 bg-white text-slate-900"
-          : "border-slate-200 bg-white text-slate-900";
-  const active = node.isActive ? "ring-2 ring-slate-950 ring-offset-2" : "";
+  const tone = toneOf(node);
+  const active = node.isActive ? `ring-2 ${tone.ring} ring-offset-2 ring-offset-white` : "";
+
+  // root 无 input 端口；shortcut 是叶子无 output 端口
+  const hasInput = node.kind !== "root";
+  const hasOutput = node.kind !== "shortcut";
 
   // requirement 节点有捷径时（isCollapsed 非 undefined）用箭头示意可展开，
   // 否则 CircleDot。结构节点(root/milestone/bucket)恒用箭头。
@@ -815,21 +858,31 @@ function GraphNodeButton({ node, onClick }: { node: GraphNode; onClick: () => vo
     <button
       type="button"
       onClick={onClick}
-      className={`absolute rounded-lg border px-3 py-2 text-left transition hover:border-slate-400 hover:shadow-sm ${tone} ${active}`}
+      className={`absolute rounded-xl border border-slate-200/80 bg-white py-2 pl-4 pr-3 text-left text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_6px_16px_-6px_rgba(15,23,42,0.10)] transition hover:border-slate-300 hover:shadow-[0_2px_4px_rgba(15,23,42,0.05),0_12px_26px_-8px_rgba(15,23,42,0.16)] ${active}`}
       style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
     >
-      <div className="flex items-center gap-2">
-        <LeadIcon
-          className={`h-3.5 w-3.5 flex-none ${
-            node.kind === "shortcut"
-              ? "text-gold"
-              : node.isRecommended
-                ? "text-gold"
-                : node.isComplete
-                  ? "text-maya"
-                  : "text-slate-400"
-          }`}
+      {/* 端口圆点：贴左右边缘中点，白环让它"浮"在卡片边上 */}
+      {hasInput && (
+        <span
+          className={`pointer-events-none absolute left-0 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-white ${tone.dot}`}
+          aria-hidden="true"
         />
+      )}
+      {hasOutput && (
+        <span
+          className={`pointer-events-none absolute right-0 top-1/2 h-2.5 w-2.5 -translate-y-1/2 translate-x-1/2 rounded-full ring-2 ring-white ${tone.dot}`}
+          aria-hidden="true"
+        />
+      )}
+
+      <div className="flex items-center gap-2">
+        {node.kind !== "shortcut" && (
+          <span
+            className={`inline-flex h-5 w-5 flex-none items-center justify-center rounded-md ${tone.iconBg}`}
+          >
+            <LeadIcon className={`h-3 w-3 ${tone.iconColor}`} />
+          </span>
+        )}
         <span
           className={`min-w-0 text-xs font-semibold ${
             node.kind === "requirement" || node.kind === "shortcut"
@@ -840,10 +893,14 @@ function GraphNodeButton({ node, onClick }: { node: GraphNode; onClick: () => vo
           {node.title}
         </span>
       </div>
-      <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+      <div
+        className={`mt-1 flex items-center justify-between gap-2 text-[11px] text-slate-500 ${
+          node.kind === "shortcut" ? "" : "pl-7"
+        }`}
+      >
         <span className="min-w-0 truncate">{node.meta}</span>
         {node.count != null && (
-          <span className="rounded-full bg-white/70 px-1.5 py-0.5 font-medium text-slate-700">
+          <span className="rounded-full bg-slate-100 px-1.5 py-0.5 font-medium text-slate-700 ring-1 ring-slate-200">
             {node.count}
           </span>
         )}
