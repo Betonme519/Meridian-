@@ -212,6 +212,8 @@ export default function DashboardPage() {
 
   // ── 对话态 ──────────────────────────────────────────────────
   const [askInput, setAskInput] = useState("");
+  // 点击空态界面空白处 → 记录点击点，触发极光「像素荡漾」波纹（不重放入场）
+  const [ripple, setRipple] = useState<{ x: number; y: number; key: number } | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingText, setStreamingText] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -307,15 +309,24 @@ export default function DashboardPage() {
   if (!hasConversation) {
     /* ── 空态：只留居中的「你今天想问点什么」对话入口（决策卡仅对话态显示） ── */
     return (
-      <section className="relative mx-auto flex min-h-[calc(100vh-5rem)] max-w-7xl flex-col justify-center px-5 sm:px-8">
+      <section
+        onClick={(e) => {
+          // 点界面空白处 → 从点击点起一段像素荡漾波纹；点输入框 / 按钮 / 链接不触发
+          if ((e.target as HTMLElement).closest("input,button,a,textarea")) return;
+          const x = e.clientX;
+          const y = e.clientY;
+          setRipple((r) => ({ x, y, key: (r?.key ?? 0) + 1 }));
+        }}
+        className="relative mx-auto flex min-h-[calc(100vh-5rem)] max-w-7xl flex-col justify-center px-5 sm:px-8"
+      >
         {/* 底部极光背景：fixed 贴视口底，pointer-events-none 不挡交互；内容在 z-10 浮其上。
-            lg:left-16 让开左侧 icon rail。rotate-180 翻转 → 硬边界贴视口最下沿、模糊朝上。
-            配色用设计标准：橙(flame) → 黄(gold) → 浅蓝(maya)。 */}
+            lg:left-16 让开左侧 icon rail。翻转已在 shader 内做（硬边在底、模糊朝上 + 入场从底部中心铺开），
+            这里不再用 CSS rotate。配色：橙(flame) → 黄(gold) → 浅蓝(maya)。 */}
         <div
-          className="pointer-events-none fixed inset-x-0 bottom-0 z-0 h-[42vh] rotate-180 lg:left-16"
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-0 h-[42vh] lg:left-16"
           aria-hidden
         >
-          <Aurora colorStops={["#FE6237", "#FFB62E", "#7CC3FF"]} blend={1.0} />
+          <Aurora colorStops={["#FE6237", "#FFB62E", "#7CC3FF"]} blend={1.0} ripple={ripple} />
         </div>
         <div className="relative z-10 flex flex-col pb-[12vh]">
           <div className="flex items-center justify-center gap-3 sm:gap-4">
