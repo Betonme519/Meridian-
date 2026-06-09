@@ -32,7 +32,7 @@ interface CategorySection {
  * - 优先 threshold（kind=credits 时最权威）
  * - threshold 为 NULL 时尝试从 title 抠出第一个 "N 学分"
  *   覆盖 E2-1 思政（17）/ E2-5 国情（3）/ E2-8 通识必修（4）/ E3 系列等
- *   E2-3 计算机这种 "0/3/5 / 师范 4" 复杂条件解不出 → 返回 0 不显示滑块
+ *   E2-3 计算机这种 "0/3/5 / 师范 4" 复杂条件解不出 → 默认按 5 学分给进度条
  */
 function getCreditCap(r: TrackRequirement): number {
   if (r.threshold != null && r.threshold > 0) return r.threshold;
@@ -42,7 +42,9 @@ function getCreditCap(r: TrackRequirement): number {
     const n = Number(m[1]);
     if (Number.isFinite(n) && n > 0) return n;
   }
-  return 0;
+  // 解不出明确学分（如 E2-3 公共计算机 "0/3/5 / 师范4"）→ 默认按 5 学分,
+  // 不返回 0（否则整条无进度条）。用户：这类"修 3 或 5 分"的至少按 5 算,也得有进度条。
+  return 5;
 }
 
 export default function RequirementProgress() {
@@ -84,23 +86,13 @@ export default function RequirementProgress() {
   const loading = authLoading || trackLoading || doneLoading;
   const error = trackError ?? doneError;
 
-  // 展开状态：默认全部 category 折叠 / 全部 requirement 折叠
+  // 展开状态：仅 category 折叠（requirement 级下拉已取消,滑块直接内联在右侧）
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
-  const [expandedReqs, setExpandedReqs] = useState<Set<string>>(new Set());
   // requirement 学分草稿（reqId → 当前已修学分，local state 占位）
   const [creditDrafts, setCreditDrafts] = useState<Record<string, number>>({});
 
   function toggleCat(id: string) {
     setExpandedCats((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleReq(id: string) {
-    setExpandedReqs((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -117,7 +109,13 @@ export default function RequirementProgress() {
       <header className="flex items-end justify-between gap-3 px-1">
         <div className="flex items-center gap-2">
           <ListTodo className="h-5 w-5 text-slate-500" />
-          <h2 className="font-semibold tracking-tight">毕业要求完成情况</h2>
+          {/* hover 标题弹出说明（替代原常驻提示句）：纯 CSS group-hover */}
+          <div className="group relative inline-flex items-center">
+            <h2 className="cursor-help font-semibold tracking-tight">毕业要求完成情况</h2>
+            <span className="pointer-events-none absolute left-0 top-full z-20 mt-1.5 w-64 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-xs font-normal leading-5 text-slate-600 opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+              勾选你已完成的毕业要求;带学分的要求可直接拖右侧滑块填写已修学分。访客模式只看不存。
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-1.5 text-xs">
           <span className="rounded-full bg-maya/15 px-2.5 py-1 font-medium text-slate-700">
@@ -130,9 +128,6 @@ export default function RequirementProgress() {
           )}
         </div>
       </header>
-      <p className="mt-1 px-1 text-xs leading-5 text-slate-500">
-        完成的要求自己打勾。展开每条要求还能拖滑块填部分已修学分。
-      </p>
 
       {isGuest && (
         <p className="mt-3 rounded-xl border border-gold/50 bg-white p-3 text-xs leading-5 text-slate-700">
@@ -191,73 +186,43 @@ export default function RequirementProgress() {
                   <ul className="divide-y divide-slate-100 border-t border-slate-100 bg-slate-50/40">
                     {s.requirements.map((r) => {
                       const done = isReqDone(r.id);
-                      const reqOpen = expandedReqs.has(r.id);
-                      // 学分上限:threshold 优先,否则从 title 解 "N 学分"
+                      // 学分上限:threshold 优先,否则从 title 解 "N 学分",仍解不出默认 5
                       const threshold = Math.floor(getCreditCap(r));
                       const hasSlider = threshold > 0;
                       const credit = creditDrafts[r.id] ?? (done ? threshold : 0);
+                      const pct = hasSlider ? Math.round((credit / threshold) * 100) : 0;
                       return (
-                        <li key={r.id} className="px-3 py-1.5">
-                          <div className="flex items-start gap-1">
-                            {/* 正向勾选 toggle —— 默认不打勾,用户主动点 */}
-                            <button
-                              type="button"
-                              disabled={isGuest}
-                              onClick={() => void toggle(r.id)}
-                              className={`flex flex-1 items-start gap-2 rounded-lg px-2 py-1 text-left text-xs transition-colors ${
-                                isGuest
-                                  ? "cursor-not-allowed opacity-60"
-                                  : "hover:bg-white"
-                              }`}
-                              title={done ? "已完成 · 点击取消勾选" : "未完成 · 点击标记完成"}
-                            >
-                              {done ? (
-                                <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none text-maya" />
-                              ) : (
-                                <Circle className="mt-0.5 h-4 w-4 flex-none text-slate-300" />
-                              )}
-                              <span className="flex-1 leading-5">
-                                <span className="font-mono text-[10px] text-slate-400">
-                                  {r.code}
-                                </span>{" "}
-                                <span className={done ? "text-slate-700" : "text-slate-600"}>
-                                  {r.title}
-                                </span>
-                              </span>
-                            </button>
-
-                            {/* 展开按钮 —— 仅 hasSlider 时显示。chevron only,文字移到滑块区 */}
-                            {hasSlider && (
-                              <button
-                                type="button"
-                                onClick={() => toggleReq(r.id)}
-                                className="flex flex-none items-center rounded-md p-1 text-slate-400 transition-colors hover:bg-white hover:text-slate-900"
-                                aria-label={reqOpen ? "收起学分滑块" : "展开学分滑块"}
-                                title={reqOpen ? "收起学分滑块" : "展开学分滑块"}
-                              >
-                                {reqOpen ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
-                                )}
-                              </button>
+                        <li
+                          key={r.id}
+                          className="grid grid-cols-1 items-center gap-x-3 gap-y-1.5 px-3 py-2 sm:grid-cols-2"
+                        >
+                          {/* 正向勾选 toggle —— 默认不打勾,用户主动点（占左半,标题左对齐） */}
+                          <button
+                            type="button"
+                            disabled={isGuest}
+                            onClick={() => void toggle(r.id)}
+                            className={`flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1 text-left text-xs transition-colors ${
+                              isGuest ? "cursor-not-allowed opacity-60" : "hover:bg-white"
+                            }`}
+                            title={done ? "已完成 · 点击取消勾选" : "未完成 · 点击标记完成"}
+                          >
+                            {done ? (
+                              <CheckCircle2 className="h-4 w-4 flex-none text-maya" />
+                            ) : (
+                              <Circle className="h-4 w-4 flex-none text-slate-300" />
                             )}
-                          </div>
+                            <span className="min-w-0 leading-5">
+                              <span className="font-mono text-[10px] text-slate-400">{r.code}</span>{" "}
+                              <span className={done ? "text-slate-700" : "text-slate-600"}>
+                                {r.title}
+                              </span>
+                            </span>
+                          </button>
 
-                          {/* 展开后的滑块 —— 每条 requirement 自己一条,step=1 只取整数 */}
-                          {hasSlider && reqOpen && (
-                            <div className="ml-7 mt-1 border-l border-slate-200 pl-3">
-                              <div className="flex items-baseline justify-between">
-                                <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">
-                                  已修学分（拖动填写）
-                                </span>
-                                <span className="text-xs tabular-nums text-slate-700">
-                                  <strong className="font-semibold text-slate-900">
-                                    {credit}
-                                  </strong>
-                                  <span className="text-slate-400"> / {threshold} 学分</span>
-                                </span>
-                              </div>
+                          {/* 内联学分滑块 —— 占右半(左界=整行中线),右端对齐(数字固定 w-12);
+                              轨道灰色无描边(appearance-none),已修部分用品牌渐变(行内 90deg gradient) */}
+                          {hasSlider && (
+                            <div className="flex items-center gap-2 pr-1">
                               <input
                                 type="range"
                                 min={0}
@@ -265,11 +230,18 @@ export default function RequirementProgress() {
                                 step={1}
                                 value={credit}
                                 disabled={isGuest}
-                                onChange={(e) =>
-                                  setCreditDraft(r.id, Number(e.target.value))
-                                }
-                                className="mt-1 block w-full accent-sapphire disabled:cursor-not-allowed disabled:opacity-50"
+                                onChange={(e) => setCreditDraft(r.id, Number(e.target.value))}
+                                style={{
+                                  background: `linear-gradient(90deg, #FFB62E 0%, #7CC3FF ${pct / 2}%, #4164FF ${pct}%, #e2e8f0 ${pct}%, #e2e8f0 100%)`,
+                                }}
+                                className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full outline-none disabled:cursor-not-allowed disabled:opacity-50 [&::-moz-range-progress]:bg-transparent [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow-[0_1px_3px_rgba(15,23,42,0.35)] [&::-moz-range-track]:bg-transparent [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-[0_1px_3px_rgba(15,23,42,0.35)]"
+                                aria-label={`${r.title} 已修学分`}
+                                title="拖动填写已修学分"
                               />
+                              <span className="w-12 flex-none text-right text-[11px] tabular-nums text-slate-600">
+                                <strong className="font-semibold text-slate-900">{credit}</strong>
+                                <span className="text-slate-400">/{threshold}</span>
+                              </span>
                             </div>
                           )}
                         </li>

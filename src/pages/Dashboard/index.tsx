@@ -360,7 +360,7 @@ export default function DashboardPage() {
               streaming={streaming}
             />
             <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
-              <JumpPill to="/course-planner" label="当前规则路径" icon={Network} />
+              <JumpPill to="/course-planner" label="当前学业路径" icon={Network} />
               <JumpPill to="/ai-advisor" label="当前目标" icon={Target} />
               <JumpPill to="/import" label="上传文件" icon={Upload} />
             </div>
@@ -417,9 +417,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 右侧决策卡竖列：再右移一档（lg:pl-16），去掉「当前决策状态」标题 + icon，
+      {/* 右侧决策卡竖列：左内边距 lg:pl-20（边框线位置不变，卡片整体左移一档），去掉「当前决策状态」标题 + icon，
           5 张卡单列竖向居中（justify-center），不纵向滚动。 */}
-      <aside className="hidden border-l border-slate-200 bg-slate-50/40 lg:flex lg:flex-col lg:overflow-hidden lg:pl-24">
+      <aside className="hidden border-l border-slate-200 bg-slate-50/40 lg:flex lg:flex-col lg:overflow-hidden lg:pl-12">
         <div className="flex flex-1 flex-col justify-center space-y-3 p-3">
           {allDecisionCards.map((c, i) => {
             const body =
