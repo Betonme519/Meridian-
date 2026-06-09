@@ -11,6 +11,7 @@ import {
   GraduationCap,
   Layers3,
   Lightbulb,
+  Loader2,
   MousePointer2,
   PanelRightOpen,
   Sparkles,
@@ -43,11 +44,20 @@ import { useRequirementAdvice, LINK_KIND_LABELS } from "@/hooks/useRequirementAd
 import type { RequirementLink, AdviceShortcut, GoalFit } from "@/api/requirementAdviceApi";
 import { GOAL_MODES } from "@/api/profileApi";
 import { useUserRequirementDone } from "@/hooks/useUserRequirementDone";
+import { chat, tokenText, interestCoursePrompt } from "@/ai";
 import PathLoader from "@/components/effects/PathLoader";
 import DotGrid from "@/components/effects/DotGrid";
 
 type ActionMode = "take" | "delay" | "switch";
 type FocusMode = "all" | "recommended";
+
+/** ShortcutDetail 兴趣→课程推荐所需的上下文，从 PlannerPage 一路透传下来 */
+interface ShortcutAiContext {
+  goalMode: GoalMode;
+  school: string;
+  year: number | null;
+  completedCourses: { code: string; name: string }[];
+}
 type GraphNodeKind = "root" | "milestone" | "bucket" | "requirement" | "shortcut";
 
 interface VisibleRequirement {
@@ -187,7 +197,7 @@ export default function PlannerPage() {
     error: progressError,
   } = useUserProgress(track?.id ?? null);
 
-  const { completedCodes } = useCourses();
+  const { courses, completedCodes } = useCourses();
   const { incompleteReqIds } = useUserRequirementDone();
 
   const visibleReqsByCategoryId = useMemo(() => {
@@ -203,7 +213,7 @@ export default function PlannerPage() {
   const reqMetaById = useMemo(() => {
     const m = new Map<string, { code: string; title: string }>();
     for (const reqs of requirementsByCategoryId.values()) {
-      for (const r of reqs) m.set(r.id, { code: r.code, title: r.title });
+      for (const r of reqs) m.set(r.id, { code: r.code, title: displayRequirementTitle(r.title) });
     }
     return m;
   }, [requirementsByCategoryId]);
@@ -423,6 +433,19 @@ export default function PlannerPage() {
     };
   }, [actionMode, allOptionsByCategoryId, progressByOptionId, selected]);
 
+  // ShortcutDetail 兴趣框现算课程推荐的上下文（已修课 code+name / goal / 学校年份）
+  const shortcutAiContext = useMemo<ShortcutAiContext>(
+    () => ({
+      goalMode,
+      school: track?.school ?? "",
+      year: track?.year ?? null,
+      completedCourses: courses
+        .filter((c) => c.status === "completed")
+        .map((c) => ({ code: c.code, name: c.name })),
+    }),
+    [goalMode, track?.school, track?.year, courses],
+  );
+
   async function handleMarkDone() {
     if (!selected?.recommendedOption || isGuest) return;
     await upsertProgress(selected.recommendedOption.id, { status: "done" });
@@ -494,6 +517,7 @@ export default function PlannerPage() {
             isGuest={isGuest}
             error={progressError}
             shortcut={resolvedShortcut}
+            aiContext={shortcutAiContext}
             onActionChange={setActionMode}
             onMarkDone={() => void handleMarkDone()}
             onClearShortcut={() => setSelectedShortcut(null)}
@@ -553,6 +577,10 @@ function PathGraph({
     useState<Set<UserMilestoneCode>>(defaultMilestones);
   const [expandedBuckets, setExpandedBuckets] = useState<Set<string>>(new Set(["course:专业必修"]));
   const [expandedRequirements, setExpandedRequirements] = useState<Set<string>>(new Set());
+  // 聚焦的一级（上课 / 第二课堂 / 论文）：只有它能往下展开到深层；其余 milestone
+  // 仅显示到一级子节点（上课 → bucket / 第二课堂 / 论文 → 建议捷径），避免一支全展开
+  // 把另两支挤到很下面看不到。
+  const [activeMilestone, setActiveMilestone] = useState<UserMilestoneCode>("course");
 
   const scrollRef = useRef<HTMLDivElement>(null);
   // 点击跟踪滚动：存被点节点 id + 可选 revealRight（展开时下一层右边界）
@@ -577,6 +605,7 @@ function PathGraph({
         expandedMilestones,
         expandedBuckets,
         expandedRequirements,
+        activeMilestone,
       }),
     [
       filteredItems,
@@ -585,6 +614,7 @@ function PathGraph({
       expandedMilestones,
       expandedBuckets,
       expandedRequirements,
+      activeMilestone,
     ],
   );
 
@@ -593,19 +623,29 @@ function PathGraph({
   }
 
   function toggleMilestone(code: UserMilestoneCode) {
-    const willExpand = !expandedMilestones.has(code);
-    setExpandedMilestones((prev) => {
-      const next = new Set(prev);
-      if (next.has(code)) next.delete(code);
-      else next.add(code);
-      return next;
-    });
-    // 展开：露出 bucket 层（x=410 w=170 → 右边界 580）；折叠：只保证 milestone 本身可见
-    queueScroll(`milestone:${code}`, willExpand ? 580 : undefined);
+    const isActive = activeMilestone === code;
+    const isExpanded = expandedMilestones.has(code);
+    if (isActive && isExpanded) {
+      // 已聚焦再点 → 收起整支（连一级也收）
+      setExpandedMilestones((prev) => {
+        const next = new Set(prev);
+        next.delete(code);
+        return next;
+      });
+      queueScroll(`milestone:${code}`);
+      return;
+    }
+    // 聚焦该支：保证一级可见 + 设为 active（深层只它能展开，其余支自动回到一级）
+    setExpandedMilestones((prev) => new Set(prev).add(code));
+    setActiveMilestone(code);
+    // 展开：露出 bucket 层（x=410 w=170 → 右边界 580）
+    queueScroll(`milestone:${code}`, 580);
   }
 
   function toggleBucket(key: string) {
     const willExpand = !expandedBuckets.has(key);
+    // bucket 只属于「上课」；点 bucket 即聚焦上课（否则深层被 activeMilestone 挡住不展开）
+    setActiveMilestone("course");
     setExpandedBuckets((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -618,6 +658,7 @@ function PathGraph({
 
   function toggleRequirement(reqId: string) {
     const willExpand = !expandedRequirements.has(reqId);
+    setActiveMilestone("course");
     setExpandedRequirements((prev) => {
       const next = new Set(prev);
       if (next.has(reqId)) next.delete(reqId);
@@ -959,6 +1000,7 @@ function buildGraph({
   expandedMilestones,
   expandedBuckets,
   expandedRequirements,
+  activeMilestone,
 }: {
   items: VisibleRequirement[];
   selectedId: string | null;
@@ -966,6 +1008,8 @@ function buildGraph({
   expandedMilestones: Set<UserMilestoneCode>;
   expandedBuckets: Set<string>;
   expandedRequirements: Set<string>;
+  /** 当前聚焦的一级；只有它能展开到深层（bucket→requirement→shortcut） */
+  activeMilestone: UserMilestoneCode;
 }) {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
@@ -1004,10 +1048,15 @@ function buildGraph({
       w: 150,
       h: 64,
       title: MILESTONE_LABEL[milestone.code],
-      meta: expandedMilestones.has(milestone.code) ? "已展开" : "点击展开",
+      meta: !expandedMilestones.has(milestone.code)
+        ? "点击展开"
+        : milestone.code === activeMilestone
+          ? "聚焦中"
+          : "点击聚焦",
       // count 同 root:数字 badge 在路径画布语境下会被误读成"N 路径"
       isRecommended: milestoneItems.some((item) => item.isOnPath),
       isActive: false,
+      // chevron 反映一级是否展开（非聚焦支也显示其一级子节点）；聚焦深浅由 meta 文案区分
       isCollapsed: !expandedMilestones.has(milestone.code),
     };
     nodes.push(node);
@@ -1027,6 +1076,11 @@ function buildGraph({
 
     // 论文 / 第二课堂：无可见课程节点，直接在 milestone 右侧挂建议捷径
     if (milestone.code !== "course") {
+      // 这些捷径节点 w=340（x 410→750）会横向探入 requirement 列（x 650→1010）。
+      // bucketY 在 course 分支被 `requirementY - n*8` 往上收紧过，可能仍高于已排的
+      // requirement 行；不先落到 requirementY 之下，就会竖向压住上一 milestone 展开的
+      // requirement 卡（例：第二课堂「创新创业学分」挡住通识必修「模块课程」）。
+      bucketY = Math.max(bucketY, requirementY);
       const msShortcuts = MILESTONE_SHORTCUTS[milestone.code] ?? [];
       for (let i = 0; i < msShortcuts.length; i += 1) {
         const sc = msShortcuts[i];
@@ -1054,6 +1108,8 @@ function buildGraph({
       continue;
     }
 
+    // 只有聚焦的一级能展开到 requirement 深层；非聚焦支的 bucket 只显示到一级（收起态）
+    const milestoneActive = milestone.code === activeMilestone;
     const milestoneItems = items.filter((item) => item.milestone === milestone.code);
     const bucketLabels =
       milestone.code === "course"
@@ -1079,11 +1135,11 @@ function buildGraph({
         w: 170,
         h: 58,
         title: String(bucket),
-        meta: expandedBuckets.has(key) ? "显示具体机会" : "点击看机会",
+        meta: milestoneActive && expandedBuckets.has(key) ? "显示具体机会" : "点击看机会",
         // count 留空,同 root / milestone:避免被读成"N 路径"
         isRecommended: bucketItems.some((item) => item.isOnPath),
         isActive: false,
-        isCollapsed: !expandedBuckets.has(key),
+        isCollapsed: !(milestoneActive && expandedBuckets.has(key)),
       };
       nodes.push(bucketNode);
       edges.push({
@@ -1093,7 +1149,7 @@ function buildGraph({
         isRecommended: bucketNode.isRecommended,
       });
 
-      if (expandedBuckets.has(key)) {
+      if (milestoneActive && expandedBuckets.has(key)) {
         for (const item of bucketItems) {
           const reqNode: GraphNode = {
             id: `requirement:${item.requirement.id}`,
@@ -1102,8 +1158,9 @@ function buildGraph({
             y: requirementY,
             w: 360,
             h: 74,
-            title: item.requirement.title,
-            meta: `${item.category.title} · ${formatMissing(item)}`,
+            title: displayRequirementTitle(item.requirement.title),
+            // 节点小字只留「构成」分类名；明细与「还差 N」都挪到右侧面板
+            meta: item.category.title,
             item,
             isRecommended: item.isOnPath,
             isActive: item.requirement.id === selectedId,
@@ -1188,6 +1245,7 @@ function ImpactPanel({
   isGuest,
   error,
   shortcut,
+  aiContext,
   onActionChange,
   onMarkDone,
   onClearShortcut,
@@ -1198,6 +1256,7 @@ function ImpactPanel({
   isGuest: boolean;
   error: string | null;
   shortcut: AdviceShortcut | null;
+  aiContext: ShortcutAiContext;
   onActionChange: (mode: ActionMode) => void;
   onMarkDone: () => void;
   onClearShortcut: () => void;
@@ -1212,8 +1271,19 @@ function ImpactPanel({
 
   // 排队 12.5：路径建议视图 —— shortcut 非空时切换为路径建议详情卡
   if (shortcut) {
-    return <ShortcutDetail selected={selected} shortcut={shortcut} onClear={onClearShortcut} />;
+    return (
+      <ShortcutDetail
+        selected={selected}
+        shortcut={shortcut}
+        aiContext={aiContext}
+        onClear={onClearShortcut}
+      />
+    );
   }
+
+  // 规则名括号里的分级 / 完成时间 / 免修等明细（从思维导图节点挪到这里），加当前进度
+  const { detail: reqDetail } = splitRequirementTitle(selected.requirement.title);
+  const reqProgress = formatMissing(selected);
 
   return (
     <section className="px-5 py-4">
@@ -1229,11 +1299,18 @@ function ImpactPanel({
         )}
       </div>
       <h3 className="mt-3 text-sm font-semibold leading-6 text-slate-950">
-        {selected.requirement.title}
+        {displayRequirementTitle(selected.requirement.title)}
       </h3>
-      <p className="mt-1 text-xs leading-5 text-slate-500">
-        {selected.category.title} · {formatMissing(selected)}
-      </p>
+      <p className="mt-1 text-xs leading-5 text-slate-500">{selected.category.title}</p>
+
+      {/* 补充说明：规则名括号里的分级 / 完成时间 / 免修等明细 + 当前进度（均从节点挪来） */}
+      <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2.5 ring-1 ring-inset ring-slate-200">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+          补充说明
+        </p>
+        <p className="mt-1.5 text-xs leading-5 text-slate-700">进度 · {reqProgress}</p>
+        {reqDetail && <p className="mt-1 text-xs leading-5 text-slate-600">{reqDetail}</p>}
+      </div>
 
       {selected.pathReason && (
         <div className="mt-4 border-l-2 border-sapphire/50 pl-3">
@@ -1281,7 +1358,7 @@ function ImpactPanel({
           />
           <ImpactMetric
             icon={Clock3}
-            label="时间后果"
+            label="时间成本"
             value={
               actionMode === "delay" ? "后移" : selected.recommendedOption ? "可执行" : "待拆分"
             }
@@ -1312,13 +1389,6 @@ function ImpactPanel({
         </div>
       )}
 
-      {!impact.option && (
-        <p className="mt-4 border-t border-slate-200 pt-3 text-xs leading-5 text-slate-500">
-          想标这条「未完成」？去 <strong className="text-slate-900">Upload 页 Section 8</strong>{" "}
-          反向勾选。
-        </p>
-      )}
-
       {isGuest && (
         <p className="mt-3 text-xs text-slate-400">访客模式可看模拟，登录后才能保存进度。</p>
       )}
@@ -1331,13 +1401,80 @@ function ImpactPanel({
 function ShortcutDetail({
   selected,
   shortcut,
+  aiContext,
   onClear,
 }: {
   selected: VisibleRequirement;
   shortcut: AdviceShortcut;
+  aiContext: ShortcutAiContext;
   onClear: () => void;
 }) {
   const candidates = shortcut.candidates ?? [];
+
+  // 兴趣 → AI 推荐课程（排队 12.5-C）：本地态，流式消费 chat()
+  const [interest, setInterest] = useState("");
+  const [streaming, setStreaming] = useState(false);
+  const [result, setResult] = useState("");
+  const [aiError, setAiError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // 切到另一条规则 / 另一个捷径时，清掉上一条的 AI 结果，避免串味
+  useEffect(() => {
+    abortRef.current?.abort();
+    setResult("");
+    setAiError(null);
+    setStreaming(false);
+  }, [selected.requirement.id, shortcut.oneLiner]);
+
+  // 卸载时中断在途请求
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  async function handleRecommend() {
+    const trimmed = interest.trim();
+    if (!trimmed || streaming) return;
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setStreaming(true);
+    setAiError(null);
+    setResult("");
+
+    let acc = "";
+    try {
+      for await (const tok of chat({
+        messages: interestCoursePrompt({
+          goalMode: aiContext.goalMode,
+          school: aiContext.school,
+          year: aiContext.year,
+          requirementTitle: selected.requirement.title,
+          categoryTitle: selected.category.title,
+          shortcutOneLiner: shortcut.oneLiner ?? "",
+          interest: trimmed,
+          completedCourses: aiContext.completedCourses,
+          candidateOptions: (selected.options ?? []).map((o) => ({
+            code: o.code,
+            name: o.name,
+            credits: o.credits,
+          })),
+        }),
+        signal: ctrl.signal,
+      })) {
+        acc += tokenText(tok);
+        setResult(acc);
+      }
+    } catch (e) {
+      // mock provider abort = 优雅 return 不进 catch；真 provider abort 抛 AbortError，忽略
+      if ((e as Error)?.name !== "AbortError") {
+        setAiError((e as Error).message || "请稍后重试");
+      }
+    } finally {
+      if (abortRef.current === ctrl) {
+        setStreaming(false);
+        abortRef.current = null;
+      }
+    }
+  }
+
   return (
     <section className="px-5 py-4">
       <div className="flex items-center justify-between gap-3">
@@ -1354,7 +1491,9 @@ function ShortcutDetail({
         </button>
       </div>
 
-      <p className="mt-1 text-[11px] text-slate-500">所属规则：{selected.requirement.title}</p>
+      <p className="mt-1 text-[11px] text-slate-500">
+        所属规则：{displayRequirementTitle(selected.requirement.title)}
+      </p>
 
       <h3 className="mt-3 border-l-2 border-gold/60 pl-3 text-sm font-semibold leading-6 text-slate-950">
         {shortcut.oneLiner ?? "未命名建议"}
@@ -1385,26 +1524,35 @@ function ShortcutDetail({
 
       <div className="mt-4 border-t border-slate-200 pt-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-          兴趣 → AI 推荐课程（待启用）
+          兴趣 → AI 推荐课程
         </p>
         <textarea
-          disabled
-          placeholder="想做什么方向？（接通真 LLM 后启用，会按你的兴趣 + 已修课表 + 学校规则推荐具体课）"
-          className="mt-2 h-20 w-full resize-none rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs leading-5 text-slate-500 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50"
+          value={interest}
+          onChange={(e) => setInterest(e.target.value)}
+          disabled={streaming}
+          placeholder="想做什么方向？AI 会按你的兴趣 + 已修课表 + 这条规则现算具体课程"
+          className="mt-2 h-20 w-full resize-none rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs leading-5 text-slate-700 placeholder:text-slate-400 focus:border-sapphire/50 focus:outline-none focus:ring-1 focus:ring-sapphire/30 disabled:cursor-not-allowed disabled:bg-slate-50"
         />
         <button
           type="button"
-          disabled
-          title="排队 13.2 接真 LLM 后启用"
-          className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-full bg-slate-950 px-3 text-[11px] font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+          onClick={() => void handleRecommend()}
+          disabled={streaming || interest.trim().length === 0}
+          className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-full bg-slate-950 px-3 text-[11px] font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
-          <Sparkles className="h-3 w-3" />
-          AI 推荐
+          {streaming ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <Sparkles className="h-3 w-3" />
+          )}
+          {streaming ? "AI 思考中…" : "AI 推荐"}
         </button>
-        <p className="mt-2 text-[11px] leading-5 text-slate-500">
-          目前是 mock 占位；接通真 LLM provider（13.2）后会按你的兴趣 + 已修课 +
-          学校规则现算具体课程。
-        </p>
+
+        {result && (
+          <div className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-700 ring-1 ring-inset ring-slate-200">
+            {result}
+          </div>
+        )}
+        {aiError && <p className="mt-2 text-[11px] leading-5 text-flame">AI 推荐失败：{aiError}</p>}
       </div>
 
       {candidates.length > 0 && (
@@ -1467,7 +1615,11 @@ function EvidencePanel({
       </div>
       {selected ? (
         <div className="mt-4 divide-y divide-slate-200 text-sm">
-          <EvidenceLine icon={BookOpen} label="规则" value={selected.requirement.title} />
+          <EvidenceLine
+            icon={BookOpen}
+            label="规则"
+            value={displayRequirementTitle(selected.requirement.title)}
+          />
           <EvidenceLine icon={Compass} label="分类" value={selected.category.title} />
           <EvidenceLine
             icon={Lightbulb}
@@ -1578,6 +1730,41 @@ function EvidenceLine({
       </div>
     </div>
   );
+}
+
+/**
+ * seed 把「分级 / 完成时间 / 雅思托福 / 免修 / N 模块」等补充说明全塞进规则标题的
+ * 括号里（如「大学英语 8 学分 (分级 A/B/C/D / 雅思 7 或托福 94 入 A 班)」）。
+ * 思维导图节点只显示括号前的主干（core），括号内的明细挪到右侧面板「补充说明」。
+ * 纯前端拆分，DB 原文不动（后端 / AI 仍读完整 title）。
+ */
+function splitRequirementTitle(title: string): { core: string; detail: string } {
+  const t = (title ?? "").trim();
+  const idx = t.search(/[（(]/);
+  if (idx < 0) return { core: cleanInternalNotes(t), detail: "" };
+  const core = cleanInternalNotes(t.slice(0, idx).trim());
+  const detail = cleanInternalNotes(
+    t
+      .slice(idx)
+      .replace(/[（）()]/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim(),
+  );
+  return { core: core || cleanInternalNotes(t), detail };
+}
+
+/** 仅给用户看：去掉「N 模块」这类只服务后端 / AI 的内部结构标注 */
+function cleanInternalNotes(s: string): string {
+  return s
+    .replace(/\s*[／/]\s*\d+\s*模块/g, "")
+    .replace(/\s*\d+\s*模块/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/** 节点 / 标题处只显示主干（括号前的 core） */
+function displayRequirementTitle(title: string): string {
+  return splitRequirementTitle(title).core;
 }
 
 function formatMissing(item: VisibleRequirement): string {

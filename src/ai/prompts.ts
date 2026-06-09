@@ -10,6 +10,7 @@
  *  - recommendModePrompt(userText)         根据用户自描述推荐 goal_mode
  *  - gradPathAdvisorPrompt(input)          排队 13：毕业路径 advisor（PathSuggestion[]）
  *  - GRAD_PATH_ADVISOR_MARKER              system prompt 头部 marker，mock 用来识别
+ *  - interestCoursePrompt(input)           排队 12.5-C：单条规则 × 兴趣 → 具体课程推荐（流式文本）
  */
 
 import type { Message } from "./stream";
@@ -189,3 +190,71 @@ const GRAD_PATH_ADVISOR_SYSTEM = `${GRAD_PATH_ADVISOR_MARKER}
 
 shortcuts 数组在排队 12.5 之前**强制为空 []**，不要凭空造。
 rankings / gaps 13 阶段也可返 []，留给 13.2 真 LLM 阶段填。`;
+
+/* ──────────────────── 兴趣 → 课程推荐（排队 12.5-C，单规则下钻） ──────────────────── */
+
+/** ShortcutDetail 兴趣框触发的现算课程推荐入参（一条规则 × 一个捷径 × 用户兴趣） */
+export interface InterestCourseInput {
+  goalMode: GoalMode | null;
+  school: string;
+  year: number | null;
+  /** 当前规则名（如「公共必修」） */
+  requirementTitle: string;
+  /** 规则所属一级分类标题 */
+  categoryTitle: string;
+  /** 用户点开的捷径策略一句话（如「不计 APF → 挑你感兴趣的」） */
+  shortcutOneLiner: string;
+  /** 用户在兴趣框里填的方向描述 */
+  interest: string;
+  /** 已修课程（code + name），用于避免重复推荐 + 推断水平 */
+  completedCourses: { code: string; name: string }[];
+  /** 该规则已 seed 的候选课（多数规则为空 → 让 AI 给方向而非编造代码） */
+  candidateOptions: { code: string; name: string; credits: number | null }[];
+}
+
+/**
+ * 兴趣 → 课程推荐 —— 排队 12.5-C。
+ *
+ * 与 gradPathAdvisor 的区别：这是**单条规则的 runtime 下钻**，输入含用户即时填写的
+ * 兴趣文本，输出是给人读的短列表（流式文本，非结构化 JSON）。调用方
+ * （Planner ShortcutDetail）用 `chat()` 流式消费、`tokenText` 取文本逐字渲染。
+ *
+ * 反幻觉：candidateOptions 为空时只给「方向 + 课程类型」，不编造课程代码；
+ * 有 candidateOptions 时优先在其中挑，代码必须来自该列表。
+ */
+export function interestCoursePrompt(input: InterestCourseInput): Message[] {
+  const userPayload = JSON.stringify({
+    goalMode: input.goalMode,
+    school: input.school,
+    year: input.year,
+    requirementTitle: input.requirementTitle,
+    categoryTitle: input.categoryTitle,
+    shortcutOneLiner: input.shortcutOneLiner,
+    interest: input.interest,
+    completedCourses: input.completedCourses,
+    candidateOptions: input.candidateOptions,
+  });
+
+  return [
+    { role: "system", content: INTEREST_COURSE_SYSTEM },
+    { role: "user", content: userPayload },
+  ];
+}
+
+const INTEREST_COURSE_SYSTEM = `你是 Meridian 的选课推荐助手。
+
+**铁律**：只能基于下面 user 消息里的 JSON 回答，不要编造学校规则或课程代码。
+  - requirementTitle / categoryTitle：用户正在攻克的毕业规则
+  - shortcutOneLiner：该规则下用户选中的一条策略（你的推荐要服务这条策略）
+  - interest：用户填写的兴趣方向（你的核心依据）
+  - completedCourses：已修课程，**不要重复推荐**已修的
+  - candidateOptions：该规则已知的候选课。**非空时课程代码必须来自此列表**；为空时只给方向 + 课程类型，不要编造任何代码
+
+任务：结合「用户兴趣 + 这条规则 + 选中的策略 + goalMode」，推荐 3-5 门具体课程或方向。
+
+输出格式（直接输出列表，不要任何前言 / 结语 / markdown 围栏）：
+
+• <课程名或方向>（<代码，仅当来自 candidateOptions；否则省略括号>）— <一句话理由：扣住用户兴趣 + 如何满足这条规则>
+
+理由要短、具体、口语化。若 candidateOptions 为空，在列表末尾补一行：
+（这条规则暂无录入候选课，以上为方向建议，确定后可在 Upload 页登记）`;

@@ -1,18 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useProfile } from "@/hooks/useProfile";
 import { useRagSources } from "@/hooks/useRagSources";
 import { buildPersonalDocBlock } from "@/lib/personalDocContext";
-import {
-  ArrowRight,
-  ArrowUp,
-  CheckCircle2,
-  Sparkles,
-  Square,
-  TriangleAlert,
-} from "lucide-react";
+import { ArrowRight, ArrowUp, Square } from "lucide-react";
 import LogoFace from "@/components/effects/LogoFace";
+import Aurora from "@/components/effects/Aurora";
 import { chat, tokenText, type Message } from "@/ai";
+import cardGoalBg from "@/assets/images/home-cards/goal.png";
+import cardRecommendBg from "@/assets/images/home-cards/recommend.png";
+import cardRiskBg from "@/assets/images/home-cards/risk.png";
+import cardProgressBg from "@/assets/images/home-cards/progress.png";
+import cardNextBg from "@/assets/images/home-cards/next.png";
 
 /**
  * Home / Dashboard (/dashboard) — 工具页主入口。
@@ -24,7 +23,7 @@ import { chat, tokenText, type Message } from "@/ai";
  * 2026-05-29 sessionStorage handoff 取消，改同页内嵌流式对话（chat from @/ai）。
  * 2026-05-30 对话态布局深度重构（用户拍板，多轮迭代）：
  *   - 空态：保留原 hero + 决策卡横向 grid 布局
- *   - 对话态：使用 max-w-7xl 容器（**禁止水平溢出**），双栏 grid [1fr_340px]
+ *   - 对话态：使用 max-w-7xl 容器（**禁止水平溢出**），双栏 grid [1fr_420px]
  *   - 左主对话区：thread 滚动 + 钉底输入框（输入框 max-w-2xl 居中收窄）
  *   - 右侧决策卡竖列：border-l 加深一档 slate-200 形成清晰分隔线
  *   - thread 内容 max-w-3xl mx-auto 居中收窄（跟 input 同宽），避免主区太宽消息飘
@@ -58,16 +57,18 @@ const decisionCards: DecisionCard[] = [
     cta: { label: "调整目标权重", to: "/ai-advisor" },
   },
   {
-    title: "AI 最近一次推荐",
+    title: "最近一次推荐",
     body: "建议本学期保留 中国近现代史纲要 与 大学英语,谨慎同修 数据结构。",
     meta: "基于培养方案 v2024 + 你的 workload 上限",
     tone: "good",
+    cta: { label: "查看推荐", to: "/ai-advisor" },
   },
   {
-    title: "最近风险变化",
+    title: "风险变化",
     body: "压分风险 ↓ 12%(模拟退掉数据结构后)",
     meta: "近 7 天 · 含 3 次模拟",
     tone: "good",
+    cta: { label: "查看风险", to: "/course-planner" },
   },
   {
     title: "卡住的 requirement",
@@ -143,40 +144,56 @@ function pickNextStep(): DecisionCard {
   return { ...NEXT_STEP_POOL[idx], tone: "neutral" };
 }
 
-// 用项目"功能页 accent palette"(flame / gold / maya / sapphire)做语义色,
-//   不用 Tailwind 默认的 emerald / amber——那些不在本项目设计标准内。
-//   confident / 正面 → maya(配 sapphire 文字)
-//   估算 / 风险      → gold(配 flame 文字)
-//   中性 / 数据来源  → slate
-//   大面积背景仍是 白卡;palette 色只落到 border / chip,符合"标记色只在小色块"铁律。
-const toneClass: Record<DecisionCard["tone"], string> = {
-  neutral: "border-slate-200 bg-white",
-  good: "border-maya/40 bg-white",
-  warn: "border-gold/50 bg-white",
+// 决策卡逐卡配置：底图（桌面「首页图片素材」已复制进 assets）+ 文字是否白 +
+// 圆形跳转键样式 + 是否隐藏 body·meta。边框 / 右上角图标已整体去掉（见渲染处）。
+// 「下一步建议」8 条文案共用同一标题 → 同一份配置。
+type CardConfig = {
+  bg: string;
+  /** 深色底图上标题 / 正文 / meta 用白字 */
+  textWhite?: boolean;
+  /** 圆形跳转键：white = 白底黑箭头，black = 黑底白箭头 */
+  ctaTone: "white" | "black";
+  hideBody?: boolean;
+  hideMeta?: boolean;
+};
+const cardConfig: Record<string, CardConfig> = {
+  当前目标: { bg: cardGoalBg, textWhite: true, ctaTone: "white", hideMeta: true },
+  最近一次推荐: { bg: cardRecommendBg, ctaTone: "black", hideMeta: true },
+  风险变化: { bg: cardRiskBg, textWhite: true, ctaTone: "white", hideMeta: true },
+  "卡住的 requirement": { bg: cardProgressBg, textWhite: true, ctaTone: "white", hideMeta: true },
+  下一步建议: { bg: cardNextBg, ctaTone: "black", hideMeta: true },
 };
 
-// 图标外圈用浅 pill 包住 icon;text 用同色板里更深的色保证对比度
-const toneIconWrap: Record<DecisionCard["tone"], string> = {
-  neutral: "bg-slate-100 text-slate-600",
-  good: "bg-maya/15 text-sapphire",
-  warn: "bg-gold/15 text-flame",
-};
+/** 把底图合进卡片 style：cover 铺满、居中、不重复；无匹配则返回空对象 */
+function cardBgStyle(title: string): CSSProperties {
+  const bg = cardConfig[title]?.bg;
+  return bg
+    ? {
+        backgroundImage: `url(${bg})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }
+    : {};
+}
 
-// hover 时把 border 拉浓一档,让"鼠标停留"有明确反馈
-const toneCardHover: Record<DecisionCard["tone"], string> = {
-  neutral: "hover:border-slate-300",
-  good: "hover:border-maya/70",
-  warn: "hover:border-gold/80",
-};
+/** 圆形箭头跳转键 —— 取代原本「文字标签 + 箭头」的链接。white=白底黑箭头 / black=黑底白箭头 */
+function CtaArrow({ to, label, tone }: { to: string; label: string; tone: "white" | "black" }) {
+  const cls =
+    tone === "black" ? "bg-slate-900 text-white" : "bg-white text-slate-900 ring-1 ring-black/5";
+  return (
+    <Link
+      to={to}
+      aria-label={label}
+      title={label}
+      className={`mt-3 inline-flex h-9 w-9 items-center justify-center rounded-full shadow-sm transition-transform duration-300 ease-out hover:scale-105 group-hover:translate-x-0.5 ${cls}`}
+    >
+      <ArrowRight className="h-4 w-4" strokeWidth={2.2} />
+    </Link>
+  );
+}
 
-// hover 顶端 1px 高光条的色,呼应卡片 tone
-const toneAccent: Record<DecisionCard["tone"], string> = {
-  neutral: "bg-slate-300",
-  good: "bg-sapphire/60",
-  warn: "bg-flame/70",
-};
-
-// meta 文字保持中性 slate 保证对比度;tone 视觉差异交给 border + icon。
+// meta 文字保持中性 slate 保证对比度（非白字卡片用）。
 const toneText: Record<DecisionCard["tone"], string> = {
   neutral: "text-slate-500",
   good: "text-slate-500",
@@ -288,17 +305,26 @@ export default function DashboardPage() {
   };
 
   if (!hasConversation) {
-    /* ── 空态：原 hero + 决策卡布局（保留） ─────────────────────── */
+    /* ── 空态：只留居中的「你今天想问点什么」对话入口（决策卡仅对话态显示） ── */
     return (
-      <section className="mx-auto max-w-7xl px-5 sm:px-8">
-        <div className="flex min-h-[44vh] flex-col justify-center pb-6 sm:min-h-[48vh] sm:pb-8">
+      <section className="relative mx-auto flex min-h-[calc(100vh-5rem)] max-w-7xl flex-col justify-center px-5 sm:px-8">
+        {/* 底部极光背景：fixed 贴视口底，pointer-events-none 不挡交互；内容在 z-10 浮其上。
+            lg:left-16 让开左侧 icon rail。rotate-180 翻转 → 硬边界贴视口最下沿、模糊朝上。
+            配色用设计标准：橙(flame) → 黄(gold) → 浅蓝(maya)。 */}
+        <div
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-0 h-[42vh] rotate-180 lg:left-16"
+          aria-hidden
+        >
+          <Aurora colorStops={["#FE6237", "#FFB62E", "#7CC3FF"]} blend={1.0} />
+        </div>
+        <div className="relative z-10 flex flex-col pb-[12vh]">
           <div className="flex items-center justify-center gap-3 sm:gap-4">
-            <LogoFace size={48} className="text-slate-900" />
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+            <LogoFace size={56} className="text-slate-900" />
+            <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
               你今天想问点什么?
             </h1>
           </div>
-          <div className="mx-auto mt-7 w-full max-w-2xl">
+          <div className="mx-auto mt-8 w-full max-w-3xl">
             <AskBox
               value={askInput}
               onChange={setAskInput}
@@ -312,68 +338,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="pb-10">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-slate-500" />
-            <h2 className="text-sm font-semibold tracking-tight">当前决策状态</h2>
-          </div>
-          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3 xl:grid-rows-2">
-            {allDecisionCards.map((c, i) => {
-              const body =
-                c.title === "当前目标" ? `${currentGoalMode} 模式` : c.body;
-              const isHero = c.title === "当前目标";
-              return (
-                <article
-                  key={c.title}
-                  className={`animate-fade-in-up-soft group relative flex flex-col overflow-hidden rounded-2xl border p-4 transition-[transform,box-shadow,border-color] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-12px_rgba(15,23,42,0.18)] ${toneCardHover[c.tone]} ${toneClass[c.tone]} ${isHero ? "xl:row-span-2 xl:p-5" : ""}`}
-                  style={{ animationDelay: `${80 + i * 60}ms` }}
-                >
-                  <span
-                    aria-hidden
-                    className={`pointer-events-none absolute inset-x-0 top-0 h-px origin-center scale-x-0 transition-transform duration-500 ease-out group-hover:scale-x-100 ${toneAccent[c.tone]}`}
-                  />
-                  <div className="flex items-center justify-between gap-3">
-                    <h3
-                      className={`font-semibold text-slate-900 ${isHero ? "text-sm xl:text-base" : "text-sm"}`}
-                    >
-                      {c.title}
-                    </h3>
-                    <span
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-transform duration-300 ease-out group-hover:scale-110 ${toneIconWrap[c.tone]}`}
-                      aria-hidden
-                    >
-                      {c.tone === "good" ? (
-                        <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2} />
-                      ) : c.tone === "warn" ? (
-                        <TriangleAlert className="h-3.5 w-3.5" strokeWidth={2} />
-                      ) : (
-                        <Sparkles className="h-3.5 w-3.5" strokeWidth={1.8} />
-                      )}
-                    </span>
-                  </div>
-                  <p
-                    className={`leading-5 text-slate-800 ${isHero ? "mt-3 text-sm xl:text-base xl:leading-6" : "mt-2 text-sm"}`}
-                  >
-                    {body}
-                  </p>
-                  <div className="mt-auto pt-3">
-                    <p className={`text-[11px] ${toneText[c.tone]}`}>{c.meta}</p>
-                    {c.cta && (
-                      <Link
-                        to={c.cta.to}
-                        className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-slate-700 transition-colors hover:text-slate-950"
-                      >
-                        {c.cta.label}
-                        <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 ease-out group-hover:translate-x-0.5" />
-                      </Link>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        </div>
-
         <NavigateGuard navigate={navigate} />
       </section>
     );
@@ -383,12 +347,13 @@ export default function DashboardPage() {
   // 高度跟 Workspace/AIAdvisor 单屏化对齐（navbar 顶部 5rem）。
   // 用 max-w-7xl + 父 padding 留出内边，避免对话区超出 viewport 出现水平滚动。
   return (
-    <section className="mx-auto grid h-[calc(100vh-5rem)] max-w-7xl grid-cols-1 lg:grid-cols-[1fr_340px]">
+    <section className="mx-auto grid h-[calc(100vh-5rem)] max-w-[96rem] grid-cols-1 lg:grid-cols-[1fr_420px]">
       {/* 左主对话区：thread + 钉底输入 */}
       <div className="flex min-w-0 flex-col overflow-hidden">
-        {/* thread 滚动区：内层 max-w-4xl 靠左 mr-auto（对话部分整体左移） */}
-        <div className="scrollbar-thin flex-1 overflow-y-auto px-5 py-6 sm:px-8">
-          <div className="mr-auto max-w-4xl space-y-5">
+        {/* thread 滚动区：内层 max-w-4xl 居中 mx-auto；lg 起左侧多留白把气泡整体再往右挪一点
+            （只影响气泡，不动下方输入框 —— 输入框是另一个独立容器） */}
+        <div className="scrollbar-thin flex-1 overflow-y-auto px-5 py-6 sm:px-8 lg:pl-32">
+          <div className="mx-auto max-w-4xl space-y-5">
             {messages.map((m, i) => (
               <ChatBubble key={i} role={m.role} content={m.content} />
             ))}
@@ -408,9 +373,9 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* 钉底输入：max-w-3xl 靠左 mr-auto（跟 thread 同向左移） */}
+        {/* 钉底输入：max-w-3xl 居中 mx-auto（跟 thread 同向右移） */}
         <div className="px-5 pb-5 pt-2 sm:px-8 sm:pb-6">
-          <div className="mr-auto max-w-3xl">
+          <div className="mx-auto max-w-3xl">
             <AskBox
               value={askInput}
               onChange={setAskInput}
@@ -423,57 +388,39 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 右侧决策卡竖列：内容右移（lg:pl-8）+ 下移（lg:pt-6），border-l 不动 */}
-      <aside className="hidden border-l border-slate-200 bg-slate-50/40 lg:flex lg:flex-col lg:overflow-hidden lg:pl-8 lg:pt-6">
-        <div className="flex items-center gap-2 px-4 py-3">
-          <Sparkles className="h-4 w-4 text-slate-500" />
-          <h3 className="text-sm font-semibold tracking-tight text-slate-800">
-            当前决策状态
-          </h3>
-        </div>
-        <div className="scrollbar-thin flex-1 space-y-3 overflow-y-auto p-3">
+      {/* 右侧决策卡竖列：再右移一档（lg:pl-16），去掉「当前决策状态」标题 + icon，
+          5 张卡单列竖向居中（justify-center），不纵向滚动。 */}
+      <aside className="hidden border-l border-slate-200 bg-slate-50/40 lg:flex lg:flex-col lg:overflow-hidden lg:pl-24">
+        <div className="flex flex-1 flex-col justify-center space-y-3 p-3">
           {allDecisionCards.map((c, i) => {
             const body =
               c.title === "当前目标" ? `${currentGoalMode} 模式` : c.body;
+            const cfg = cardConfig[c.title];
+            const white = cfg?.textWhite;
             return (
               <article
                 key={c.title}
-                className={`animate-fade-in-up-soft group relative flex flex-col overflow-hidden rounded-2xl border p-3.5 transition-[transform,box-shadow,border-color] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-12px_rgba(15,23,42,0.18)] ${toneCardHover[c.tone]} ${toneClass[c.tone]}`}
-                style={{ animationDelay: `${80 + i * 60}ms` }}
+                className={`animate-fade-in-up-soft group relative flex flex-col overflow-hidden rounded-2xl p-3.5 transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-12px_rgba(15,23,42,0.18)] bg-white`}
+                style={{ animationDelay: `${80 + i * 60}ms`, ...cardBgStyle(c.title) }}
               >
-                {/* hover 时从顶端晕开 1px tone 色高光条 */}
-                <span
-                  aria-hidden
-                  className={`pointer-events-none absolute inset-x-0 top-0 h-px origin-center scale-x-0 transition-transform duration-500 ease-out group-hover:scale-x-100 ${toneAccent[c.tone]}`}
-                />
                 <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-xs font-semibold text-slate-900">
+                  <h4 className={`text-xs font-semibold ${white ? "text-white" : "text-slate-900"}`}>
                     {c.title}
                   </h4>
-                  <span
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-transform duration-300 ease-out group-hover:scale-110 ${toneIconWrap[c.tone]}`}
-                    aria-hidden
-                  >
-                    {c.tone === "good" ? (
-                      <CheckCircle2 className="h-3 w-3" strokeWidth={2} />
-                    ) : c.tone === "warn" ? (
-                      <TriangleAlert className="h-3 w-3" strokeWidth={2} />
-                    ) : (
-                      <Sparkles className="h-3 w-3" strokeWidth={1.8} />
-                    )}
-                  </span>
                 </div>
-                <p className="mt-2 text-xs leading-5 text-slate-800">{body}</p>
+                {!cfg?.hideBody && (
+                  <p className={`mt-2 text-xs leading-5 ${white ? "text-white/90" : "text-slate-800"}`}>
+                    {body}
+                  </p>
+                )}
                 <div className="mt-2 pt-2">
-                  <p className={`text-[10px] ${toneText[c.tone]}`}>{c.meta}</p>
+                  {!cfg?.hideMeta && (
+                    <p className={`text-[10px] ${white ? "text-white/75" : toneText[c.tone]}`}>
+                      {c.meta}
+                    </p>
+                  )}
                   {c.cta && (
-                    <Link
-                      to={c.cta.to}
-                      className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 transition-colors hover:text-slate-950"
-                    >
-                      {c.cta.label}
-                      <ArrowRight className="h-3 w-3 transition-transform duration-300 ease-out group-hover:translate-x-0.5" />
-                    </Link>
+                    <CtaArrow to={c.cta.to} label={c.cta.label} tone={cfg?.ctaTone ?? "white"} />
                   )}
                 </div>
               </article>
@@ -516,27 +463,31 @@ function AskBox({
 }) {
   return (
     <div className="relative">
-      <textarea
+      {/* 单行胶囊输入：rounded-full 两端圆头，发送键贴右侧竖向居中。
+          非 compact（首页 hero）整体放大一档（h-14 + text-base）。 */}
+      <input
+        type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
-          // Enter = 发送（ChatGPT 风格）；Shift+Enter = 换行；Cmd/Ctrl+Enter 兼容老快捷键
-          if (e.key === "Enter" && !e.shiftKey) {
+          // 单行：Enter = 发送
+          if (e.key === "Enter") {
             e.preventDefault();
             if (!streaming) onSubmit();
           }
         }}
         placeholder="实习能不能算第二课堂? 换保研方向会有什么后果?"
-        rows={compact ? 2 : 3}
         disabled={streaming}
-        className="block w-full resize-none rounded-2xl border border-slate-200 bg-white px-5 py-4 pr-14 text-sm leading-6 text-slate-900 shadow-sm outline-none transition-colors placeholder:text-slate-400 hover:border-slate-300 focus:border-slate-900 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+        className={`block w-full rounded-full border border-slate-200 bg-white text-slate-900 shadow-sm outline-none transition-colors placeholder:text-slate-400 hover:border-slate-300 focus:border-slate-900 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 ${
+          compact ? "h-12 px-5 pr-14 text-sm" : "h-14 px-6 pr-16 text-base"
+        }`}
       />
       {streaming ? (
         <button
           type="button"
           onClick={onStop}
           aria-label="停止"
-          className="absolute bottom-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition-all hover:border-slate-400 hover:text-slate-900"
+          className="absolute right-2.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition-all hover:border-slate-400 hover:text-slate-900"
         >
           <Square className="h-3.5 w-3.5 fill-current" strokeWidth={0} />
         </button>
@@ -545,7 +496,7 @@ function AskBox({
           type="button"
           onClick={onSubmit}
           aria-label="提问"
-          className="absolute bottom-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-brand-gradient text-white shadow-sm transition-all hover:brightness-110"
+          className="absolute right-2.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-brand-gradient text-white shadow-sm transition-all hover:brightness-110"
         >
           <ArrowUp className="h-4 w-4" strokeWidth={2.2} />
         </button>

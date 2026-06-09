@@ -123,9 +123,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
       {/* Top header — borderless, transparent so it doesn't read as a
           separate framed box intersecting with the icon rail. */}
-      <header className="sticky top-0 z-30 bg-transparent px-4 py-3 lg:ml-16">
+      {/* header 整体 pointer-events-none、两侧簇 auto —— 透明 header 中段（含 px/py padding）
+          不挡其下浮层。pointer-events-none 必须落在 <header> 本身：放子 div 上时 header
+          box 仍以默认 auto 捕获中段空隙的点击，导致 Planner「全部路径/只看推荐」切换点不动。 */}
+      <header className="pointer-events-none sticky top-0 z-30 bg-transparent px-4 py-3 lg:ml-16">
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+          <div className="pointer-events-auto flex items-center gap-3">
             <button
               type="button"
               aria-label={open ? "关闭菜单" : "打开菜单"}
@@ -220,7 +223,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               </HoverCard>
             )}
           </div>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="pointer-events-auto ml-auto flex items-center gap-3">
             <span className="hidden text-sm text-slate-500 sm:inline">
               2026 春季学期
             </span>
