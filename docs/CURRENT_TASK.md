@@ -18,7 +18,7 @@
 **新优先级**（2026-05-31）：
 1. **C2b** wrangler secret put + 真部署到 Cloudflare Worker（等真要上线时做）← **下一条候选**
 2. （可选）接轻量 AI 层：GLM-5.1 按目标在这张连接图上挑可执行组合 / 精简 advice 文案
-**最近 commit**：（本 session 待 commit）workspace 画布布局微调——纯前端 UI 优化，详见下方 ✅ 表 2026-06-09 行；`66152a2` workspace 思维导图画布精致化（点阵背景 + 浮动毛玻璃图例 + 节点端口圆点/柔光 + 推荐线 gold→maya 渐变）；`93dc411` 连接图重做 + TD-10b 权重 AI 派生 + 画布建议层微调；`02e6167` splitSeedSql + gitignore 向量 seed；`8c72623` 13.8-B 手册 RAG 代码；`106f530` 13.8-A 个人文档解析；`cbea9fd` Dashboard 内嵌 AI 对话。
+**最近 commit**：`4766d32` workspace 兴趣→AI推荐接通 + 切换/重叠修复 + 一级聚焦；home 决策卡底图重做 + 极光背景（详见下方 ✅ 表 2026-06-09 行；极光后续微调待 commit）；`66152a2` workspace 思维导图画布精致化（点阵背景 + 浮动毛玻璃图例 + 节点端口圆点/柔光 + 推荐线 gold→maya 渐变）；`93dc411` 连接图重做 + TD-10b 权重 AI 派生 + 画布建议层微调；`02e6167` splitSeedSql + gitignore 向量 seed；`8c72623` 13.8-B 手册 RAG 代码；`106f530` 13.8-A 个人文档解析；`cbea9fd` Dashboard 内嵌 AI 对话。
 **架构转向（2026-05-25）**：用户拍板"静态路径库 + AI 连接"。改原 AI runtime 生成 reason 为 Claude 预编译 (goal × req) → 280 advice + 40 link 关系，DB 查询替代 runtime AI 调用。
 **UI 重设计（排队 14）**：✅ 已闭环（2026-05-28）。五批迭代见下方排队 14 段落 + 最近完成第一条。
 
@@ -40,6 +40,8 @@
 
 | ID | 阶段 | 完成日期 | 关键 commit / 文件 |
 |---|---|---|---|
+| **C2b 真部署 Cloudflare Worker**（`wrangler.jsonc` name 改 `meridian`；`npm run build` → `wrangler deploy` 创建 Worker；`wrangler secret put` 注入 4 个 server 密钥 ZHIPU_API_KEY / GLM_MODEL / SUPABASE_URL / SUPABASE_ANON_KEY；workers.dev 子域 `betonme519` 注册；上线 **https://meridian.betonme519.workers.dev**；CF 账号 betonme519@gmail.com / account `3b61235a162cae8e508e1d23826a3eca`） | 后端/上线 | 2026-06-09 | `wrangler.jsonc` name 改动待 commit；重部署 = build+deploy |
+| **workspace 兴趣→AI推荐接通 + 切换/重叠修复 + 一级聚焦**（① 兴趣→AI 推荐课程接通真 LLM：`interestCoursePrompt` + `chat` 流式，ShortcutDetail 兴趣框启用 ② 修复「全部路径/只看推荐」切换点不动：DashboardLayout header 整体 `pointer-events-none`、两侧交互簇 `pointer-events-auto` ③ 修复思维导图节点竖向重叠：非 course milestone 捷径排版前 `bucketY = max(bucketY, requirementY)` ④ 一级聚焦模型：只有聚焦的 milestone 展开到深层、其余只显示一级（`activeMilestone`） ⑤ 规则标题主干/补充拆分 `splitRequirementTitle`、明细+「还差 N」移到右侧「补充说明」、隐藏「N 模块」内部标注、删 Upload 反向勾选提示、时间后果→时间成本）；**home 更新了 UI**（决策卡底图素材 + 圆形箭头跳转键、空态居中单行提问框、对话态右栏右移加宽、底部极光背景 Aurora(ogl)：半圆穹顶入场 + 点击像素荡漾波纹） | 二/三 | 2026-06-09 | `4766d32` + 极光迭代待 commit |
 | **workspace 画布布局微调**（纯前端 UI 优化：右面板右移一点 / 目标 + 全部路径·只看推荐 切换并入右上一行靠"2026 春季学期"，左上 chip 只留 学校·年级 + 计数 / 画布滚动容器 `top-0` 顶到整屏（边界=整个 workspace）+ TOP_PAD 84 避让 header / 展开右侧分支按右面板**真实左边界**测量跟随滚动（替死值 inset）/ 双指横滑左右平移 = `overscroll-x-contain` 挡浏览器翻页 + 内容区右侧预留 `CANVAS_RIGHT_RESERVE 440` 保证横向滚动量把被面板挡住的右节点拉出来。曾试 click-drag 平移已回滚——灰层是浏览器双指翻页手势非本程序问题） | 二 | 2026-06-09 | `src/pages/Planner/index.tsx`，本 session 待 commit |
 | **排队 13.8-B** 手册 RAG（migration 0012 pgvector+rag_chunk+match RPC / genHandbookChunks 脚本 / chat.ts 检索注入 / **624 块向量灌库完成**） | 后端 | 2026-05-30 | `8c72623` + `02e6167` |
 | **排队 13.8-A** 个人文档解析 → 塞 prompt（pdfjs 浏览器抽文字 + parsed_text 写回 + Dashboard system 上下文喂 GLM-5.1） | 后端 | 2026-05-30 | `106f530` |
@@ -65,7 +67,7 @@
 
 | 优先级 | ID | 状态 | 卡点 |
 |---|---|---|---|
-| 1 | **C2b** wrangler secret put + 真部署 CF Worker | ⏳ 待真上线 | 注入 ZHIPU_API_KEY / GLM_MODEL / SUPABASE_URL / SUPABASE_ANON_KEY；deploy 后跑 GET/POST 验证 |
+| 1 | **C2c** 自定义域名 `meridianedu.xyz` 绑定 Worker | 🚧 阻塞（外部） | **workers.dev 国内被 GFW 在 TLS/SNI 层阻断**（实测：同机抓 developers.cloudflare.com ✅、抓 *.workers.dev → SSL alert 40 handshake_failure），WiFi/流量都打不开 → 必须绑自有域名才能国内访问。域名阿里云/腾讯云买，**当前卡在 .xyz 强制实名审核**（已提交待审）。审核通过后三步：①CF 后台 Add Site `meridianedu.xyz`(Free) 拿 2 个 ns.cloudflare.com →②阿里/腾讯控制台改 DNS 服务器 →③`wrangler.jsonc` 加 `routes`(custom_domain) + deploy。用户有 VPN 可开 CF 后台。预计实名次日（约 2026-06-10）继续 |
 
 ---
 
@@ -364,11 +366,11 @@
 
 ## 当前阻塞
 
-**主线无运行任务。排队 14 已闭环（2026-05-28）。**
+**C2b 真部署 ✅ 已闭环（2026-06-09，上线 https://meridian.betonme519.workers.dev）。**
 
-下一条候选执行顺序：
+当前外部阻塞：
 
-1. **C2b** wrangler secret put + 真部署 CF Worker ← 等真上线
+1. **C2c** 绑自定义域名 `meridianedu.xyz` 🚧 —— workers.dev 国内被墙（TLS/SNI 阻断，实测 SSL alert 40），必须绑自有域名。卡在 **.xyz 实名审核**（阿里/腾讯，已提交待审）；通过后做 Add Site→改 NS→wrangler routes custom_domain。**约 2026-06-10 继续。** 详见上方 ⏳ 表 C2c 行。
 
 > TD-10b ✅ 已闭环（2026-05-31 AI 派生静默权重）。TD-50 ❌ 做完即弃（用户认为便利贴价值不足，已回滚）。
 
@@ -420,6 +422,12 @@
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线（5-15 ~ 5-25 各排队 N 详细 / 5-17 基础设施大波次 / 5-16 数据源切 PDF / 5-15 digest 录入 等）见 `AI_MEMORY.md § 9`（L210+）+ git log。
 
+- **2026-06-09** — C2b 真部署上线 Cloudflare Worker（`wrangler.jsonc` name 改 `meridian` 待 commit）
+  - `npm run build`（✓ 3.71s）→ `wrangler deploy` 创建 Worker；`wrangler secret put` 注入 4 密钥（ZHIPU_API_KEY/GLM_MODEL/SUPABASE_URL/SUPABASE_ANON_KEY，源自 `.dev.vars`，一次性永久）；注册 workers.dev 子域 `betonme519`
+  - 上线 **https://meridian.betonme519.workers.dev**（CF 账号 betonme519@gmail.com / account `3b61235a162cae8e508e1d23826a3eca`）
+  - **发现卡点 C2c**：workers.dev 国内被 GFW TLS/SNI 阻断（实测同机 developers.cloudflare.com ✅ vs *.workers.dev SSL alert 40），WiFi/流量都打不开 → 必须绑自有域名
+  - 已买 `meridianedu.xyz`（阿里/腾讯），卡在 .xyz 实名审核；通过后 Add Site→改 NS→wrangler routes 绑定。安装了 Cloudflare 官方 Claude Code 插件（skills + 7 MCP）。详见 memory `project_deploy_cloudflare_live`
+
 - **2026-05-30** — 排队 13.8-B 手册 RAG 全闭环（commit `8c72623` + `02e6167`）
   - `0012_add_handbook_rag.sql`：pgvector + rag_chunk（authed 可读 RLS，非 user-owned）+ match_handbook_chunks RPC（SECURITY DEFINER cosine）+ 0012_verify（修 `polname`→`policyname`）
   - `scripts/genHandbookChunks.ts`：pdfjs legacy 抽字（pathToFileURL 修 Windows worker）+ 段落感知分块 + 批 embedding-3（自动读 .dev.vars key）→ seed SQL；实测 guide 215 + handbook 409 = 624 块
@@ -443,10 +451,5 @@
   - LogoFace 呼吸/变脸（`transform-box: fill-box` 修闪烁）+ `.bg-brand-gradient` / `.scrollbar-thin` 单源 utility
   - Schedule 删用户"新建规则"全套 + iframe 嵌 PDF（public/docs 临时静态）；Import 默认全不打勾（语义翻转，user_requirement_done 表"已完成"）；课程码全替为华师大风格中文名
   - **撤回**："最轻松毕业" → "轻松毕业" rename（DB 2 表 CHECK + jsonb 嵌套改动面太大）
-
-- **2026-05-28** — 排队 14 第二批（commit `6155a0e`）
-  - Planner 单屏 `xl:h-[calc(100vh-5rem)]` + PathGraph scrollRef 双向跟踪（解决点前节点视口卡右边）；右栏全 "框中套框" 改 hairline；WorkbenchHeader 二次精简
-  - AIAdvisor 单屏 + 8 mode 卡 2×4 自动拉满；Schedule 改两列「左结构树 + 右 PDF 预览」；Upload section 5 区重排；RequirementProgress 改 per-requirement 滑块 + `getCreditCap` regex 兜底
-  - **migration 0011** `0011_clean_e3_title.sql` 待用户 Supabase Dashboard 跑
 
 > 更早条目（排队 14 第一批 / 排队 12.5 子任务 A-E / 排队 12.5 sub-0 反向勾选 / 排队 13 mock advisor / 排队 13.5 静态路径库 / 排队 12 v5 workspace / 排队 11 / 排队 10 / 5-17 基础设施大波次 / 5-16 数据源切 PDF + TD-25 / 5-15 digest 录入）已全部由 `AI_MEMORY.md § 9` + git log 覆盖，本节不再保留。

@@ -3,7 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useProfile } from "@/hooks/useProfile";
 import { useRagSources } from "@/hooks/useRagSources";
 import { buildPersonalDocBlock } from "@/lib/personalDocContext";
-import { ArrowRight, ArrowUp, Square } from "lucide-react";
+import { ArrowRight, ArrowUp, Network, Square, Target, Upload, type LucideIcon } from "lucide-react";
 import LogoFace from "@/components/effects/LogoFace";
 import Aurora from "@/components/effects/Aurora";
 import { chat, tokenText, type Message } from "@/ai";
@@ -193,6 +193,19 @@ function CtaArrow({ to, label, tone }: { to: string; label: string; tone: "white
   );
 }
 
+/** Home 空态快捷跳转胶囊 —— 浅灰描边、透明填充（透出底部极光）、浅灰字（比边框略深）+ 左侧导航 icon。 */
+function JumpPill({ to, label, icon: Icon }: { to: string; label: string; icon: LucideIcon }) {
+  return (
+    <Link
+      to={to}
+      className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-4 py-1.5 text-xs font-medium text-slate-500 transition-colors duration-200 hover:border-slate-400 hover:text-slate-700 sm:text-sm"
+    >
+      <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+      {label}
+    </Link>
+  );
+}
+
 // meta 文字保持中性 slate 保证对比度（非白字卡片用）。
 const toneText: Record<DecisionCard["tone"], string> = {
   neutral: "text-slate-500",
@@ -335,7 +348,10 @@ export default function DashboardPage() {
               你今天想问点什么?
             </h1>
           </div>
-          <div className="mx-auto mt-8 w-full max-w-3xl">
+          <p className="mt-3 text-center text-xs text-slate-400">
+            记下今天的新想法,或问问系统查一条学校规则是否属实
+          </p>
+          <div className="mx-auto mt-6 w-full max-w-3xl">
             <AskBox
               value={askInput}
               onChange={setAskInput}
@@ -343,9 +359,11 @@ export default function DashboardPage() {
               onStop={handleStop}
               streaming={streaming}
             />
-            <p className="mt-3 text-center text-xs text-slate-400">
-              记下今天的新想法,或问问系统查一条学校规则是否属实
-            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
+              <JumpPill to="/course-planner" label="当前规则路径" icon={Network} />
+              <JumpPill to="/ai-advisor" label="当前目标" icon={Target} />
+              <JumpPill to="/import" label="上传文件" icon={Upload} />
+            </div>
           </div>
         </div>
 
