@@ -46,9 +46,9 @@ export function UserMenu({ trigger }: { trigger: ReactNode }) {
     navigate({ to: "/" });
   };
 
-  // 暂时所有非登出项都跳转到 /dashboard——项目还没有对应路由，
-  // 等业务页就位后只在这里改一处。
   const goDashboard = () => navigate({ to: "/dashboard" });
+  // 个人资料 / 设置 → import 页（个人设置 + 资料上传都在那）
+  const goImport = () => navigate({ to: "/import" });
 
   // 交互只改颜色——任何 transform（translate/rotate/scale）放在 4×4 的小图标上
   // 都会显得抽搐。Apple-like 的克制：底色 + 文字 + 图标颜色一起平滑过渡。
@@ -85,15 +85,16 @@ export function UserMenu({ trigger }: { trigger: ReactNode }) {
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="my-1 bg-slate-100" />
 
-        <DropdownMenuItem onSelect={goDashboard} className={itemNeutral}>
+        <DropdownMenuItem onSelect={goImport} className={itemNeutral}>
           <UserRound className="mr-2.5 h-4 w-4 text-slate-500" strokeWidth={1.7} />
           个人资料
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={goDashboard} className={itemUpgrade}>
           <Sparkles className="mr-2.5 h-4 w-4 text-amber-600" strokeWidth={1.7} />
           Upgrade plan
+          <span className="ml-auto text-[10px] font-normal text-amber-700/50">待上线</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={goDashboard} className={itemNeutral}>
+        <DropdownMenuItem onSelect={goImport} className={itemNeutral}>
           <Settings className="mr-2.5 h-4 w-4 text-slate-500" strokeWidth={1.7} />
           设置
         </DropdownMenuItem>

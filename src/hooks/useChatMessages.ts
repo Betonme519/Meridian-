@@ -33,6 +33,8 @@ import { randomUUID } from "@/lib/uuid";
  */
 
 const DEFAULT_LIST_LIMIT_ROWS = 100;
+// 用户拍板：AI 选课顾问历史只保留最近 3 次会话，超出自动删最旧的。
+const MAX_CONVERSATIONS = 3;
 
 export interface PersistRoundInput {
   userMessage: string;
@@ -90,7 +92,13 @@ export function useChatMessages(): UseChatMessagesValue {
         DEFAULT_LIST_LIMIT_ROWS,
       );
       if (reqId !== listReqIdRef.current) return;
-      setConversations(rows);
+      // 只显示最近 N 个；若 DB 里超量，后台裁剪掉旧的（best-effort，不阻塞展示）
+      if (rows.length > MAX_CONVERSATIONS) {
+        void chatMessageApi.pruneConversations(userId, MAX_CONVERSATIONS);
+        setConversations(rows.slice(0, MAX_CONVERSATIONS));
+      } else {
+        setConversations(rows);
+      }
     } catch (e) {
       if (reqId !== listReqIdRef.current) return;
       const msg = e instanceof Error ? e.message : "加载对话历史失败";
@@ -201,6 +209,22 @@ export function useChatMessages(): UseChatMessagesValue {
           ...prev,
         ]);
 
+        // 裁剪：只留最近 MAX_CONVERSATIONS 个会话，删掉更旧的（best-effort，不影响本轮）。
+        try {
+          const removed = await chatMessageApi.pruneConversations(userId, MAX_CONVERSATIONS);
+          if (removed.length > 0) {
+            const staleSet = new Set(removed);
+            setConversations((prev) => prev.filter((c) => !staleSet.has(c.conversation_id)));
+            if (activeConversationId && staleSet.has(activeConversationId)) {
+              activeReqIdRef.current++;
+              setActiveConversationId(null);
+              setActiveMessages([]);
+            }
+          }
+        } catch {
+          /* 裁剪失败忽略，下轮 / 下次加载再裁 */
+        }
+
         return conversationId;
       } catch (e) {
         const msg = e instanceof Error ? e.message : "保存对话失败";
@@ -208,7 +232,7 @@ export function useChatMessages(): UseChatMessagesValue {
         return null;
       }
     },
-    [user],
+    [user, activeConversationId],
   );
 
   /**

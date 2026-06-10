@@ -1697,13 +1697,13 @@ function ImpactMetric({
   gradient?: boolean;
 }) {
   return (
-    <div>
+    <div className="flex items-center justify-between gap-2">
       <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
         <Icon className="h-3.5 w-3.5 text-slate-400" />
         {label}
       </p>
       <p
-        className={`mt-1 text-sm font-semibold tabular-nums ${
+        className={`text-sm font-semibold tabular-nums ${
           gradient ? "bg-brand-gradient bg-clip-text text-transparent" : "text-slate-950"
         }`}
       >

@@ -229,3 +229,29 @@ export async function deleteConversation(
     .eq("conversation_id", conversationId);
   if (error) failApiCall("chat.deleteConversation", `删除对话失败：${error.message}`);
 }
+
+/**
+ * 只保留该用户最近 `keep` 个会话，删掉更旧的（连同其所有消息）。控制历史体量
+ * （用户拍板：AI 选课顾问只留最近 3 次）。best-effort：内部错误吞掉、不抛、不弹全局
+ * 错误，失败下一轮再裁。返回实际被删掉的 conversation_id 列表（供调用方同步本地态）。
+ */
+export async function pruneConversations(userId: string, keep: number): Promise<string[]> {
+  if (!isSupabaseConfigured) return [];
+  let list: ConversationSummary[];
+  try {
+    list = await listConversations(userId);
+  } catch {
+    return [];
+  }
+  const stale = list.slice(Math.max(0, keep)); // keep 之后（更旧）的全删
+  const removed: string[] = [];
+  for (const c of stale) {
+    const { error } = await supabase
+      .from("chat_message")
+      .delete()
+      .eq("user_id", userId)
+      .eq("conversation_id", c.conversation_id);
+    if (!error) removed.push(c.conversation_id);
+  }
+  return removed;
+}

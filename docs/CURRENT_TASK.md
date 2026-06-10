@@ -3,7 +3,7 @@
 > 短期工作内存。**AI 接手优先读这份**，再按需查 `AI_MEMORY.md` / `TECH_DEBT.md`。
 > 铁律：只做下方「排队」里的事，做完停下汇报。「不要修改」当只读。
 
-> Last updated: **2026-06-10**
+> Last updated: **2026-06-11**
 
 ---
 
@@ -40,6 +40,7 @@
 
 | ID | 阶段 | 完成日期 | 关键 commit / 文件 |
 |---|---|---|---|
+| **import 毕业要求悬停手风琴 + 头像菜单跳转 + 模拟器横排 + 对话历史限 3**（① RequirementProgress 分类改「悬停预览展开 / 点击钉住常驻（渐变白字反馈）」手风琴：切换锁防布局塌缩抖动、钉住后禁悬停只点击切换、grid-rows 缓动+微 Q 弹 ② 头像菜单：个人资料/设置 → `/import`、Upgrade plan 加浅色「待上线」 ③ Planner 选择模拟器 ImpactMetric 改标签左·值右同行 ④ AI 选课顾问历史只留最近 3 次会话：`pruneConversations` 每轮 + 加载时裁旧） | 三/后端 | 2026-06-11 | `RequirementProgress.tsx` · `UserMenu.tsx` · `Planner/index.tsx` · `chatMessageApi.ts` · `useChatMessages.ts` |
 | **问题反馈功能**（头像菜单「帮助」→ 毛玻璃白色弹窗提交：标题/多行输入/渐变「发送」按钮；`feedback` 表 owner-insert + 无 SELECT policy → 管理员仅在 Supabase 后台看，前端读不到。需在 Supabase 跑 `0014_add_feedback.sql`） | 后端+三 | 2026-06-10 | `supabase/migrations/0014_add_feedback.sql` · `src/api/feedbackApi.ts` · `src/components/feedback/FeedbackDialog.tsx` · `UserMenu.tsx` |
 | **通识课程手册 RAG 灌库**（第三本 `source_key=ecnu-gened-courses`，1085 块；`genHandbookChunks.ts` 扩 markdown 源 + 子目录路径；`splitGenedSeed.mjs` 切分器解决网页 SQL Editor ≥1MB 粘贴失败；用户已灌库） | 后端 | 2026-06-10 | `genHandbookChunks.ts` · `scripts/splitGenedSeed.mjs` · `0013_seed_gened_courses.sql`(gitignore) |
 | **Planner 第二课堂/论文放出全部规则数据 + 画布流式布局重写**（① `trackUserView` 分类器重排救回 C6/D5、`isUserVisibleRequirement(req,milestone)` 放行规则类 ② buildGraph 用 category 当 bucket 层复用展开机制、`CATEGORY_HIGHLIGHTS` 重点置顶、规则叶子点开右侧「规则说明」显 description ③ 画布从固定间距改**内容驱动流式 + 顶对齐**：收起紧凑一屏可见、展开只下推后续、父节点不抖 ④ 选择模拟器删「本要求/本分类」、留「学分影响/时间成本」一行 + 渐变字） | 二/三 | 2026-06-10 | `Planner/index.tsx` · `trackUserView.ts` |

@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronRight, Circle, ListTodo, Loader2 } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { CheckCircle2, ChevronRight, Circle, ListTodo, Loader2 } from "lucide-react";
 import { useTrack } from "@/hooks/useTrack";
 import { useUserRequirementDone } from "@/hooks/useUserRequirementDone";
 import { useAuth } from "@/hooks/useAuth";
@@ -86,19 +86,56 @@ export default function RequirementProgress() {
   const loading = authLoading || trackLoading || doneLoading;
   const error = trackError ?? doneError;
 
-  // 展开状态：仅 category 折叠（requirement 级下拉已取消,滑块直接内联在右侧）
-  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
+  // ── 分类展开逻辑（手风琴：同时只一个开） ─────────────────────────────
+  // 两种模式：
+  //  · 没钉住任何（pinnedId=null）→ 悬停预览：鼠标移到哪个分类哪个展开，移出全收。
+  //  · 钉住了某个（点击）→ 进入「点击切换」模式：钉住的常驻展开（渐变），**悬停别的
+  //    不再展开**，必须点击才把钉住+展开切到新的那个；再点钉住的本身则取消。
+  // 故展开的 = pinnedId 优先、否则看 hoverId。
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const [pinnedId, setPinnedId] = useState<string | null>(null);
+  const openId = pinnedId ?? hoverId;
+
+  // openId 的 ref 镜像，给事件回调读「当前展开的是谁」而不吃闭包旧值
+  const openIdRef = useRef<string | null>(null);
+  openIdRef.current = openId;
+
+  // 切换锁：手风琴切换时，上方分类收起会塌缩布局、把下方顶到静止的鼠标下面，
+  // 浏览器据此对静止鼠标反复派发 mouseenter → 两个框无限抖动。切换后锁 ~320ms
+  // （略大于展开动画 300ms），期间忽略一切 enter，等动画稳定再放开 → 断掉死循环。
+  const lockRef = useRef(false);
+  // 收起宽限：移出卡片瞬间若因塌缩误触 leave，延迟 90ms 再收；期间进了别的分类就取消。
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const enterCat = (id: string) => {
+    if (pinnedId !== null) return; // 已钉住 → 进入点击切换模式，悬停不接管（也顺带杜绝抖动）
+    if (lockRef.current) return; // 切换动画未结束，忽略布局位移引发的伪 enter
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    if (id === openIdRef.current) return; // 已经是它，不动（也不上锁）
+    setHoverId(id);
+    lockRef.current = true;
+    setTimeout(() => {
+      lockRef.current = false;
+    }, 320);
+  };
+
+  const scheduleCloseAll = () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = setTimeout(() => setHoverId(null), 90);
+  };
+
+  // 点击：切到/取消钉住。同步 hoverId 到点的这个 —— 取消钉住后落回鼠标所在的它，
+  // 不会因 hoverId 残留旧值而跳去展开别的。
+  const togglePin = (id: string) => {
+    setPinnedId((p) => (p === id ? null : id));
+    setHoverId(id);
+  };
+
   // requirement 学分草稿（reqId → 当前已修学分，local state 占位）
   const [creditDrafts, setCreditDrafts] = useState<Record<string, number>>({});
-
-  function toggleCat(id: string) {
-    setExpandedCats((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
 
   function setCreditDraft(reqId: string, value: number) {
     setCreditDrafts((prev) => ({ ...prev, [reqId]: value }));
@@ -154,35 +191,58 @@ export default function RequirementProgress() {
         </div>
       )}
 
-      {/* 单层 card，内部 divide-y 细线分隔各 category */}
+      {/* 单层 card，内部 divide-y 细线分隔各 category。移出整张卡 → 全部收起 */}
       {sections.length > 0 && (
-        <div className="mt-3 divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div
+          className="mt-3 divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 bg-white"
+          onMouseLeave={scheduleCloseAll}
+        >
           {sections.map((s) => {
-            const catOpen = expandedCats.has(s.category.id);
             // 翻转:set 内 = done,所以直接 filter set 内
             const doneInCat = s.requirements.filter((r) => isReqDone(r.id)).length;
             const totalInCat = s.requirements.length;
+            const catOpen = openId === s.category.id;
+            const isPinned = pinnedId === s.category.id;
 
             return (
-              <div key={s.category.id}>
+              // 鼠标进入本块即展开它、同时收起其它（手风琴）；从 A 移到 B 直接平滑切换，
+              // 不会先瞬间收回。移出整张卡（外层 onMouseLeave）才全收。
+              <div key={s.category.id} onMouseEnter={() => enterCat(s.category.id)}>
                 <button
                   type="button"
-                  onClick={() => toggleCat(s.category.id)}
-                  className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-slate-50"
+                  onClick={() => togglePin(s.category.id)}
+                  className={`flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left transition-colors ${
+                    isPinned ? "bg-brand-gradient" : catOpen ? "bg-slate-50" : ""
+                  }`}
+                  title={isPinned ? "已固定 · 点击收起" : "点击固定展开"}
                 >
-                  {catOpen ? (
-                    <ChevronDown className="h-4 w-4 text-slate-400" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-slate-400" />
-                  )}
-                  <h3 className="text-sm font-semibold text-slate-950">{s.category.title}</h3>
-                  <span className="ml-auto text-[11px] tabular-nums text-slate-500">
+                  <ChevronRight
+                    className={`h-4 w-4 transition-transform duration-300 ${
+                      catOpen ? "rotate-90" : ""
+                    } ${isPinned ? "text-white" : "text-slate-400"}`}
+                  />
+                  <h3
+                    className={`text-sm font-semibold ${isPinned ? "text-white" : "text-slate-950"}`}
+                  >
+                    {s.category.title}
+                  </h3>
+                  <span
+                    className={`ml-auto text-[11px] tabular-nums ${
+                      isPinned ? "text-white/90" : "text-slate-500"
+                    }`}
+                  >
                     {doneInCat} / {totalInCat}
                   </span>
                 </button>
 
-                {catOpen && (
-                  <ul className="divide-y divide-slate-100 border-t border-slate-100 bg-slate-50/40">
+                {/* 展开/收起动画：grid-rows 0fr↔1fr + back-out 贝塞尔（微 Q 弹），不闪不跳 */}
+                <div
+                  className={`grid transition-all duration-300 ease-[cubic-bezier(0.34,1.4,0.64,1)] ${
+                    catOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                  }`}
+                >
+                  <div className="overflow-hidden">
+                    <ul className="divide-y divide-slate-100 border-t border-slate-100 bg-slate-50/40">
                     {s.requirements.map((r) => {
                       const done = isReqDone(r.id);
                       // 学分上限:threshold 优先,否则从 title 解 "N 学分",仍解不出默认 5
@@ -246,8 +306,9 @@ export default function RequirementProgress() {
                         </li>
                       );
                     })}
-                  </ul>
-                )}
+                    </ul>
+                  </div>
+                </div>
               </div>
             );
           })}
