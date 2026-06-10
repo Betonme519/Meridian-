@@ -20,7 +20,6 @@ import {
 import { useProfile } from "@/hooks/useProfile";
 import { useRagSources } from "@/hooks/useRagSources";
 import type { ParsedStatus, RagSource, RagSourceKind } from "@/api/ragSourceApi";
-import CourseManager from "@/pages/Upload/CourseManager";
 import RequirementProgress from "@/pages/Upload/RequirementProgress";
 
 /* ───────────────────────── Section 2 · File import slots ───────────────────────── */
@@ -91,15 +90,15 @@ const schoolOptions = [
 type MiniApp = {
   title: string;
   desc: string;
-  status: "已连接" | "可连接";
+  status: "已连接" | "待上线";
   icon: LucideIcon;
 };
 
 const miniApps: MiniApp[] = [
-  { title: "超级课程表", desc: "课表 + 课评数据同步", status: "可连接", icon: Smartphone },
-  { title: "小红书课评", desc: "聚合学生真实评价", status: "可连接", icon: Smartphone },
-  { title: "学校论坛", desc: "本校匿名社区抓取（按学校）", status: "可连接", icon: Database },
-  { title: "自定义 RSS", desc: "教务公告 / 通知订阅", status: "可连接", icon: Cloud },
+  { title: "超级课程表", desc: "课表 + 课评数据同步", status: "待上线", icon: Smartphone },
+  { title: "小红书课评", desc: "聚合学生真实评价", status: "待上线", icon: Smartphone },
+  { title: "学校论坛", desc: "本校匿名社区抓取（按学校）", status: "待上线", icon: Database },
+  { title: "自定义 RSS", desc: "教务公告 / 通知订阅", status: "待上线", icon: Cloud },
 ];
 
 /* ───────────────────────── Section 6 · Imported data list ───────────────────────── */
@@ -118,7 +117,7 @@ const STATUS_LABEL: Record<ParsedStatus, string> = {
 const STATUS_CLS: Record<ParsedStatus, string> = {
   pending: "bg-gold/10 text-slate-700",
   parsing: "bg-gold/10 text-slate-700",
-  parsed: "bg-maya/15 text-slate-700",
+  parsed: "bg-brand-gradient text-white",
   failed: "bg-flame/10 text-flame",
 };
 
@@ -147,8 +146,6 @@ export default function UploadPage() {
   const [school, setSchool] = useState(schoolOptions[0]);
   const [grade, setGrade] = useState("");
   const [major, setMajor] = useState("");
-  // target_gpa 默认 3.0（DB 可为 null，未设置时滑块显示中位）
-  const [targetGpa, setTargetGpa] = useState<number>(3.0);
   const [dragHover, setDragHover] = useState<number | null>(null);
 
   // profile 加载/变化时同步到本地草稿（包括首次加载和多 tab 同步场景）
@@ -157,8 +154,7 @@ export default function UploadPage() {
     setSchool(profile.school ?? schoolOptions[0]);
     setGrade(profile.grade != null ? String(profile.grade) : "");
     setMajor(profile.major ?? "");
-    setTargetGpa(profile.target_gpa != null ? Number(profile.target_gpa) : 3.0);
-  }, [profile?.school, profile?.grade, profile?.major, profile?.target_gpa]);
+  }, [profile?.school, profile?.grade, profile?.major]);
 
   // school 是 select，change 即 commit
   const handleSchoolChange = (v: string) => {
@@ -191,15 +187,6 @@ export default function UploadPage() {
     const trimmed = major.trim();
     void updateProfile({ major: trimmed === "" ? null : trimmed }).catch((e) =>
       console.warn("[Upload] 保存专业失败:", e),
-    );
-  };
-
-  // target_gpa slider 拖动期间仅本地 state 跟随；松手 / 失焦才写 DB，避免狂触
-  // updateProfile。保留 2 位小数精度（DB numeric(3,2)），与 toFixed(1) 显示一致。
-  const handleGpaCommit = () => {
-    const rounded = Math.round(targetGpa * 10) / 10;
-    void updateProfile({ target_gpa: rounded }).catch((e) =>
-      console.warn("[Upload] 保存目标 GPA 失败:", e),
     );
   };
 
@@ -308,43 +295,10 @@ export default function UploadPage() {
                 className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm transition-colors hover:border-slate-400 focus:border-slate-950 focus:outline-none"
               />
             </Field>
-
-            {/* TD-10 第一刀 · 目标 GPA */}
-            <Field
-              label="目标 GPA"
-              hint="影响 advisor 推荐课程的难度倾向"
-            >
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min={0}
-                  max={4}
-                  step={0.1}
-                  value={targetGpa}
-                  onChange={(e) => setTargetGpa(parseFloat(e.target.value))}
-                  onPointerUp={handleGpaCommit}
-                  onKeyUp={(e) => {
-                    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-                      handleGpaCommit();
-                    }
-                  }}
-                  className="flex-1 accent-sapphire"
-                  aria-label="目标 GPA"
-                />
-                <span className="w-12 text-right text-sm font-semibold tabular-nums text-slate-900">
-                  {targetGpa.toFixed(1)}
-                </span>
-              </div>
-              <div className="mt-1 flex justify-between text-[10px] text-slate-400">
-                <span>0.0</span>
-                <span>2.0</span>
-                <span>4.0</span>
-              </div>
-            </Field>
           </div>
           <button
             type="button"
-            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:border-slate-400 hover:text-slate-950"
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand-gradient px-3 py-2 text-xs font-medium text-white shadow-sm transition-all hover:brightness-110"
           >
             <Download className="h-3.5 w-3.5" />
             导出我的所有数据
@@ -616,9 +570,6 @@ export default function UploadPage() {
           })}
         </div>
       </div>
-
-      {/* 5 · 我已修的课（排队 11） */}
-      <CourseManager />
     </section>
   );
 }

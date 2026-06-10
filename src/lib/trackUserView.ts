@@ -82,12 +82,7 @@ const HIDE_KEYWORDS = [
  * 关键词扫顺序：先排除 HIDE，再按 bucket / milestone 关键词匹配。
  */
 export function classifyCategory(code: string, title: string): CategoryClassification | null {
-  // 1. 黑名单：管理规则全 hide
-  for (const k of HIDE_KEYWORDS) {
-    if (title.includes(k)) return null;
-  }
-
-  // 2. "上课" milestone 的 5 个 bucket
+  // 1. "上课" milestone 的 5 个 bucket（明确修课分类，最优先）
   if (/(公共必修|体质|体育)/.test(title)) {
     return { milestone: "course", bucket: "公共必修" };
   }
@@ -104,17 +99,21 @@ export function classifyCategory(code: string, title: string): CategoryClassific
     return { milestone: "course", bucket: "任选" };
   }
 
-  // 3. 第二课堂
+  // 2. 第二课堂 / 论文项目 —— 放在 HIDE 黑名单**之前**判定。
+  //    否则 C6「创新创业学分认定」被"学分认定"、D5「毕业论文抽检」被"抽检"误伤隐藏。
   if (/(创新创业|学科竞赛|创新训练|CTP|社会实践)/i.test(title)) {
     return { milestone: "second" };
   }
-
-  // 4. 论文项目
-  if (/(实习|毕业论文工作|毕业论文指导|毕业设计)/.test(title)) {
+  if (/(实习|毕业论文|毕业设计)/.test(title)) {
     return { milestone: "thesis" };
   }
 
-  // 5. code 前缀兜底（非 ECNU track 可能有不同 title 但 code 仍约定俗成）
+  // 3. 黑名单：剩下的管理 / 流程规则全 hide（学籍 / 注册 / 辅修 / 转专业 / 推免 …）
+  for (const k of HIDE_KEYWORDS) {
+    if (title.includes(k)) return null;
+  }
+
+  // 4. code 前缀兜底（非 ECNU track 可能有不同 title 但 code 仍约定俗成）
   //    极端 fallback：能想到的最后救命，没匹配上就 hide
   const letter = code.charAt(0).toUpperCase();
   if (letter === "E") {
@@ -127,8 +126,14 @@ export function classifyCategory(code: string, title: string): CategoryClassific
 
 /**
  * requirement 是否对用户可见。
- * 仅 course-kind 4 档（count/credits/one_of/all_of）可见；学校规则类 8 档全隐藏。
+ *  - 上课（course / 缺省）：仅 course-kind 4 档（count/credits/one_of/all_of），规则类隐藏。
+ *  - 第二课堂 / 论文：放行全部 kind —— 这两支的内容几乎都是规则类（学分认定 / 抽检 /
+ *    评分方案 / 计划专项等），是用户真正想看的「关键事项」，故不再过滤。
  */
-export function isUserVisibleRequirement(req: TrackRequirement): boolean {
+export function isUserVisibleRequirement(
+  req: TrackRequirement,
+  milestone?: UserMilestoneCode,
+): boolean {
+  if (milestone === "second" || milestone === "thesis") return true;
   return (COURSE_REQUIREMENT_KINDS as readonly string[]).includes(req.kind);
 }

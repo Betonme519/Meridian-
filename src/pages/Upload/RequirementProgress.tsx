@@ -70,7 +70,7 @@ export default function RequirementProgress() {
       const cls = classifyCategory(category.code, category.title);
       if (!cls) continue;
       const reqs = requirementsByCategoryId.get(category.id) ?? [];
-      const visible = reqs.filter(isUserVisibleRequirement);
+      const visible = reqs.filter((r) => isUserVisibleRequirement(r));
       if (visible.length > 0) out.push({ category, requirements: visible });
     }
     return out;
@@ -176,7 +176,6 @@ export default function RequirementProgress() {
                     <ChevronRight className="h-4 w-4 text-slate-400" />
                   )}
                   <h3 className="text-sm font-semibold text-slate-950">{s.category.title}</h3>
-                  <span className="font-mono text-[11px] text-slate-400">{s.category.code}</span>
                   <span className="ml-auto text-[11px] tabular-nums text-slate-500">
                     {doneInCat} / {totalInCat}
                   </span>

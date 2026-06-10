@@ -1,5 +1,9 @@
-# 13.8-B 生成的手册向量 seed（~7MB，可由 scripts/genHandbookChunks.ts 重新生成，不入库）
+# 生成的手册向量 seed（数 MB~十几 MB，可由 scripts/genHandbookChunks.ts 重新生成，不入库）
 supabase/migrations/0012_seed_handbook_chunks*.sql
+supabase/migrations/0013_seed_gened_courses*.sql
+
+# 通识课程手册：md 清洗版入库（RAG 源），原始 PDF（~10MB）仅本地备份用
+docs/20260610华师大通识课文档/*.pdf
 
 # Logs
 logs

@@ -33,7 +33,7 @@ const REPO_ROOT = resolve(__dirname, "..");
 const DOCS_DIR = resolve(REPO_ROOT, "public/docs");
 const OUT_SQL = resolve(
   REPO_ROOT,
-  "supabase/migrations/0012_seed_handbook_chunks.sql",
+  "supabase/migrations/0013_seed_gened_courses.sql",
 );
 
 /* ───────────────────────── 配置 ───────────────────────── */
@@ -47,9 +47,16 @@ interface SourceDef {
   file: string;
 }
 
+// file 含 "/" → 按仓库根解析；否则按 public/docs 解析。支持 .pdf 与 .md/.markdown。
 const SOURCES: SourceDef[] = [
-  { key: "ecnu-2025-guide", file: "ecnu-2025-guide.pdf" },
-  { key: "ecnu-2025-handbook", file: "ecnu-2025-handbook.pdf" },
+  // 通识教育课程手册（2026-06 更新）——用 markdown 源（比 PDF 抽字更干净）
+  {
+    key: "ecnu-gened-courses",
+    file: "docs/20260610华师大通识课文档/华东师范大学通识教育课程手册_2026年6月更新.md",
+  },
+  // 以下两本此前已建；如需重灌取消注释再跑（重跑只覆盖各自 source_key 的行）：
+  // { key: "ecnu-2025-guide", file: "ecnu-2025-guide.pdf" },
+  // { key: "ecnu-2025-handbook", file: "ecnu-2025-handbook.pdf" },
 ];
 
 const CHUNK_TARGET = 700; // 目标块长（字符）
@@ -88,6 +95,16 @@ async function extractPdfText(absPath: string): Promise<string> {
   return pages.join("\n\n");
 }
 
+/** 按扩展名取文本：.md/.markdown 直接读（去掉图片行），其余走 PDF 抽取。 */
+async function extractText(absPath: string): Promise<string> {
+  if (/\.(md|markdown)$/i.test(absPath)) {
+    return readFileSync(absPath, "utf8")
+      .replace(/^!\[.*?\]\(.*?\)\s*$/gm, "") // 去 markdown 图片行（base64/CDN 图无意义）
+      .replace(/\n{3,}/g, "\n\n");
+  }
+  return extractPdfText(absPath);
+}
+
 /* ───────────────────────── 分块 ───────────────────────── */
 
 interface Chunk {
@@ -98,7 +115,9 @@ interface Chunk {
 /** 启发式判断一行是否像章节标题 */
 function looksLikeHeading(line: string): boolean {
   const s = line.trim();
-  if (!s || s.length > 40) return false;
+  if (!s) return false;
+  if (/^#{1,6}\s+/.test(s)) return true; // markdown 标题
+  if (s.length > 40) return false;
   if (/^第[一二三四五六七八九十百零〇\d]+[章节条编部篇]/.test(s)) return true;
   if (/^[\d]+([.、][\d]+){0,3}[\s、.]/.test(s)) return true;
   // 短行且无句末标点，多半是小标题
@@ -132,7 +151,7 @@ function chunkText(full: string): Chunk[] {
     if (looksLikeHeading(u)) {
       // 标题前先收掉已积累内容，再把标题作为新块的引子
       flush();
-      currentHeading = u.slice(0, 40);
+      currentHeading = u.replace(/^#{1,6}\s+/, "").slice(0, 40);
     }
     if (!buf) {
       buf = u;
@@ -231,7 +250,7 @@ function vecLiteral(v: number[]): string {
 async function main() {
   const sqlParts: string[] = [];
   sqlParts.push(
-    "-- 0012_seed_handbook_chunks.sql —— 由 scripts/genHandbookChunks.ts 生成，勿手改",
+    "-- 0013_seed_gened_courses.sql —— 由 scripts/genHandbookChunks.ts 生成，勿手改",
     "-- 前提：0012_add_handbook_rag.sql 已跑（rag_chunk + pgvector + match RPC 就绪）",
     "-- 幂等：ON CONFLICT (source_key, chunk_index) DO UPDATE",
     "begin;",
@@ -250,13 +269,15 @@ async function main() {
   let grandTotal = 0;
 
   for (const src of SOURCES) {
-    const abs = resolve(DOCS_DIR, src.file);
+    const abs = src.file.includes("/")
+      ? resolve(REPO_ROOT, src.file)
+      : resolve(DOCS_DIR, src.file);
     if (!existsSync(abs)) {
       console.error(`✗ 找不到 ${abs}，跳过 ${src.key}`);
       continue;
     }
     console.log(`\n[${src.key}] 抽取 ${src.file} …`);
-    const text = await extractPdfText(abs);
+    const text = await extractText(abs);
     const chunks = chunkText(text);
     console.log(
       `  抽到 ${text.length} 字符 → ${chunks.length} 块（目标 ${CHUNK_TARGET} / 上限 ${CHUNK_MAX} / 重叠 ${CHUNK_OVERLAP}）`,

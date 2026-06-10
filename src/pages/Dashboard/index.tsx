@@ -339,7 +339,7 @@ export default function DashboardPage() {
           className="pointer-events-none fixed inset-x-0 bottom-0 z-0 h-[42vh] lg:left-16"
           aria-hidden
         >
-          <Aurora colorStops={["#FE6237", "#FFB62E", "#7CC3FF"]} blend={1.0} ripple={ripple} />
+          <Aurora colorStops={["#FF7C52", "#FFC95A", "#9FD6FF"]} blend={1.0} ripple={ripple} />
         </div>
         <div className="relative z-10 flex flex-col pb-[12vh]">
           <div className="flex items-center justify-center gap-3 sm:gap-4">

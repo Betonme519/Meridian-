@@ -3,7 +3,7 @@
 > 短期工作内存。**AI 接手优先读这份**，再按需查 `AI_MEMORY.md` / `TECH_DEBT.md`。
 > 铁律：只做下方「排队」里的事，做完停下汇报。「不要修改」当只读。
 
-> Last updated: **2026-06-09**
+> Last updated: **2026-06-10**
 
 ---
 
@@ -40,6 +40,10 @@
 
 | ID | 阶段 | 完成日期 | 关键 commit / 文件 |
 |---|---|---|---|
+| **问题反馈功能**（头像菜单「帮助」→ 毛玻璃白色弹窗提交：标题/多行输入/渐变「发送」按钮；`feedback` 表 owner-insert + 无 SELECT policy → 管理员仅在 Supabase 后台看，前端读不到。需在 Supabase 跑 `0014_add_feedback.sql`） | 后端+三 | 2026-06-10 | `supabase/migrations/0014_add_feedback.sql` · `src/api/feedbackApi.ts` · `src/components/feedback/FeedbackDialog.tsx` · `UserMenu.tsx` |
+| **通识课程手册 RAG 灌库**（第三本 `source_key=ecnu-gened-courses`，1085 块；`genHandbookChunks.ts` 扩 markdown 源 + 子目录路径；`splitGenedSeed.mjs` 切分器解决网页 SQL Editor ≥1MB 粘贴失败；用户已灌库） | 后端 | 2026-06-10 | `genHandbookChunks.ts` · `scripts/splitGenedSeed.mjs` · `0013_seed_gened_courses.sql`(gitignore) |
+| **Planner 第二课堂/论文放出全部规则数据 + 画布流式布局重写**（① `trackUserView` 分类器重排救回 C6/D5、`isUserVisibleRequirement(req,milestone)` 放行规则类 ② buildGraph 用 category 当 bucket 层复用展开机制、`CATEGORY_HIGHLIGHTS` 重点置顶、规则叶子点开右侧「规则说明」显 description ③ 画布从固定间距改**内容驱动流式 + 顶对齐**：收起紧凑一屏可见、展开只下推后续、父节点不抖 ④ 选择模拟器删「本要求/本分类」、留「学分影响/时间成本」一行 + 渐变字） | 二/三 | 2026-06-10 | `Planner/index.tsx` · `trackUserView.ts` |
+| **多处 UI 删改 + home 极光提亮**（Schedule 规则树删各分支内「AI 推测」块；RequirementProgress 删分类 code 徽章；Upload 删「目标 GPA」/删「我已修的课」/「导出我的所有数据」按钮改渐变底/「解析完成」徽章改渐变底白字/小程序「可连接」→「待上线」；home 极光配色提亮一档） | 三 | 2026-06-10 | `Schedule/index.tsx` · `Upload/index.tsx` · `RequirementProgress.tsx` · `Dashboard/index.tsx` |
 | **C2b 真部署 Cloudflare Worker**（`wrangler.jsonc` name 改 `meridian`；`npm run build` → `wrangler deploy` 创建 Worker；`wrangler secret put` 注入 4 个 server 密钥 ZHIPU_API_KEY / GLM_MODEL / SUPABASE_URL / SUPABASE_ANON_KEY；workers.dev 子域 `betonme519` 注册；上线 **https://meridian.betonme519.workers.dev**；CF 账号 betonme519@gmail.com / account `3b61235a162cae8e508e1d23826a3eca`） | 后端/上线 | 2026-06-09 | `wrangler.jsonc` name 改动待 commit；重部署 = build+deploy |
 | **workspace 兴趣→AI推荐接通 + 切换/重叠修复 + 一级聚焦**（① 兴趣→AI 推荐课程接通真 LLM：`interestCoursePrompt` + `chat` 流式，ShortcutDetail 兴趣框启用 ② 修复「全部路径/只看推荐」切换点不动：DashboardLayout header 整体 `pointer-events-none`、两侧交互簇 `pointer-events-auto` ③ 修复思维导图节点竖向重叠：非 course milestone 捷径排版前 `bucketY = max(bucketY, requirementY)` ④ 一级聚焦模型：只有聚焦的 milestone 展开到深层、其余只显示一级（`activeMilestone`） ⑤ 规则标题主干/补充拆分 `splitRequirementTitle`、明细+「还差 N」移到右侧「补充说明」、隐藏「N 模块」内部标注、删 Upload 反向勾选提示、时间后果→时间成本）；**home 更新了 UI**（决策卡底图素材 + 圆形箭头跳转键、空态居中单行提问框、对话态右栏右移加宽、底部极光背景 Aurora(ogl)：半圆穹顶入场 + 点击像素荡漾波纹） | 二/三 | 2026-06-09 | `4766d32` + 极光迭代待 commit |
 | **workspace 画布布局微调**（纯前端 UI 优化：右面板右移一点 / 目标 + 全部路径·只看推荐 切换并入右上一行靠"2026 春季学期"，左上 chip 只留 学校·年级 + 计数 / 画布滚动容器 `top-0` 顶到整屏（边界=整个 workspace）+ TOP_PAD 84 避让 header / 展开右侧分支按右面板**真实左边界**测量跟随滚动（替死值 inset）/ 双指横滑左右平移 = `overscroll-x-contain` 挡浏览器翻页 + 内容区右侧预留 `CANVAS_RIGHT_RESERVE 440` 保证横向滚动量把被面板挡住的右节点拉出来。曾试 click-drag 平移已回滚——灰层是浏览器双指翻页手势非本程序问题） | 二 | 2026-06-09 | `src/pages/Planner/index.tsx`，本 session 待 commit |
@@ -422,6 +426,12 @@
 
 > 详细技术债见 `TECH_DEBT.md`；项目时间线（5-15 ~ 5-25 各排队 N 详细 / 5-17 基础设施大波次 / 5-16 数据源切 PDF / 5-15 digest 录入 等）见 `AI_MEMORY.md § 9`（L210+）+ git log。
 
+- **2026-06-09** — Home + Import 前端微调（本 session，待 commit）
+  - **Home(Dashboard) 空态**：新增三枚描边胶囊跳转键 `JumpPill`（当前学业路径→/course-planner · 当前目标→/ai-advisor · 上传文件→/import），浅灰边 + 浅灰字 + 左侧导航 icon（Network/Target/Upload），透明填充透极光，hover 轻加深；提示句移到「你今天想问什么」标题正下方，输入框 mt-8→mt-6 上移，按钮 mt-6
+  - **Home 对话态**：右侧 5 决策卡 `lg:pl-24→pl-12` 左移（border-l 分隔线位置不动）
+  - **Import「毕业要求完成情况」(RequirementProgress)**：① 删常驻提示句 → 改标题 hover 弹框（group-hover 纯 CSS） ② 取消每条要求的 chevron 下拉，学分滑块改 grid 两列内联右半（左界=整行中线 / 右端对齐 / 数字固定 w-12） ③ 滑块 `appearance-none` 去默认描边→灰轨，已修部分品牌渐变（行内 90° #FFB62E→#7CC3FF→#4164FF）+ 白圆钮 ④ `getCreditCap` 解不出默认 0→5（公共计算机这类"修3或5分"也有进度条）
+  - 改动文件：`src/pages/Dashboard/index.tsx` + `src/pages/Upload/RequirementProgress.tsx`；两文件 `tsc --noEmit` 0 新错
+
 - **2026-06-09** — C2b 真部署上线 Cloudflare Worker（`wrangler.jsonc` name 改 `meridian` 待 commit）
   - `npm run build`（✓ 3.71s）→ `wrangler deploy` 创建 Worker；`wrangler secret put` 注入 4 密钥（ZHIPU_API_KEY/GLM_MODEL/SUPABASE_URL/SUPABASE_ANON_KEY，源自 `.dev.vars`，一次性永久）；注册 workers.dev 子域 `betonme519`
   - 上线 **https://meridian.betonme519.workers.dev**（CF 账号 betonme519@gmail.com / account `3b61235a162cae8e508e1d23826a3eca`）
@@ -446,10 +456,5 @@
   - CLAUDE.md §9 / PROJECT_OVERVIEW.md 安全边界 / ARCHITECTURE.md §9 三处加前端安全铁律（NEVER 列表 + RLS + server-route 边界）
   - 归档 `_archive/ARCHITECTURE_AUDIT.md` + `_archive/20260427AI选课顾问_项目立项说明.md`，9 处反向引用同步路径
   - 本文件加 §状态总览（一屏全任务 ✅/⏳/❌）+ 排队 10/12 trim + 最近完成节砍到 5 条合规
-
-- **2026-05-28** — 排队 14 第四批 + 第五批撤回（commit `341e651` + `9961fa8`）
-  - LogoFace 呼吸/变脸（`transform-box: fill-box` 修闪烁）+ `.bg-brand-gradient` / `.scrollbar-thin` 单源 utility
-  - Schedule 删用户"新建规则"全套 + iframe 嵌 PDF（public/docs 临时静态）；Import 默认全不打勾（语义翻转，user_requirement_done 表"已完成"）；课程码全替为华师大风格中文名
-  - **撤回**："最轻松毕业" → "轻松毕业" rename（DB 2 表 CHECK + jsonb 嵌套改动面太大）
 
 > 更早条目（排队 14 第一批 / 排队 12.5 子任务 A-E / 排队 12.5 sub-0 反向勾选 / 排队 13 mock advisor / 排队 13.5 静态路径库 / 排队 12 v5 workspace / 排队 11 / 排队 10 / 5-17 基础设施大波次 / 5-16 数据源切 PDF + TD-25 / 5-15 digest 录入）已全部由 `AI_MEMORY.md § 9` + git log 覆盖，本节不再保留。

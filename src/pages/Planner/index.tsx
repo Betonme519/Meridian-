@@ -9,7 +9,6 @@ import {
   Clock3,
   Compass,
   GraduationCap,
-  Layers3,
   Lightbulb,
   Loader2,
   MousePointer2,
@@ -39,6 +38,7 @@ import {
   type CourseBucket,
   type UserMilestoneCode,
 } from "@/lib/trackUserView";
+import { REQUIREMENT_KIND_META } from "@/types/trackEnums";
 import { computeRecommendation, type RecommendedPath } from "@/lib/trackRecommendation";
 import { useRequirementAdvice, LINK_KIND_LABELS } from "@/hooks/useRequirementAdvice";
 import type { RequirementLink, AdviceShortcut, GoalFit } from "@/api/requirementAdviceApi";
@@ -122,24 +122,23 @@ const MILESTONE_LABEL: Record<UserMilestoneCode, string> = {
 };
 
 /**
- * 论文 / 第二课堂 milestone 下全是后台规则类 req（assessment_rule / status_gate /
- * program_rule），画布隐藏 → 没有可见课程节点当锚点。这里直接在 milestone 级挂
- * 建议捷径（文案据规则 digest：论文 D4 / 第二课堂 C6+D6）。纯展示，点击不进
- * ImpactPanel（无 requirement 可模拟）。
+ * 第二课堂 / 论文分类下的「重点提示」—— 人工据规则 digest 提炼的一句话，比原始
+ * 规则标题更友好。按 track_category.code 映射，展开该分类时置顶排在真实规则条目之上。
+ * 纯展示，无 shortcut data → 点击不可选（不进 ImpactPanel）。
  */
-const MILESTONE_SHORTCUTS: Partial<
-  Record<UserMilestoneCode, { id: string; oneLiner: string }[]>
-> = {
-  thesis: [
-    { id: "T-1", oneLiner: "第七学期定选题，早开题早跳过抽检批次" },
-    { id: "T-2", oneLiner: "竞赛获奖 / 专利成果可替代毕业论文免答辩" },
-    { id: "T-3", oneLiner: "重复率盯紧：30% 限期整改 / 50% 直接延期" },
-  ],
-  second: [
+const CATEGORY_HIGHLIGHTS: Record<string, { id: string; oneLiner: string }[]> = {
+  // 第二课堂
+  C6: [
     { id: "S-1", oneLiner: "创新创业学分可顶劳动与创造 ≤ 2 分" },
     { id: "S-2", oneLiner: "竞赛 / 论文 / 专利累加 > 8 分记 A，其余记 P" },
-    { id: "S-3", oneLiner: "CTP 创新训练项目结题可换创新创业学分" },
   ],
+  D6: [{ id: "S-3", oneLiner: "CTP 创新训练项目结题可换创新创业学分" }],
+  // 论文项目
+  D4: [
+    { id: "T-1", oneLiner: "第七学期定选题，早开题早跳过抽检批次" },
+    { id: "T-2", oneLiner: "竞赛获奖 / 专利成果可替代毕业论文免答辩" },
+  ],
+  D5: [{ id: "T-3", oneLiner: "重复率盯紧：30% 限期整改 / 50% 直接延期" }],
 };
 
 const ACTION_LABEL: Record<ActionMode, string> = {
@@ -203,7 +202,7 @@ export default function PlannerPage() {
   const visibleReqsByCategoryId = useMemo(() => {
     const m = new Map<string, TrackRequirement[]>();
     for (const [catId, reqs] of requirementsByCategoryId.entries()) {
-      const filtered = reqs.filter(isUserVisibleRequirement);
+      const filtered = reqs.filter((r) => isUserVisibleRequirement(r));
       if (filtered.length > 0) m.set(catId, filtered);
     }
     return m;
@@ -261,7 +260,14 @@ export default function PlannerPage() {
     for (const category of categories) {
       const cls = classifyCategory(category.code, category.title);
       if (!cls) continue;
-      const reqs = visibleReqsByCategoryId.get(category.id) ?? [];
+      // 上课：仅课程类 req（沿用预过滤的 map）。第二课堂 / 论文：从未过滤全集取，
+      // 放行规则类 req（这两支的「关键事项」几乎都是规则类）。
+      const reqs =
+        cls.milestone === "course"
+          ? (visibleReqsByCategoryId.get(category.id) ?? [])
+          : (requirementsByCategoryId.get(category.id) ?? []).filter((r) =>
+              isUserVisibleRequirement(r, cls.milestone),
+            );
       const categoryOptions = allOptionsByCategoryId.get(category.id) ?? [];
       const earnedCredits = calcCategoryCredits(categoryOptions, progressByOptionId);
 
@@ -304,6 +310,7 @@ export default function PlannerPage() {
   }, [
     categories,
     visibleReqsByCategoryId,
+    requirementsByCategoryId,
     allOptionsByCategoryId,
     optionsByRequirementId,
     progressByOptionId,
@@ -644,8 +651,10 @@ function PathGraph({
 
   function toggleBucket(key: string) {
     const willExpand = !expandedBuckets.has(key);
-    // bucket 只属于「上课」；点 bucket 即聚焦上课（否则深层被 activeMilestone 挡住不展开）
-    setActiveMilestone("course");
+    // bucket key 首段即所属 milestone（course / second / thesis）；点 bucket 即聚焦该支，
+    // 否则深层被 activeMilestone 挡住不展开。
+    const ms = (key.split(":")[0] as UserMilestoneCode) ?? "course";
+    setActiveMilestone(ms);
     setExpandedBuckets((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -1013,8 +1022,6 @@ function buildGraph({
 }) {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
-  const reqRows = Math.max(1, items.length);
-  const height = Math.max(620, reqRows * 74 + 170);
   const width = 1400;
   // 顶部留白：画布现在顶到 workspace 最上沿（top-0），header（~56px）+ 悬浮 chip 浮在其上，
   // 这里把整张图下移避开它们（滚到顶也不被 header 压住）
@@ -1024,7 +1031,7 @@ function buildGraph({
     id: "root",
     kind: "root",
     x: 24,
-    y: Math.round(height / 2 - 35) + TOP_PAD,
+    y: TOP_PAD, // 占位；待 milestone 排完后居中到它们跨度中点
     w: 132,
     h: 70,
     title: "我的目标",
@@ -1036,135 +1043,187 @@ function buildGraph({
   };
   nodes.push(root);
 
-  const milestones = USER_MILESTONES.map((milestone, index) => {
+  // 行高常量
+  const MILESTONE_H = 64;
+  const MILESTONE_GAP = 30; // 收起时 milestone 间距 —— 保证三支紧凑、一屏可见
+  const BUCKET_STRIDE = 84; // 收起 bucket 的行高（含间隔）
+  const LEAF_STRIDE = 88; // requirement 叶子行高
+  const HL_STRIDE = 60; // 高亮 / 路径建议行高
+  const GROUP_GAP = 16; // 展开分类之间的额外间隔
+
+  type Group = {
+    key: string;
+    title: string;
+    items: VisibleRequirement[];
+    categoryCode?: string;
+  };
+
+  // 单个分类展开后，右侧子块（高亮 + 条目 + 各条目的路径建议）占的纵向高度
+  function groupChildrenHeight(group: Group): number {
+    const highlights = group.categoryCode ? (CATEGORY_HIGHLIGHTS[group.categoryCode] ?? []) : [];
+    let h = highlights.length * HL_STRIDE;
+    for (const item of group.items) {
+      const scBlock =
+        expandedRequirements.has(item.requirement.id) && item.shortcuts.length > 0
+          ? item.shortcuts.length * HL_STRIDE + 12
+          : 0;
+      h += Math.max(LEAF_STRIDE, scBlock);
+    }
+    return h;
+  }
+
+  // 流式纵向布局：从顶往下依次排 milestone。每个 milestone 占「自身节点 / 其展开子树」
+  // 二者中较高者的高度；所有节点**顶对齐**——展开某节点只把它后面的往下推，已展开的
+  // 节点不动（不抖）。收起时各占最小高度 → 三支紧凑、一屏可见。
+  let cursorY = TOP_PAD + 16;
+  let maxY = cursorY;
+  const placedMilestones: { code: UserMilestoneCode; node: GraphNode }[] = [];
+
+  for (const milestone of USER_MILESTONES) {
     const milestoneItems = items.filter((item) => item.milestone === milestone.code);
-    const y =
-      TOP_PAD + Math.round(90 + index * Math.max(130, (height - 210) / USER_MILESTONES.length));
+    const expandedMs = expandedMilestones.has(milestone.code);
+    const milestoneActive = milestone.code === activeMilestone;
+
+    // 分组层（仅 milestone 展开时铺一级 bucket）：上课 = 5 个课程 bucket；
+    // 第二课堂 / 论文 = 各自的 category（点开分类才铺出具体条目）。key 首段恒为 milestone code。
+    let laid: { group: Group; expanded: boolean; footprint: number }[] = [];
+    if (expandedMs && milestoneItems.length > 0) {
+      let groups: Group[];
+      if (milestone.code === "course") {
+        groups = COURSE_BUCKETS.filter((bucket) =>
+          milestoneItems.some((item) => item.bucket === bucket),
+        ).map((bucket) => ({
+          key: bucketKey("course", bucket),
+          title: bucket,
+          items: milestoneItems.filter((item) => item.bucket === bucket),
+        }));
+      } else {
+        const byCat = new Map<string, { cat: TrackCategory; items: VisibleRequirement[] }>();
+        for (const item of milestoneItems) {
+          const entry = byCat.get(item.category.id) ?? { cat: item.category, items: [] };
+          entry.items.push(item);
+          byCat.set(item.category.id, entry);
+        }
+        groups = [...byCat.values()]
+          .sort((a, b) => a.cat.order_index - b.cat.order_index)
+          .map(({ cat, items: catItems }) => ({
+            key: bucketKey(milestone.code, cat.id),
+            title: cat.title,
+            items: catItems,
+            categoryCode: cat.code,
+          }));
+      }
+      laid = groups
+        .filter((g) => g.items.length > 0)
+        .map((group) => {
+          const expanded = milestoneActive && expandedBuckets.has(group.key);
+          const contentH = expanded
+            ? Math.max(BUCKET_STRIDE, groupChildrenHeight(group))
+            : BUCKET_STRIDE;
+          return { group, expanded, footprint: contentH + (expanded ? GROUP_GAP : 0) };
+        });
+    }
+
+    const subtreeH = laid.reduce((s, g) => s + g.footprint, 0);
+    const bandTop = cursorY;
+    const bandH = Math.max(MILESTONE_H, subtreeH);
+
+    // milestone 节点顶对齐到 band 顶：展开子节点不挪它，只把后续 milestone 往下推
     const node: GraphNode = {
       id: `milestone:${milestone.code}`,
       kind: "milestone",
       x: 210,
-      y,
+      y: bandTop,
       w: 150,
-      h: 64,
+      h: MILESTONE_H,
       title: MILESTONE_LABEL[milestone.code],
-      meta: !expandedMilestones.has(milestone.code)
-        ? "点击展开"
-        : milestone.code === activeMilestone
-          ? "聚焦中"
-          : "点击聚焦",
-      // count 同 root:数字 badge 在路径画布语境下会被误读成"N 路径"
+      meta: !expandedMs ? "点击展开" : milestoneActive ? "聚焦中" : "点击聚焦",
       isRecommended: milestoneItems.some((item) => item.isOnPath),
       isActive: false,
-      // chevron 反映一级是否展开（非聚焦支也显示其一级子节点）；聚焦深浅由 meta 文案区分
-      isCollapsed: !expandedMilestones.has(milestone.code),
+      isCollapsed: !expandedMs,
     };
     nodes.push(node);
-    edges.push({
-      id: `root-${milestone.code}`,
-      from: root,
-      to: node,
-      isRecommended: node.isRecommended,
-    });
-    return { code: milestone.code, node };
-  });
+    placedMilestones.push({ code: milestone.code, node });
+    maxY = Math.max(maxY, bandTop + MILESTONE_H);
 
-  let bucketY = 58 + TOP_PAD;
-  let requirementY = 40 + TOP_PAD;
-  for (const milestone of milestones) {
-    if (!expandedMilestones.has(milestone.code)) continue;
-
-    // 论文 / 第二课堂：无可见课程节点，直接在 milestone 右侧挂建议捷径
-    if (milestone.code !== "course") {
-      // 这些捷径节点 w=340（x 410→750）会横向探入 requirement 列（x 650→1010）。
-      // bucketY 在 course 分支被 `requirementY - n*8` 往上收紧过，可能仍高于已排的
-      // requirement 行；不先落到 requirementY 之下，就会竖向压住上一 milestone 展开的
-      // requirement 卡（例：第二课堂「创新创业学分」挡住通识必修「模块课程」）。
-      bucketY = Math.max(bucketY, requirementY);
-      const msShortcuts = MILESTONE_SHORTCUTS[milestone.code] ?? [];
-      for (let i = 0; i < msShortcuts.length; i += 1) {
-        const sc = msShortcuts[i];
-        const scNode: GraphNode = {
-          id: `mshortcut:${milestone.code}:${i}`,
-          kind: "shortcut",
-          x: 410,
-          y: bucketY + i * 60,
-          w: 340,
-          h: 52,
-          title: sc.oneLiner,
-          meta: `建议 · ${sc.id}`,
-          isRecommended: false,
-          isActive: false,
-        };
-        nodes.push(scNode);
-        edges.push({
-          id: `${milestone.node.id}-${scNode.id}`,
-          from: milestone.node,
-          to: scNode,
-          isRecommended: false,
-        });
-      }
-      bucketY += msShortcuts.length * 60 + 24;
-      continue;
-    }
-
-    // 只有聚焦的一级能展开到 requirement 深层；非聚焦支的 bucket 只显示到一级（收起态）
-    const milestoneActive = milestone.code === activeMilestone;
-    const milestoneItems = items.filter((item) => item.milestone === milestone.code);
-    const bucketLabels =
-      milestone.code === "course"
-        ? COURSE_BUCKETS.filter((bucket) => milestoneItems.some((item) => item.bucket === bucket))
-        : (["关键事项"] as const);
-
-    for (const bucket of bucketLabels) {
-      const key =
-        milestone.code === "course"
-          ? bucketKey(milestone.code, bucket as CourseBucket)
-          : bucketKey(milestone.code);
-      const bucketItems =
-        milestone.code === "course"
-          ? milestoneItems.filter((item) => item.bucket === bucket)
-          : milestoneItems;
-      if (bucketItems.length === 0) continue;
+    // 子树：bucket 顶对齐 flow（展开某 bucket 只把它后面的往下推，它自己不动）
+    let groupTop = bandTop;
+    for (const { group, expanded, footprint } of laid) {
+      const bucketY = groupTop;
 
       const bucketNode: GraphNode = {
-        id: `bucket:${key}`,
+        id: `bucket:${group.key}`,
         kind: "bucket",
         x: 410,
         y: bucketY,
         w: 170,
         h: 58,
-        title: String(bucket),
-        meta: milestoneActive && expandedBuckets.has(key) ? "显示具体机会" : "点击看机会",
+        title: group.title,
+        meta: expanded ? "显示具体条目" : "点击展开",
         // count 留空,同 root / milestone:避免被读成"N 路径"
-        isRecommended: bucketItems.some((item) => item.isOnPath),
+        isRecommended: group.items.some((item) => item.isOnPath),
         isActive: false,
-        isCollapsed: !(milestoneActive && expandedBuckets.has(key)),
+        isCollapsed: !expanded,
       };
       nodes.push(bucketNode);
       edges.push({
-        id: `${milestone.node.id}-${bucketNode.id}`,
-        from: milestone.node,
+        id: `${node.id}-${bucketNode.id}`,
+        from: node,
         to: bucketNode,
         isRecommended: bucketNode.isRecommended,
       });
+      maxY = Math.max(maxY, bucketY + 58);
 
-      if (milestoneActive && expandedBuckets.has(key)) {
-        for (const item of bucketItems) {
+      if (expanded) {
+        let childY = groupTop; // 右侧子块从本组顶部开始往下铺
+        // 分类高亮：保留的人工一句话，置顶排在该分类条目之上（纯展示，不可点）
+        const highlights = group.categoryCode
+          ? (CATEGORY_HIGHLIGHTS[group.categoryCode] ?? [])
+          : [];
+        for (let i = 0; i < highlights.length; i += 1) {
+          const hl = highlights[i];
+          const hlNode: GraphNode = {
+            id: `highlight:${group.key}:${i}`,
+            kind: "shortcut",
+            x: 650,
+            y: childY,
+            w: 360,
+            h: 52,
+            title: hl.oneLiner,
+            meta: `重点 · ${hl.id}`,
+            isRecommended: false,
+            isActive: false,
+          };
+          nodes.push(hlNode);
+          edges.push({
+            id: `${bucketNode.id}-${hlNode.id}`,
+            from: bucketNode,
+            to: hlNode,
+            isRecommended: false,
+          });
+          childY += HL_STRIDE;
+        }
+
+        for (const item of group.items) {
+          // 规则类条目（第二课堂/论文）：显示 kind 友好名、不显示完成勾（信息类，非可完成项）
+          const isRule = REQUIREMENT_KIND_META[item.requirement.kind]?.group === "rule";
+          const reqY = childY;
           const reqNode: GraphNode = {
             id: `requirement:${item.requirement.id}`,
             kind: "requirement",
             x: 650,
-            y: requirementY,
+            y: reqY,
             w: 360,
             h: 74,
             title: displayRequirementTitle(item.requirement.title),
-            // 节点小字只留「构成」分类名；明细与「还差 N」都挪到右侧面板
-            meta: item.category.title,
+            // 上课：节点小字留「构成」分类名；规则条目：显示 kind 友好名（分类已是父节点）
+            meta: isRule
+              ? REQUIREMENT_KIND_META[item.requirement.kind].label
+              : item.category.title,
             item,
             isRecommended: item.isOnPath,
             isActive: item.requirement.id === selectedId,
-            isComplete: !item.isUnmet,
+            isComplete: isRule ? undefined : !item.isUnmet,
             isCollapsed:
               item.shortcuts.length > 0
                 ? !expandedRequirements.has(item.requirement.id)
@@ -1177,9 +1236,9 @@ function buildGraph({
             to: reqNode,
             isRecommended: item.isOnPath,
           });
-          requirementY += 88;
 
-          // 排队 12.5：requirement 展开后渲染 shortcut 子节点
+          // 排队 12.5：requirement 展开后渲染 shortcut 子节点（仅上课的课程 req 有 advice）
+          let advance = LEAF_STRIDE;
           if (expandedRequirements.has(item.requirement.id) && item.shortcuts.length > 0) {
             for (let i = 0; i < item.shortcuts.length; i += 1) {
               const sc = item.shortcuts[i];
@@ -1188,7 +1247,7 @@ function buildGraph({
                 id: `shortcut:${scKey}`,
                 kind: "shortcut",
                 x: 1050,
-                y: requirementY - 88 + i * 60,
+                y: reqY + i * HL_STRIDE,
                 w: 320,
                 h: 52,
                 title: sc.oneLiner ?? "未命名建议",
@@ -1205,23 +1264,40 @@ function buildGraph({
                 isRecommended: item.isOnPath,
               });
             }
-            // 给后续 requirement 让出空间：每条 shortcut 60px，加 12px 间隔
-            const shortcutBlock = item.shortcuts.length * 60 + 12;
-            requirementY = Math.max(requirementY, requirementY - 88 + shortcutBlock);
+            advance = Math.max(LEAF_STRIDE, item.shortcuts.length * HL_STRIDE + 12);
           }
+          childY += advance;
         }
-        bucketY = Math.max(bucketY + 82, requirementY - bucketItems.length * 8);
-      } else {
-        bucketY += 82;
+        maxY = Math.max(maxY, childY);
       }
+
+      groupTop += footprint;
     }
+
+    cursorY = bandTop + bandH + MILESTONE_GAP;
+  }
+
+  // root 居中到 milestone 跨度中点，再连边（节点位置先排完，root 才知道该对齐到哪）
+  const firstNode = placedMilestones[0]?.node;
+  const lastNode = placedMilestones[placedMilestones.length - 1]?.node;
+  if (firstNode && lastNode) {
+    const spanCenter = (firstNode.y + firstNode.h / 2 + (lastNode.y + lastNode.h / 2)) / 2;
+    root.y = Math.round(spanCenter - root.h / 2);
+  }
+  for (const m of placedMilestones) {
+    edges.push({
+      id: `root-${m.code}`,
+      from: root,
+      to: m.node,
+      isRecommended: m.node.isRecommended,
+    });
   }
 
   return {
     nodes,
     edges,
     width,
-    height: Math.max(height + TOP_PAD, requirementY + 110, bucketY + 110),
+    height: Math.max(maxY + 120, root.y + root.h + 40),
   };
 }
 
@@ -1234,7 +1310,9 @@ function edgePath(from: GraphNode, to: GraphNode): string {
   return `M ${x1} ${y1} C ${x1 + mid} ${y1}, ${x2 - mid} ${y2}, ${x2} ${y2}`;
 }
 
-function bucketKey(milestone: UserMilestoneCode, bucket?: CourseBucket): string {
+// 上课 → "course:<bucket名>"；第二课堂/论文 → "<milestone>:<categoryId>"。
+// 首段恒为 milestone code，toggleBucket 据此回推该点亮哪一支。
+function bucketKey(milestone: UserMilestoneCode, bucket?: string): string {
   return bucket ? `${milestone}:${bucket}` : milestone;
 }
 
@@ -1261,7 +1339,43 @@ function ImpactPanel({
   onMarkDone: () => void;
   onClearShortcut: () => void;
 }) {
-  if (!selected || !impact) {
+  if (!selected) {
+    return (
+      <section className="px-5 py-4">
+        <p className="text-sm text-slate-500">选择左侧一个节点后，这里会显示后果分析。</p>
+      </section>
+    );
+  }
+
+  // 规则类条目（第二课堂 / 论文下的关键事项）：无可模拟 option，显示规则说明而非模拟器。
+  // 出处见下方「规则证据」面板（source_ref）。
+  const kindMeta = REQUIREMENT_KIND_META[selected.requirement.kind];
+  if (kindMeta?.group === "rule") {
+    return (
+      <section className="px-5 py-4">
+        <div className="flex items-center gap-2">
+          <PanelRightOpen className="h-5 w-5 text-slate-500" />
+          <h2 className="font-semibold text-slate-950">规则说明</h2>
+        </div>
+        <h3 className="mt-3 text-sm font-semibold leading-6 text-slate-950">
+          {displayRequirementTitle(selected.requirement.title)}
+        </h3>
+        <p className="mt-1 text-xs leading-5 text-slate-500">
+          {selected.category.title} · {kindMeta.label}
+        </p>
+        {selected.requirement.description && (
+          <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2.5 ring-1 ring-inset ring-slate-200">
+            <p className="text-xs leading-6 text-slate-700">{selected.requirement.description}</p>
+          </div>
+        )}
+        <p className="mt-3 text-[11px] leading-5 text-slate-400">
+          信息类规则，无可模拟选项；出处见下方「规则证据」。
+        </p>
+      </section>
+    );
+  }
+
+  if (!impact) {
     return (
       <section className="px-5 py-4">
         <p className="text-sm text-slate-500">选择左侧一个节点后，这里会显示后果分析。</p>
@@ -1345,16 +1459,7 @@ function ImpactPanel({
             icon={GraduationCap}
             label="学分影响"
             value={actionMode === "delay" ? "0" : `+${fmtCredits(impact.credits)}`}
-          />
-          <ImpactMetric
-            icon={Target}
-            label="本要求"
-            value={`${fmtNum(impact.before)} → ${fmtNum(impact.after)}`}
-          />
-          <ImpactMetric
-            icon={Layers3}
-            label="本分类"
-            value={`${fmtCredits(impact.categoryBefore)} → ${fmtCredits(impact.categoryAfter)}`}
+            gradient
           />
           <ImpactMetric
             icon={Clock3}
@@ -1362,6 +1467,7 @@ function ImpactPanel({
             value={
               actionMode === "delay" ? "后移" : selected.recommendedOption ? "可执行" : "待拆分"
             }
+            gradient
           />
         </div>
       </div>
@@ -1582,10 +1688,13 @@ function ImpactMetric({
   icon: Icon,
   label,
   value,
+  gradient = false,
 }: {
   icon: LucideIcon;
   label: string;
   value: string;
+  /** true：值文字走品牌渐变（bg-clip-text） */
+  gradient?: boolean;
 }) {
   return (
     <div>
@@ -1593,7 +1702,13 @@ function ImpactMetric({
         <Icon className="h-3.5 w-3.5 text-slate-400" />
         {label}
       </p>
-      <p className="mt-1 text-sm font-semibold tabular-nums text-slate-950">{value}</p>
+      <p
+        className={`mt-1 text-sm font-semibold tabular-nums ${
+          gradient ? "bg-brand-gradient bg-clip-text text-transparent" : "text-slate-950"
+        }`}
+      >
+        {value}
+      </p>
     </div>
   );
 }

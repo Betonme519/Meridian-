@@ -220,17 +220,6 @@ export default function SchedulePage() {
                           </ul>
                         )}
                       </div>
-
-                      {/* AI 推测 · 接通 RAG 后启用 */}
-                      <div className="border-t border-slate-200 pt-3">
-                        <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-sapphire">
-                          <Sparkles className="h-3 w-3" />
-                          AI 推测
-                        </p>
-                        <p className="mt-2 text-[11px] leading-5 text-slate-500">
-                          基于已导入资料的推测内容（接通 RAG 后启用）。
-                        </p>
-                      </div>
                     </div>
                   )}
                 </div>

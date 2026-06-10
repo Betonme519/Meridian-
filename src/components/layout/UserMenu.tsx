@@ -1,8 +1,9 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { exitGuestMode } from "@/lib/guestMode";
+import FeedbackDialog from "@/components/feedback/FeedbackDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +34,7 @@ export function UserMenu({ trigger }: { trigger: ReactNode }) {
   const { user, logout } = useAuth();
   const { profile } = useProfile();
   const navigate = useNavigate();
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   // 显示名优先级：profile.name > auth.user.name (来自注册时 metadata) > email
   // profile 加载完成前后无缝切换，无需 loading state
@@ -65,6 +67,7 @@ export function UserMenu({ trigger }: { trigger: ReactNode }) {
     itemBase + " text-red-600 focus:bg-red-50 focus:text-red-700";
 
   return (
+    <>
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       <DropdownMenuContent
@@ -94,7 +97,7 @@ export function UserMenu({ trigger }: { trigger: ReactNode }) {
           <Settings className="mr-2.5 h-4 w-4 text-slate-500" strokeWidth={1.7} />
           设置
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={goDashboard} className={itemNeutral}>
+        <DropdownMenuItem onSelect={() => setFeedbackOpen(true)} className={itemNeutral}>
           <HelpCircle className="mr-2.5 h-4 w-4 text-slate-500" strokeWidth={1.7} />
           帮助
         </DropdownMenuItem>
@@ -106,5 +109,7 @@ export function UserMenu({ trigger }: { trigger: ReactNode }) {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+    </>
   );
 }

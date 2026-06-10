@@ -3,7 +3,14 @@
   "name": "meridian",
   "compatibility_date": "2025-09-24",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "@tanstack/react-start/server-entry"
+  "main": "@tanstack/react-start/server-entry",
+
+  // 自定义域名绑定（custom_domain:true 会自动建 DNS 记录 + 申请 SSL 证书）
+  // ⚠️ 前提：meridianedu.xyz 必须已作为 zone 接入本 Cloudflare 账号且状态 active
+  "routes": [
+    { "pattern": "meridianedu.xyz", "custom_domain": true },
+    { "pattern": "www.meridianedu.xyz", "custom_domain": true }
+  ]
 
   // ⚠️ 不要在这里加 VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY 之类的 vars。
   //    Vite `VITE_*` 前缀变量是【构建时】内联到 bundle，部署给 CF Worker 的
