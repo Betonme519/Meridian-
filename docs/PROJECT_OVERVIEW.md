@@ -8,6 +8,8 @@
 
 **Meridian — Academic Decision Engine**：让学业不成为你的全部。用最高效的方式完成学业，把时间留给生活与爱好。
 
+**线上地址**：https://meridianedu.xyz （自定义域名已接入，绑到 Cloudflare worker `meridian`；旧 `meridian.betonme519.workers.dev` 仍可用）。
+
 ---
 
 ## 核心理念（最重要，先读这段）

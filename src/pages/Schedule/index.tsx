@@ -1,18 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowRight,
-  ChevronDown,
-  ChevronRight,
   FileText,
   Globe2,
-  Plus,
   RefreshCcw,
   ShieldAlert,
-  ShieldCheck,
   Sparkles,
   X,
 } from "lucide-react";
+import { chat, tokenText } from "@/ai";
 import { useAuth } from "@/hooks/useAuth";
 import { useRules } from "@/hooks/useRules";
 import type { Rule } from "@/api/ruleApi";
@@ -102,17 +99,58 @@ export default function SchedulePage() {
     return m;
   }, [showSeed, ruleMap]);
 
-  /** 默认打开第一个分组 */
-  const [openBranch, setOpenBranch] = useState<string | null>(
-    () => displayRulesByBranch[0]?.branch ?? null,
-  );
-  // 数据切换时（访客 → 登录 / DB → SEED），若当前 openBranch 已不存在，落回第一个
-  const safeOpenBranch =
-    openBranch && displayRulesByBranch.some((b) => b.branch === openBranch)
-      ? openBranch
-      : (displayRulesByBranch[0]?.branch ?? null);
+  // 冲突区尾格：CTA 卡 ↔ 新建冲突表单的开合
+  const [creating, setCreating] = useState(false);
 
-  const [conflictFormOpen, setConflictFormOpen] = useState(false);
+  // 左栏「规则查询」：输入问题 → AI 流式解释（手册 RAG 检索 13.8B 未上线前，
+  // 先把已知规则清单塞进 system prompt 做轻量上下文；将来联动右侧 PDF 跳转对应条款）
+  const [query, setQuery] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [querying, setQuerying] = useState(false);
+  const [queryError, setQueryError] = useState<string | null>(null);
+  const queryAbortRef = useRef<AbortController | null>(null);
+  // 卸载时取消进行中的流
+  useEffect(() => () => queryAbortRef.current?.abort(), []);
+
+  const runQuery = async () => {
+    const q = query.trim();
+    if (!q || querying) return;
+    queryAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    queryAbortRef.current = ctrl;
+    setQuerying(true);
+    setAnswer("");
+    setQueryError(null);
+    try {
+      const ruleList = displayRulesByBranch
+        .flatMap((b) => b.items)
+        .map((r) => `- ${r.title}${r.source ? `（来源：${r.source}）` : ""}`)
+        .join("\n");
+      const system =
+        `你是「${selectedDoc.title}」的规则查询助理，帮学生看懂本校学业规则。` +
+        `已知规则条目（可能不全，仅供参考）：\n${ruleList || "（暂无）"}\n\n` +
+        `请用简洁中文回答：相关规则写了什么、出自哪里、对学生有什么影响。` +
+        `手册未明确的，直说不确定，不要编造。`;
+      let acc = "";
+      for await (const tok of chat({
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: q },
+        ],
+        signal: ctrl.signal,
+      })) {
+        acc += tokenText(tok);
+        setAnswer(acc);
+      }
+    } catch (e) {
+      if (!ctrl.signal.aborted) {
+        setQueryError("查询失败，请稍后重试。");
+        console.warn("[Schedule] AI 查询失败:", e);
+      }
+    } finally {
+      if (queryAbortRef.current === ctrl) setQuerying(false);
+    }
+  };
 
   const canEdit = !isGuest && !authLoading;
 
@@ -147,7 +185,7 @@ export default function SchedulePage() {
         >
           <div className="flex items-center gap-2 px-1">
             <FileText className="h-5 w-5 text-slate-500" />
-            <h2 className="font-semibold tracking-tight">规则结构树</h2>
+            <h2 className="font-semibold tracking-tight">规则查询</h2>
           </div>
           {/* 当前预览的 PDF 文档:同一学校规则一份,有多份(指南/手册)时下拉切换。
               学校官方 PDF 是只读参考资料,所以这里不是"新建规则"入口。 */}
@@ -166,65 +204,43 @@ export default function SchedulePage() {
             </select>
           </label>
 
-          {/* 分支列表：单层 card + 内部 divide-y 细线，flex-1 填底与右侧 PDF 对齐 */}
-          <div className="mt-3 flex min-h-0 flex-1 flex-col divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
-            {displayRulesByBranch.length === 0 && !loading && (
-              <p className="p-4 text-center text-xs text-slate-400">暂无规则</p>
-            )}
-            {displayRulesByBranch.map((b) => {
-              const open = safeOpenBranch === b.branch;
-              const highRules = b.items.filter((r) => r.trust === "high");
-              return (
-                <div key={b.branch}>
-                  <button
-                    type="button"
-                    onClick={() => setOpenBranch(open ? null : b.branch)}
-                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-slate-50"
-                  >
-                    {open ? (
-                      <ChevronDown className="h-4 w-4 text-slate-400" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-slate-400" />
-                    )}
-                    <span className="text-sm font-medium text-slate-900">{b.branch}</span>
-                    <span className="ml-auto text-[11px] tabular-nums text-slate-400">
-                      {b.items.length}
-                    </span>
-                  </button>
-                  {open && (
-                    <div className="space-y-3 border-t border-slate-100 bg-slate-50/40 px-4 py-3">
-                      {/* 当前分区官方规则 · 高可信度 */}
-                      <div>
-                        <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">
-                          <ShieldCheck className="h-3 w-3 text-maya" />
-                          官方规则 · 高可信度
-                        </p>
-                        {highRules.length === 0 ? (
-                          <p className="mt-2 text-[11px] text-slate-400">本分区暂无官方规则</p>
-                        ) : (
-                          <ul className="mt-2 space-y-2.5">
-                            {highRules.map((leaf) => (
-                              <li key={leaf.id} className="text-xs">
-                                <p className="font-medium text-slate-900">{leaf.title}</p>
-                                {leaf.body && (
-                                  <p className="mt-0.5 text-slate-600 leading-5">{leaf.body}</p>
-                                )}
-                                <p className="mt-1 text-[11px] text-slate-400">
-                                  {leaf.source ?? "未注明来源"}
-                                  {leaf.source_page && (
-                                    <span className="ml-1 text-slate-300">· {leaf.source_page}</span>
-                                  )}
-                                </p>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          {/* 规则查询：输入问题 → AI 流式解释。输出区限高 + 内部滚动，
+              答案再长也不撑高这个框（见下 max-h-[60vh]）。
+              将来：命中后右侧 PDF 跳转到对应条款（13.8B 手册 RAG 上线后接）。 */}
+          <div className="mt-3 flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div className="flex flex-none flex-col gap-2 border-b border-slate-100 p-3">
+              <textarea
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void runQuery();
+                }}
+                rows={3}
+                placeholder="想查什么规则？例如：体育课怎么算成绩、创新创业学分上限、补考范围…"
+                className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-900 outline-none transition-colors focus:border-slate-400"
+              />
+              <button
+                type="button"
+                onClick={() => void runQuery()}
+                disabled={querying || !query.trim()}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-gradient px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:bg-none"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                {querying ? "AI 查询中…" : "AI 查询"}
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto p-3">
+              {!answer && !querying && !queryError && (
+                <p className="text-[11px] leading-5 text-slate-400">
+                  对学校规则有疑问就问这里 —— AI 会结合手册解释规则写了什么、出自哪、对你有什么影响。将来还会把右侧 PDF 自动跳到对应条款。
+                </p>
+              )}
+              {querying && !answer && <p className="text-[11px] text-slate-400">AI 查询中…</p>}
+              {answer && (
+                <p className="whitespace-pre-wrap text-xs leading-6 text-slate-700">{answer}</p>
+              )}
+              {queryError && <p className="mt-2 text-[11px] text-flame">{queryError}</p>}
+            </div>
           </div>
         </aside>
 
@@ -264,30 +280,7 @@ export default function SchedulePage() {
           <span className="ml-auto text-xs text-slate-400 tabular-nums">
             {displayConflicts.length} 条需要人工确认
           </span>
-          {canEdit && (
-            <button
-              type="button"
-              onClick={() => setConflictFormOpen((v) => !v)}
-              disabled={rules.length < 2}
-              className="inline-flex items-center gap-1 rounded-md bg-flame px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-flame/90 disabled:cursor-not-allowed disabled:bg-slate-300"
-              title={rules.length < 2 ? "至少有 2 条规则才能新建冲突" : ""}
-            >
-              <Plus className="h-3 w-3" />
-              新建冲突
-            </button>
-          )}
         </div>
-
-        {canEdit && conflictFormOpen && rules.length >= 2 && (
-          <NewConflictForm
-            rules={rules}
-            onCancel={() => setConflictFormOpen(false)}
-            onSubmit={async (input) => {
-              const saved = await createConflict(input);
-              if (saved) setConflictFormOpen(false);
-            }}
-          />
-        )}
 
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
           {displayConflicts.length === 0 && !loading && (
@@ -360,6 +353,36 @@ export default function SchedulePage() {
               </article>
             );
           })}
+
+          {/* 尾格：反馈 CTA 卡（与冲突卡同款实心样式）→ 点「新建冲突」展开表单。
+              未来：同校同学共享，AI 查询时可参考大家上传的「存疑 / 冲突」规则纠错。 */}
+          {creating ? (
+            <NewConflictForm
+              rules={rules}
+              onCancel={() => setCreating(false)}
+              onSubmit={async (input) => {
+                const saved = await createConflict(input);
+                if (saved) setCreating(false);
+              }}
+            />
+          ) : (
+            <div className="flex flex-col rounded-xl border border-flame/40 bg-white p-4">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5 text-flame" />
+                <h3 className="text-sm font-semibold text-slate-900">你发现规则冲突了吗？</h3>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-600">
+                如果你发现学校规则里有互相矛盾、或 AI 分析可能有误的地方，反馈给我们 —— 同校同学共享，规则库越用越准。
+              </p>
+              <button
+                type="button"
+                onClick={() => setCreating(true)}
+                className="mt-4 inline-flex items-center justify-center self-start rounded-md bg-brand-gradient px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90"
+              >
+                新建冲突
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -469,7 +492,8 @@ function NewConflictForm({
   };
 
   return (
-    <div className="mt-3 space-y-2 rounded-xl border border-flame/40 bg-white p-3">
+    <div className="space-y-2 rounded-xl border border-flame/40 bg-white p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-flame">新建冲突</p>
       <div className="grid grid-cols-2 gap-2">
         <label className="text-[11px] font-medium text-slate-600">
           A 方规则
@@ -506,7 +530,7 @@ function NewConflictForm({
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="如：体育课是否计入 GPA"
+          placeholder="如：同一问题，两个来源说法不同"
           className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 outline-none focus:border-slate-400"
         />
       </label>
@@ -549,7 +573,7 @@ function NewConflictForm({
           disabled={busy || !title.trim() || aId === bId}
           className="rounded-md bg-flame px-3 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-flame/90 disabled:cursor-not-allowed disabled:bg-slate-400"
         >
-          {busy ? "保存中…" : "保存"}
+          {busy ? "提交中…" : "提交"}
         </button>
       </div>
     </div>

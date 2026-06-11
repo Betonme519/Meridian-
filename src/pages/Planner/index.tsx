@@ -133,7 +133,15 @@ const CATEGORY_HIGHLIGHTS: Record<string, { id: string; oneLiner: string }[]> = 
     { id: "S-2", oneLiner: "竞赛 / 论文 / 专利累加 > 8 分记 A，其余记 P" },
   ],
   D6: [{ id: "S-3", oneLiner: "CTP 创新训练项目结题可换创新创业学分" }],
+  C7: [
+    { id: "S-4", oneLiner: "A 类竞赛获奖另发现金奖金，最高 1 万元" },
+    { id: "S-5", oneLiner: "竞赛获奖：创新创业学分 + 奖金可两头拿" },
+  ],
   // 论文项目
+  D3: [
+    { id: "T-4", oneLiner: "实习缺勤 ≥ 1/3 直接重修，重出勤 + 单位评价" },
+    { id: "T-5", oneLiner: "实习分三类，毕业实习才计入毕业环节" },
+  ],
   D4: [
     { id: "T-1", oneLiner: "第七学期定选题，早开题早跳过抽检批次" },
     { id: "T-2", oneLiner: "竞赛获奖 / 专利成果可替代毕业论文免答辩" },
@@ -1062,6 +1070,8 @@ function buildGraph({
   function groupChildrenHeight(group: Group): number {
     const highlights = group.categoryCode ? (CATEGORY_HIGHLIGHTS[group.categoryCode] ?? []) : [];
     let h = highlights.length * HL_STRIDE;
+    // 已策划金句的二课/论文分类：画布只铺金句、不铺原始 requirement 灰条，高度同步只算金句
+    if (highlights.length > 0) return h;
     for (const item of group.items) {
       const scBlock =
         expandedRequirements.has(item.requirement.id) && item.shortcuts.length > 0
@@ -1204,7 +1214,8 @@ function buildGraph({
           childY += HL_STRIDE;
         }
 
-        for (const item of group.items) {
+        // 已策划金句的二课/论文分类：金句取代原始 requirement 灰条，灰条不再铺进画布
+        for (const item of highlights.length > 0 ? [] : group.items) {
           // 规则类条目（第二课堂/论文）：显示 kind 友好名、不显示完成勾（信息类，非可完成项）
           const isRule = REQUIREMENT_KIND_META[item.requirement.kind]?.group === "rule";
           const reqY = childY;
@@ -1431,7 +1442,7 @@ function ImpactPanel({
           <div className="flex items-center gap-1.5">
             <Sparkles className="h-3.5 w-3.5 text-sapphire" />
             <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sapphire">
-              AI 理由
+              系统推荐
             </span>
           </div>
           <p className="mt-1.5 text-xs leading-5 text-slate-700">{selected.pathReason}</p>
@@ -1628,38 +1639,44 @@ function ShortcutDetail({
         </div>
       </div>
 
-      <div className="mt-4 border-t border-slate-200 pt-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-          兴趣 → AI 推荐课程
-        </p>
-        <textarea
-          value={interest}
-          onChange={(e) => setInterest(e.target.value)}
-          disabled={streaming}
-          placeholder="想做什么方向？AI 会按你的兴趣 + 已修课表 + 这条规则现算具体课程"
-          className="mt-2 h-20 w-full resize-none rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs leading-5 text-slate-700 placeholder:text-slate-400 focus:border-sapphire/50 focus:outline-none focus:ring-1 focus:ring-sapphire/30 disabled:cursor-not-allowed disabled:bg-slate-50"
-        />
-        <button
-          type="button"
-          onClick={() => void handleRecommend()}
-          disabled={streaming || interest.trim().length === 0}
-          className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-full bg-slate-950 px-3 text-[11px] font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-        >
-          {streaming ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <Sparkles className="h-3 w-3" />
-          )}
-          {streaming ? "AI 思考中…" : "AI 推荐"}
-        </button>
+      {/* 兴趣 → AI 推荐课程：仅通识课开放（已接通识课程手册 RAG，能现算真实通识课名）。
+          其它 bucket（公必/专必/专选/任选）不显示这块。 */}
+      {selected.bucket === "通识必修" && (
+        <div className="mt-4 border-t border-slate-200 pt-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            兴趣 → AI 推荐通识课
+          </p>
+          <textarea
+            value={interest}
+            onChange={(e) => setInterest(e.target.value)}
+            disabled={streaming}
+            placeholder="想做什么方向？例如「画画 / 摄影 / 心理学」—— AI 会从学校通识课程库里挑相关的课"
+            className="mt-2 h-20 w-full resize-none rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs leading-5 text-slate-700 placeholder:text-slate-400 focus:border-sapphire/50 focus:outline-none focus:ring-1 focus:ring-sapphire/30 disabled:cursor-not-allowed disabled:bg-slate-50"
+          />
+          <button
+            type="button"
+            onClick={() => void handleRecommend()}
+            disabled={streaming || interest.trim().length === 0}
+            className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-full bg-slate-950 px-3 text-[11px] font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            {streaming ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Sparkles className="h-3 w-3" />
+            )}
+            {streaming ? "AI 思考中…" : "AI 推荐"}
+          </button>
 
-        {result && (
-          <div className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-700 ring-1 ring-inset ring-slate-200">
-            {result}
-          </div>
-        )}
-        {aiError && <p className="mt-2 text-[11px] leading-5 text-flame">AI 推荐失败：{aiError}</p>}
-      </div>
+          {result && (
+            <div className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-700 ring-1 ring-inset ring-slate-200">
+              {result}
+            </div>
+          )}
+          {aiError && (
+            <p className="mt-2 text-[11px] leading-5 text-flame">AI 推荐失败：{aiError}</p>
+          )}
+        </div>
+      )}
 
       {candidates.length > 0 && (
         <div className="mt-4 border-t border-slate-200 pt-4">

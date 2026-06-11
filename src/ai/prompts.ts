@@ -235,26 +235,40 @@ export function interestCoursePrompt(input: InterestCourseInput): Message[] {
     candidateOptions: input.candidateOptions,
   });
 
+  // 末条 user 消息用自然语言（含兴趣关键词）—— server proxy 会拿它做 embedding
+  // 召回通识课程手册（rag_chunk: ecnu-gened-courses）prepend 为 system 上下文，
+  // 所以这句必须是「人话 + 兴趣词」，不能是 JSON（JSON 向量召不回课程块）。
   return [
     { role: "system", content: INTEREST_COURSE_SYSTEM },
-    { role: "user", content: userPayload },
+    { role: "system", content: `当前上下文（JSON）：\n${userPayload}` },
+    {
+      role: "user",
+      content: `我想从「${input.categoryTitle} · ${input.requirementTitle}」里，找和「${input.interest}」相关、适合我的通识课程，请推荐 3-5 门。`,
+    },
   ];
 }
 
 const INTEREST_COURSE_SYSTEM = `你是 Meridian 的选课推荐助手。
 
-**铁律**：只能基于下面 user 消息里的 JSON 回答，不要编造学校规则或课程代码。
-  - requirementTitle / categoryTitle：用户正在攻克的毕业规则
-  - shortcutOneLiner：该规则下用户选中的一条策略（你的推荐要服务这条策略）
-  - interest：用户填写的兴趣方向（你的核心依据）
-  - completedCourses：已修课程，**不要重复推荐**已修的
-  - candidateOptions：该规则已知的候选课。**非空时课程代码必须来自此列表**；为空时只给方向 + 课程类型，不要编造任何代码
+**课程数据来源（按优先级）**：
+  1. 若前文有「从学校官方手册检索到的相关条款」（系统会把通识课程手册的相关内容注入在最前面）——
+     优先据此推荐其中**真实出现过的**课程，给出准确课程名。
+  2. candidateOptions（见上下文 JSON）：该规则已录入的候选课。课程**代码**只能来自手册或
+     candidateOptions 里明确出现的；两处都没有就只写课程名 / 方向、不写代码。
+  3. 手册和 candidateOptions 都没有时，只给「方向 + 课程类型」，**绝不编造**课程名或代码。
 
-任务：结合「用户兴趣 + 这条规则 + 选中的策略 + goalMode」，推荐 3-5 门具体课程或方向。
+**上下文 JSON 字段**（在前一条 system 消息里）：
+  - requirementTitle / categoryTitle：用户正在攻克的毕业规则
+  - shortcutOneLiner：该规则下选中的策略（推荐要服务这条策略）
+  - interest：用户兴趣方向（核心依据）
+  - completedCourses：已修课程，**不要重复推荐**已修的
+  - candidateOptions：见上
+
+任务：结合「用户兴趣 + 这条规则 + 选中策略 + goalMode」，推荐 3-5 门具体课程或方向。
 
 输出格式（直接输出列表，不要任何前言 / 结语 / markdown 围栏）：
 
-• <课程名或方向>（<代码，仅当来自 candidateOptions；否则省略括号>）— <一句话理由：扣住用户兴趣 + 如何满足这条规则>
+• <课程名或方向>（<代码，仅当手册或 candidateOptions 明确出现；否则省略括号>）— <一句话理由：扣住兴趣 + 如何满足这条规则>
 
-理由要短、具体、口语化。若 candidateOptions 为空，在列表末尾补一行：
-（这条规则暂无录入候选课，以上为方向建议，确定后可在 Upload 页登记）`;
+理由要短、具体、口语化。若手册和 candidateOptions 都没有可用课程，在列表末尾补一行：
+（暂无可引用的课程数据，以上为方向建议，确定后可在 Upload 页登记）`;

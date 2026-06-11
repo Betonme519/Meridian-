@@ -157,6 +157,33 @@ export const SEED_RULES: Rule[] = [
     created_at: SEED_TS,
     updated_at: SEED_TS,
   },
+  // 示例规则 —— 仅用于撑起下方「冲突规则」的模板示例卡片，可随时删除
+  {
+    id: seedRuleId(13),
+    user_id: SEED_USER_ID,
+    branch: "替代规则",
+    title: "示例规则 A（如官方培养方案口径）",
+    body: "演示用占位规则，展示冲突卡片长什么样。",
+    trust: "high",
+    source: "示例来源 · 官方",
+    source_page: null,
+    rag_source_id: null,
+    created_at: SEED_TS,
+    updated_at: SEED_TS,
+  },
+  {
+    id: seedRuleId(14),
+    user_id: SEED_USER_ID,
+    branch: "替代规则",
+    title: "示例规则 B（如学长经验 / 其他专业）",
+    body: "演示用占位规则，与 A 说法不同，用来演示冲突。",
+    trust: "low",
+    source: "示例来源 · 社区",
+    source_page: null,
+    rag_source_id: null,
+    created_at: SEED_TS,
+    updated_at: SEED_TS,
+  },
   // 学生口碑
   {
     id: seedRuleId(11),
@@ -193,24 +220,13 @@ export const SEED_RULES: Rule[] = [
  */
 export const SEED_CONFLICTS: RuleConflict[] = [
   {
-    id: "seed-conflict-1",
+    id: "seed-conflict-template",
     user_id: SEED_USER_ID,
-    rule_a_id: seedRuleId(1), // 必修课全部计入 GPA
-    rule_b_id: seedRuleId(2), // 体育课不计入 GPA
-    title: "体育课是否计入 GPA",
-    judgement: "AI 倾向教务处口径（实际入库不计），但建议导师/教务确认。",
-    confidence: "med",
-    resolved_by: "b",
-    created_at: SEED_TS,
-    updated_at: SEED_TS,
-  },
-  {
-    id: "seed-conflict-2",
-    user_id: SEED_USER_ID,
-    rule_a_id: seedRuleId(5), // 专业必修 60 学分（占位 A 方）
-    rule_b_id: seedRuleId(8), // 数模国赛可抵 2 分二课
-    title: "比赛能否抵学分",
-    judgement: "需教务个案审批。其他同学历史成功案例不保证当届有效。",
+    rule_a_id: seedRuleId(13), // 示例规则 A（官方口径）
+    rule_b_id: seedRuleId(14), // 示例规则 B（社区 / 其他专业）
+    title: "示例 · 冲突会这样显示",
+    judgement:
+      "这是一个模板示例。当两条规则对同一问题说法不一致（来源不同 / 专业不同 / 文件版本不同）时，系统会并列两方并给出倾向判断。点右上角「新建冲突」，挑两条自己存疑的规则配成一对，就能生成你自己的冲突卡片。",
     confidence: "low",
     resolved_by: "unresolved",
     created_at: SEED_TS,

@@ -127,8 +127,10 @@ export function classifyCategory(code: string, title: string): CategoryClassific
 /**
  * requirement 是否对用户可见。
  *  - 上课（course / 缺省）：仅 course-kind 4 档（count/credits/one_of/all_of），规则类隐藏。
- *  - 第二课堂 / 论文：放行全部 kind —— 这两支的内容几乎都是规则类（学分认定 / 抽检 /
- *    评分方案 / 计划专项等），是用户真正想看的「关键事项」，故不再过滤。
+ *  - 第二课堂 / 论文：放行全部 kind —— 内容几乎都是规则类。但**已策划过 CATEGORY_HIGHLIGHTS
+ *    金句的分类**（创新创业 / 论文 / 抽检 / CTP 等）在 Planner 画布会用金句取代原始
+ *    requirement 灰条（见 Planner buildGraph：highlights 存在则跳过 req 节点）。
+ *    这里仍放行，让 AI 后台 / Upload 勾选清单拿到全集；画布的去噪在渲染层做。
  */
 export function isUserVisibleRequirement(
   req: TrackRequirement,
