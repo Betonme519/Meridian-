@@ -1,5 +1,7 @@
 # Meridian
 
+**[在线体验 Meridian → meridianedu.xyz](https://meridianedu.xyz/)**
+
 **Academic Decision Engine · 让学业规划有依据，让每次选择看得见。**
 
 Meridian 是一个面向高校学生的学业规划与决策辅助工具。它将分散的培养要求、学校规则与个人进度组织成可探索的路径画布，结合选择模拟和 AI 解释，帮助用户理解：还有哪些要求需要完成、不同选择会带来什么变化，以及建议依据来自哪里。
@@ -66,6 +68,8 @@ Meridian 把这件事组织为一个连续的工作流：**整理背景 → 查�
 | 部署 | Cloudflare Workers |
 
 ## 本地开始
+
+直接使用请访问 [Meridian 在线版](https://meridianedu.xyz/)，无需在本地安装。以下步骤面向开发者及希望自行部署的用户。
 
 ```bash
 git clone https://github.com/Betonme519/Meridian-.git
